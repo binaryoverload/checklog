@@ -8,6 +8,10 @@ function required(name: string): string {
 
 export const env = {
   port: Number(process.env.PORT ?? 3001),
+  publicUrl: required("PUBLIC_URL"),
   databaseUrl: required("DATABASE_URL"),
   migrateOnStart: process.env.MIGRATE_ON_START === "true",
+  betterAuth: {
+    secret: required("BETTER_AUTH_SECRET"),
+  },
 }

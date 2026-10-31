@@ -95,7 +95,7 @@ Every primary key is a TypeID: a lowercase prefix naming the type, an underscore
 - **Better Auth:** its `advanced.database.generateId` option takes a function that is told which model the ID is for, so Better Auth's own tables get prefixed TypeIDs too (`user_…`, `org_…`, `team_…`). Every ID in the system looks the same.
 - **Storage:** `text` columns. A native `uuid` column would be half the size, but then every ID would need converting at the API boundary, and Better Auth's endpoints would return the raw form. At Checklog's scale the extra index size doesn't matter.
 - **Generation:** in the app with `typeid-js`, not in Postgres. A `CHECK` constraint on each table can enforce the prefix.
-- **Prefixes:** short and fixed once chosen, because they are part of every stored ID. Proposed: `user`, `org`, `mem`, `inv`, `team`, `tmpl`, `tver`, `tstep`, `tfield`, `tacc`, `sched`, `run`, `rstep`, `fval`, `note`, `apreq`, `apdec`, `achain`, `aevt`, `notif`.
+- **Prefixes:** short and fixed once chosen, because they are part of every stored ID. The list lives in `src/apps/api/src/util/typeid.ts`: `user`, `sess`, `acct`, `verif`, `org`, `mem`, `inv`, `team`, `tmem`, `tmpl`, `tver`, `tstep`, `tfield`, `tacc`, `sched`, `run`, `rstep`, `fval`, `note`, `apreq`, `apdec`, `achain`, `aevt`, `notif`.
 
 ## Relationships
 
