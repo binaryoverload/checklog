@@ -191,6 +191,9 @@ catalogs:
     better-auth:
       specifier: ^1.7.14
       version: 1.7.14
+    dotenv:
+      specifier: ^18.0.9
+      version: 18.0.9
     drizzle-kit:
       specifier: ^0.31.11
       version: 0.31.11
@@ -290,6 +293,9 @@ importers:
       '@types/pg':
         specifier: 'catalog:'
         version: 8.23.1
+      dotenv:
+        specifier: 'catalog:'
+        version: 18.0.9
       drizzle-kit:
         specifier: 'catalog:'
         version: 0.31.11
@@ -3496,6 +3502,11 @@ packages:
   dotenv@17.4.2:
     resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
     engines: {node: '>=12'}
+
+  dotenv@18.0.9:
+    resolution: {integrity: sha512-3fVOW4cB02R066PUSwn8O4TJyz9NckQl7F81blIbaq9jKBm2tSmOKky7ZHIXzGvkVPXCSn6jkpziBPZdGFs8Tw==}
+    engines: {node: '>=12'}
+    hasBin: true
 
   drizzle-kit@0.31.11:
     resolution: {integrity: sha512-YCYqxTLIB2OCqf6w9/Vef13baBVbwQIPcbT4Y56AfO6B9ajZhDhD8Jkveg/hJvT/iuMloKD/IYYkyMMNhr7Kqg==}
@@ -9515,6 +9526,8 @@ snapshots:
       type-fest: 5.10.0
 
   dotenv@17.4.2: {}
+
+  dotenv@18.0.9: {}
 
   drizzle-kit@0.31.11:
     dependencies:

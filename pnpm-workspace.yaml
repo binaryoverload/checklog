@@ -21,6 +21,7 @@ catalog:
   '@types/node': ^24.0.0
   '@types/pg': ^8.15.0
   better-auth: ^1.7.14
+  dotenv: ^18.0.9
   drizzle-kit: ^0.31.11
   drizzle-orm: ^0.45.4
   eslint: ^10.14.0

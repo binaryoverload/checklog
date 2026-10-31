@@ -8,7 +8,8 @@ You need Node 24+, pnpm (via `corepack enable`) and Postgres.
 
 ```bash
 pnpm install
-cp .env.example .env
+cp src/apps/api/.env.example src/apps/api/.env
+cp src/apps/web/.env.example src/apps/web/.env
 pnpm dev:api
 pnpm dev:web
 ```

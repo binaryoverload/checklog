@@ -37,6 +37,6 @@ The same principle applies to AI features in the product: product AI may suggest
 - **Scripts must be cross-platform.** Development happens on Windows and Unix. `pnpm-workspace.yaml` enables `shellEmulator`; anything longer than a one-liner is a small Node script.
 - **Linting:** one ESLint config with Stylistic (`eslint.shared.js`); no Prettier. Run `pnpm lint` and `pnpm typecheck` before handing work back.
 - **Frontend:** Nuxt renders the UI only. No Nuxt server routes; all data goes through the Express API via TanStack Query (not `useFetch`).
-- **Configuration:** environment variables only. See `.env.example`.
+- **Configuration:** environment variables only. Each app has its own `.env.example`; in development the API loads its `.env` with the `dotenv` package and Nuxt loads its own. Production never reads `.env` files.
 - **Commits:** single-line [Conventional Commits](https://www.conventionalcommits.org/), for example `feat(api): add run scheduling` or `chore: update renovate config`. Subject line only: no body and no trailers. Use a `!` after the type for breaking changes (`feat(api)!: ...`).
 - **Decisions:** see [`docs/decisions.md`](docs/decisions.md) and [`docs/implementation-notes.md`](docs/implementation-notes.md) before proposing changes to the stack.

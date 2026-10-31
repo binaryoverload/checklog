@@ -5,8 +5,8 @@
   "type": "module",
   "license": "SEE LICENSE IN ../../../LICENSE",
   "scripts": {
-    "dev": "tsx watch --env-file-if-exists=../../../.env src/index.ts",
-    "dev:worker": "tsx watch --env-file-if-exists=../../../.env src/worker.ts",
+    "dev": "tsx watch --import dotenv/config src/index.ts",
+    "dev:worker": "tsx watch --import dotenv/config src/worker.ts",
     "build": "tsdown",
     "start": "node dist/index.mjs",
     "start:worker": "node dist/worker.mjs",
@@ -26,6 +26,7 @@
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
+    "dotenv": "catalog:",
     "drizzle-kit": "catalog:",
     "tsdown": "catalog:",
     "tsx": "catalog:",

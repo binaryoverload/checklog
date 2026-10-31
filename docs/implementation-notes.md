@@ -43,6 +43,10 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 - Two images, `api` and `web`, multi-stage, running as a non-root user; pg-boss workers run from the api image as their own deployment, scaled separately from the API
 - Liveness and readiness endpoints; graceful shutdown on SIGTERM for requests and jobs
 - All configuration through environment variables
+- Each app keeps its own `.env.example` next to its `package.json`. In development:
+  - The API's `dev` and `dev:worker` scripts preload the `dotenv` package with `tsx watch --import dotenv/config`, and `drizzle.config.ts` imports `dotenv/config`. Both read `src/apps/api/.env`; a missing file is not an error.
+  - Nuxt loads `src/apps/web/.env` itself in `nuxt dev`, so the web app needs no extra setup.
+  - Production scripts (`start`, `start:worker`, the Nuxt server) never load a file: Kubernetes supplies the variables. Application code never imports `dotenv`.
 - Production migrations run as a Job or init container using a migrate command in the API image
 - Dev and staging can set `MIGRATE_ON_START=true` (default off) to run the same migration function at startup, wrapped in a Postgres advisory lock so multiple replicas do not race
 - When proof upload arrives in v1, files go to S3-compatible storage, never pod disk
