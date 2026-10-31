@@ -1,6 +1,6 @@
-import { createApp } from './app.ts'
-import { pool } from './db/index.ts'
-import { env } from './env.ts'
+import { createApp } from "./app.ts"
+import { pool } from "./db/index.ts"
+import { env } from "./env.ts"
 
 // TODO: when env.migrateOnStart is set, run the migration function under a Postgres advisory lock before listening
 
@@ -20,5 +20,5 @@ function shutdown(signal: string) {
   setTimeout(() => process.exit(1), 10_000).unref()
 }
 
-process.on('SIGTERM', () => shutdown('SIGTERM'))
-process.on('SIGINT', () => shutdown('SIGINT'))
+process.on("SIGTERM", () => shutdown("SIGTERM"))
+process.on("SIGINT", () => shutdown("SIGINT"))

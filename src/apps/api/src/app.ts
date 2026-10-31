@@ -1,23 +1,22 @@
-import express from 'express'
-import { pool } from './db/index.ts'
+import express from "express"
+import { pool } from "./db/index.ts"
 
 export function createApp() {
   const app = express()
 
-  app.disable('x-powered-by')
+  app.disable("x-powered-by")
 
   // Kubernetes probes hit the pod directly, outside the /api prefix
-  app.get('/healthz', (_req, res) => {
-    res.json({ status: 'ok' })
+  app.get("/healthz", (_req, res) => {
+    res.json({ status: "ok" })
   })
 
-  app.get('/readyz', async (_req, res) => {
+  app.get("/readyz", async (_req, res) => {
     try {
-      await pool.query('select 1')
-      res.json({ status: 'ready' })
-    }
-    catch {
-      res.status(503).json({ status: 'unavailable' })
+      await pool.query("select 1")
+      res.json({ status: "ready" })
+    } catch {
+      res.status(503).json({ status: "unavailable" })
     }
   })
 
@@ -26,7 +25,7 @@ export function createApp() {
   app.use(express.json())
 
   const api = express.Router()
-  app.use('/api', api)
+  app.use("/api", api)
 
   return app
 }

@@ -1,15 +1,15 @@
-import { PgBoss } from 'pg-boss'
-import { env } from './env.ts'
+import { PgBoss } from "pg-boss"
+import { env } from "./env.ts"
 
 // pg-boss workers run from the API image as their own Kubernetes deployment
 const boss = new PgBoss(env.databaseUrl)
 
-boss.on('error', (error) => {
-  console.error('pg-boss error', error)
+boss.on("error", (error) => {
+  console.error("pg-boss error", error)
 })
 
 await boss.start()
-console.log('Worker started')
+console.log("Worker started")
 
 // TODO: register job handlers here
 
@@ -20,5 +20,5 @@ async function shutdown(signal: string) {
   process.exit(0)
 }
 
-process.on('SIGTERM', () => void shutdown('SIGTERM'))
-process.on('SIGINT', () => void shutdown('SIGINT'))
+process.on("SIGTERM", () => void shutdown("SIGTERM"))
+process.on("SIGINT", () => void shutdown("SIGINT"))
