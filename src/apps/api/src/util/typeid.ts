@@ -29,7 +29,6 @@ const tableToPrefix = {
   stepNotes: "note",
   approvalRequests: "apreq",
   approvalDecisions: "apdec",
-  auditChains: "achain",
   auditEvents: "aevt",
   notifications: "notif",
 }

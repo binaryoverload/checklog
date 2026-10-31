@@ -18,7 +18,7 @@ Each item is marked with who does it under the [AI use policy](../AGENTS.md): **
   - [ ] `approval_requests`, `approval_decisions`
   - [ ] `notifications`
   - [ ] Generate the migration and apply it to a fresh dev database
-- [ ] Remove the unused `auditChains` prefix from `src/apps/api/src/util/typeid.ts` (person)
+- [x] Remove the unused `auditChains` prefix from `src/apps/api/src/util/typeid.ts` (person)
 
 ## Next: core app
 
