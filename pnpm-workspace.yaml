@@ -1,0 +1,39 @@
+packages:
+  - src/apps/*
+  - src/packages/*
+
+# Run package scripts through pnpm's cross-platform shell so they behave the same on Windows and Unix
+shellEmulator: true
+
+# Dependencies allowed to run install scripts
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+  vue-demi: true
+
+catalog:
+  '@eslint/js': ^10.0.0
+  '@nuxt/eslint': ^1.17.0
+  '@nuxt/ui': ^4.12.0
+  '@stylistic/eslint-plugin': ^5.10.0
+  '@tanstack/vue-query': ^5.105.0
+  '@types/express': ^5.0.6
+  '@types/node': ^24.0.0
+  '@types/pg': ^8.15.0
+  better-auth: ^1.7.14
+  drizzle-kit: ^0.31.11
+  drizzle-orm: ^0.45.4
+  eslint: ^10.14.0
+  express: ^5.3.0
+  globals: ^17.0.0
+  nuxt: ^4.6.3
+  pg: ^8.23.1
+  pg-boss: ^12.38.0
+  tailwindcss: ^4.3.3
+  tsdown: ^0.23.4
+  tsx: ^4.23.15
+  # typescript-eslint supports TypeScript <6.1; hold here until it supports 7.x
+  typescript: ~6.0.3
+  typescript-eslint: ^8.72.1
+  vue-tsc: ^3.3.14
+  zod: ^4.6.7

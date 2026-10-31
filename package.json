@@ -1,0 +1,27 @@
+{
+  "name": "checklog",
+  "private": true,
+  "type": "module",
+  "license": "SEE LICENSE IN LICENSE",
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @checklog/api dev",
+    "dev:worker": "pnpm --filter @checklog/api dev:worker",
+    "dev:web": "pnpm --filter @checklog/web dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "lint:fix": "pnpm -r run lint --fix",
+    "typecheck": "pnpm -r run typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "catalog:",
+    "@stylistic/eslint-plugin": "catalog:",
+    "eslint": "catalog:",
+    "globals": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:"
+  }
+}

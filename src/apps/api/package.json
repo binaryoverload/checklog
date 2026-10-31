@@ -1,0 +1,34 @@
+{
+  "name": "@checklog/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "SEE LICENSE IN ../../../LICENSE",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../../../.env src/index.ts",
+    "dev:worker": "tsx watch --env-file-if-exists=../../../.env src/worker.ts",
+    "build": "tsdown",
+    "start": "node dist/index.mjs",
+    "start:worker": "node dist/worker.mjs",
+    "db:generate": "drizzle-kit generate",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@checklog/shared": "workspace:*",
+    "better-auth": "catalog:",
+    "drizzle-orm": "catalog:",
+    "express": "catalog:",
+    "pg": "catalog:",
+    "pg-boss": "catalog:"
+  },
+  "devDependencies": {
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "drizzle-kit": "catalog:",
+    "tsdown": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "packageRules": [
+    {
+      "description": "Major upgrades wait for approval on the dependency dashboard",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "GitHub Actions majors are raised without approval",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": false
+    },
+    {
+      "groupName": "GitHub Actions",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"]
+    },
+    {
+      "groupName": "Docker minor and patch",
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"]
+    },
+    {
+      "groupName": "Node minor and patch",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"]
+    }
+  ]
+}
