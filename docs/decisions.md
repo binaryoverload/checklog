@@ -19,6 +19,7 @@ Recorded 2026-10-31. Add new decisions to the end of the list with a date; when 
 | UI | Use a mature component framework rather than building our own; Nuxt UI chosen |
 | AI use | Assistive, not replacing. Rules in [AGENTS.md](../AGENTS.md). |
 | Competitor research | Work from what is known; unknown cells stay unknown |
+| Data model | See the [database structure plan](plans/db-structure.md): TypeIDs for every key; Better Auth teams shown as Groups; permissions from member roles plus per-template access, with group roles later; skippable steps need a reason; app-level tenant isolation for the MVP |
 | Commits | Single-line Conventional Commits for everyone, people and agents: `type(scope): summary`, no body or trailers |
 | Dependency updates | Renovate, with a dependency dashboard. Major upgrades need approval on the dashboard, except GitHub Actions, whose majors are raised directly. GitHub Actions are pinned to digests. Minor and patch updates are grouped: one group each for Docker, GitHub Actions and Node packages. |
 

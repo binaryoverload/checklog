@@ -12,6 +12,7 @@ A self-hostable tool for process logging and compliance: repeatable and ad hoc c
 | `src/apps/web`        | Nuxt frontend with Nuxt UI and TanStack Query                     |
 | `src/packages/shared` | Shared TypeScript types and validation schemas, shipped as source |
 | `docs`                | Decisions, implementation notes and MVP scope                     |
+| `docs/plans`          | [Plans](docs/plans/README.md) for upcoming work                   |
 
 ## Development
 
