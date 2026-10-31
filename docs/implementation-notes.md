@@ -40,6 +40,9 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 
 ## Kubernetes and Docker
 
+- Dockerfiles live in `docker/` (`api.Dockerfile`, `web.Dockerfile`) and build from the repo root. Both use `node:24-trixie-slim`, install with the pinned pnpm through Corepack, and copy only build output into the runtime stage, owned by root and run as the `node` user. The API image is built with `pnpm deploy --prod` and also carries `drizzle/` for the migrate Job.
+- `docker-compose.yaml` runs Postgres for local development only (`pnpm db:up`); it is not the production deployment.
+- CI (`.github/workflows/ci.yml`) runs lint, typecheck and build, and builds both images without publishing them.
 - Two images, `api` and `web`, multi-stage, running as a non-root user; pg-boss workers run from the api image as their own deployment, scaled separately from the API
 - Liveness and readiness endpoints; graceful shutdown on SIGTERM for requests and jobs
 - All configuration through environment variables

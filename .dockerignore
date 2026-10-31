@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/.output
+**/.nuxt
+**/.nitro
+**/.cache
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.github
+docs
+*.md
+!src/**/*.md

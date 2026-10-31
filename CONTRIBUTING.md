@@ -4,17 +4,20 @@ Thanks for helping. Checklog is licensed under the [GNU AGPLv3 with the Commons 
 
 ## Getting started
 
-You need Node 24+, pnpm (via `corepack enable`) and Postgres.
+You need Node 24+, pnpm (via `corepack enable`) and Docker, which runs Postgres for development (`docker-compose.yaml`). If port 5432 is already taken, set `POSTGRES_PORT` before `pnpm db:up` and use the same port in `DATABASE_URL`. `pnpm db:down` stops it; data is kept in a Docker volume.
 
 ```bash
 pnpm install
 cp src/apps/api/.env.example src/apps/api/.env
 cp src/apps/web/.env.example src/apps/web/.env
+pnpm db:up
 pnpm dev:api
 pnpm dev:web
 ```
 
 ## Before opening a PR
+
+CI runs the same checks on every pull request and push to `main`, and also builds both Docker images.
 
 ```bash
 pnpm lint

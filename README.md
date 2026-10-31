@@ -20,6 +20,7 @@ A self-hostable tool for process logging and compliance: repeatable and ad hoc c
 pnpm install
 cp src/apps/api/.env.example src/apps/api/.env
 cp src/apps/web/.env.example src/apps/web/.env
+pnpm db:up       # Postgres in Docker on port 5432
 pnpm dev:api     # http://localhost:3001
 pnpm dev:web     # http://localhost:3000
 ```

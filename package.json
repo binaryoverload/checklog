@@ -15,7 +15,9 @@
     "lint": "pnpm -r run lint",
     "lint:fix": "pnpm -r run lint --fix",
     "lint:inspect": "eslint --inspect-config .",
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm -r run typecheck",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:down": "docker compose down"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",

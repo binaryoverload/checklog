@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: checklog
+      POSTGRES_PASSWORD: checklog
+      POSTGRES_DB: checklog
+    ports:
+      # Set POSTGRES_PORT if 5432 is already taken, and match it in DATABASE_URL
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U checklog -d checklog"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
