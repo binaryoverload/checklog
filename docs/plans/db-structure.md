@@ -9,7 +9,7 @@ It covers the [MVP scope](../mvp-scope.md) and leaves room for v1 (proof upload,
 - **Every tenant table carries `organization_id`.** Queries always filter on it, and foreign keys between tenant tables include it, so a row can't point at another tenant's data.
 - **Organizations are soft-deleted.** Deleting one hides it at once and keeps everything for a grace period, during which it can be restored; a nightly job then hard-deletes it, audit log included. See the [audit log plan](audit-log.md#deleted-organizations).
 - **Templates are versioned and published versions are immutable.** A run points at the exact version it started from, which gives the "run snapshot" requirement without copying data.
-- **The audit log is append-only and hash-chained.** The app's database role gets no `UPDATE` or `DELETE` on it.
+- **The audit log is append-only.** The app's database role gets no `UPDATE` or `DELETE` on it, and a trigger refuses edits and deletes from anyone else. There are no hash chains (decided); tamper evidence is a future feature.
 - **Store facts, derive state where cheap.** For example, a step's `due_at` is stored because the overdue job queries it, but "is the run overdue" is computed.
 - **Conventions:** snake_case names, `timestamptz` everywhere, `created_at` on every table, archive instead of delete for anything a run references.
 - **IDs are [TypeIDs](https://github.com/jetify-com/typeid):** a type prefix plus a UUIDv7, such as `run_01jbx…`. Stored as `text`. See [IDs](#ids).
@@ -101,10 +101,9 @@ pg-boss does the firing: a recurring job finds schedules with `next_run_at <= no
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
-| `audit_chains` | `scope` (organization, run, user, app), `organization_id`, `run_id`, `user_id`, `head_seq`, `head_hash` | One chain per run, one per organization for administrative changes, one per user for sign-ins, and one for the whole deployment (the app chain). Foreign keys to organizations, runs and users use `RESTRICT`, so audit history is only ever removed on purpose: when a soft-deleted organization is purged after its grace period. Details in the [audit log plan](audit-log.md). |
-| `audit_events` | `chain_id`, `seq`, `prev_hash`, `hash`, `actor_type` (user, system, guest), `actor_id`, `action`, `entity_type`, `entity_id`, `payload` (jsonb), `context` (jsonb, not hashed), `occurred_at` | Unique on (`chain_id`, `seq`) so a chain can't fork |
+| `audit_events` | `scope` (organization, user, platform), `organization_id`, `run_id`, `user_id`, `occurred_at`, `actor_type` (user, system, guest), `actor_id`, `action`, `entity_type`, `entity_id`, `payload` (jsonb), `context` (jsonb) | One table for every event. Organization events (including runs) belong to an organization, user events (sign-ins) to a user, and platform events to the deployment. Foreign keys to organizations, runs and users use `RESTRICT`, so audit history is only ever removed on purpose: when a soft-deleted organization is purged after its grace period. Details in the [audit log plan](audit-log.md). |
 
-Writing an event: lock the chain row (`SELECT … FOR UPDATE`), compute `hash = sha256(prev_hash + canonical JSON of the event)`, insert the event, update the chain head, all in the same transaction as the change being recorded. Verification replays a chain and recomputes each hash.
+Writing an event inserts one row in the same transaction as the change being recorded, so the change and its event either both commit or neither does.
 
 ### 7. Notifications
 
@@ -120,7 +119,7 @@ Every primary key is a TypeID: a lowercase prefix naming the type, an underscore
 - **Better Auth:** its `advanced.database.generateId` option takes a function that is told which model the ID is for, so Better Auth's own tables get prefixed TypeIDs too (`user_…`, `org_…`, `team_…`). Every ID in the system looks the same.
 - **Storage:** `text` columns. A native `uuid` column would be half the size, but then every ID would need converting at the API boundary, and Better Auth's endpoints would return the raw form. At Checklog's scale the extra index size doesn't matter.
 - **Generation:** in the app with `typeid-js`, not in Postgres. A `CHECK` constraint on each table can enforce the prefix.
-- **Prefixes:** short and fixed once chosen, because they are part of every stored ID. The list lives in `src/apps/api/src/util/typeid.ts`: `user`, `sess`, `acct`, `verif`, `org`, `mem`, `inv`, `team`, `tmem`, `tmpl`, `tver`, `tstep`, `tfield`, `tacc`, `sched`, `run`, `rstep`, `fval`, `note`, `apreq`, `apdec`, `achain`, `aevt`, `notif`.
+- **Prefixes:** short and fixed once chosen, because they are part of every stored ID. The list lives in `src/apps/api/src/util/typeid.ts`: `user`, `sess`, `acct`, `verif`, `org`, `mem`, `inv`, `team`, `tmem`, `tmpl`, `tver`, `tstep`, `tfield`, `tacc`, `sched`, `run`, `rstep`, `fval`, `note`, `apreq`, `apdec`, `aevt`, `notif`.
 
 ## Relationships
 
@@ -141,9 +140,9 @@ erDiagram
   run_steps ||--o{ step_notes : has
   runs ||--o{ approval_requests : needs
   approval_requests ||--o{ approval_decisions : gets
-  organizations ||--o{ audit_chains : has
-  runs |o--o| audit_chains : "chain for"
-  audit_chains ||--o{ audit_events : contains
+  organizations ||--o{ audit_events : logs
+  runs ||--o{ audit_events : logs
+  users ||--o{ audit_events : logs
 ```
 
 ## Leaving room for v1
@@ -174,7 +173,7 @@ None at the moment. Add new ones here as the schema is written.
 ## Suggested order of work
 
 1. Configure Better Auth with the organization plugin and generate its tables
-2. Audit chain and events, since every later write records one
+2. The audit log, since every later write records an event
 3. Templates, versions, steps, fields and template access
 4. Runs, run steps, field values and notes
 5. Approvals

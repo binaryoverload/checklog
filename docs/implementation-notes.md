@@ -30,7 +30,7 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 - Serve web and API under one domain behind a reverse proxy (for example `/api` to Express) so session cookies stay first-party and SSR requests work
 - Mount the Better Auth handler before `express.json()`
 - Use Better Auth's organization plugin for tenants, members, roles and invitations
-- Write sign-ins, role changes and invitations to the hash-chained audit log via Better Auth hooks
+- Write sign-ins, role changes and invitations to the audit log via Better Auth hooks
 - SAML is community-maintained in Better Auth; OIDC covers most identity providers
 
 ## Frontend data

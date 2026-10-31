@@ -11,7 +11,7 @@ The MVP is a self-hosted template-to-run loop with approvals and an audit trail.
 - Notes on any step
 - Required fields and halt steps that block completion
 - Approvals: a named approver or role signs off a step or run, with a comment and timestamp in the audit log
-- Append-only, hash-chained audit log per run
+- Append-only audit log covering organizations, runs, sign-ins and platform changes
 - Overdue flags and email notifications
 - Self-hostable from day one: Docker Compose deployment with Postgres; REST API
 
@@ -26,6 +26,8 @@ The MVP is a self-hosted template-to-run loop with approvals and an audit trail.
 - Linked checklists started from a step
 
 ## Later
+
+- Tamper-evident audit log: signed, chained digests of events, so changes made directly in the database can be detected
 
 - Offline-capable PWA with sync
 - Dashboards and completion analytics
