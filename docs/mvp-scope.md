@@ -22,6 +22,7 @@ The MVP is a self-hosted template-to-run loop with approvals and an audit trail.
 - Guest links for external assignees and approvers
 - Evidence pack export (PDF report plus ZIP of files and log)
 - Webhooks and OIDC sign-in
+- More ways to create managed accounts: verified email domains, sign-in through an organization's SSO, and SCIM provisioning
 - Linked checklists started from a step
 
 ## Later
