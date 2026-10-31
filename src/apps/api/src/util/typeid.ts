@@ -1,6 +1,9 @@
 // Prefixes are part of every stored ID, so never change one once rows exist.
+
+import { typeid } from "typeid-js"
+
 // TypeID prefixes may only use lowercase a-z and underscores.
-const tableToPrefix: Record<string, string> = {
+const tableToPrefix = {
   // Better Auth, keyed by the model name it passes to advanced.database.generateId
   user: "user",
   session: "sess",
@@ -14,27 +17,36 @@ const tableToPrefix: Record<string, string> = {
   organizationRole: "orole",
 
   // Checklog tables
-  template: "tmpl",
-  template_version: "tver",
-  template_step: "tstep",
-  template_field: "tfield",
-  template_access: "tacc",
-  schedule: "sched",
-  run: "run",
-  run_step: "rstep",
-  run_field_value: "fval",
-  step_note: "note",
-  approval_request: "apreq",
-  approval_decision: "apdec",
-  audit_chain: "achain",
-  audit_event: "aevt",
-  notification: "notif",
+  templates: "tmpl",
+  templateVersions: "tver",
+  templateSteps: "tstep",
+  templateFields: "tfield",
+  templateAccess: "tacc",
+  schedules: "sched",
+  runs: "run",
+  runSteps: "rstep",
+  runFieldValues: "fval",
+  stepNotes: "note",
+  approvalRequests: "apreq",
+  approvalDecisions: "apdec",
+  auditChains: "achain",
+  auditEvents: "aevt",
+  notifications: "notif",
 }
 
-export function prefixForTable(tableName: string) {
-  const prefix = tableToPrefix[tableName]
+export function typeIdForModel(modelName: string) {
+  const prefix = tableToPrefix[modelName as keyof typeof tableToPrefix]
   if (!prefix) {
-    throw new Error(`No typeid prefix found for table: ${tableName}`)
+    throw new Error(`No typeid prefix found for model: ${modelName}`)
   }
+  return typeid(prefix)
+}
+
+export function prefixForTable(tableName: keyof typeof tableToPrefix) {
+  const prefix = tableToPrefix[tableName]
   return prefix
+}
+
+export function typeIdForTable(tableName: keyof typeof tableToPrefix) {
+  return typeid(prefixForTable(tableName))
 }

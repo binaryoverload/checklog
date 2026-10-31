@@ -5,8 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1793473650710,
-      "tag": "0000_crazy_orphan",
+      "when": 1793476752949,
+      "tag": "0000_better_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793476767495,
+      "tag": "0001_templates",
       "breakpoints": true
     }
   ]
