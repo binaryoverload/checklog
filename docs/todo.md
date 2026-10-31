@@ -12,7 +12,7 @@ Each item is marked with who does it under the [AI use policy](../AGENTS.md): **
   - [x] `disableOrganizationDeletion: true` on the organization plugin
   - [x] Regenerate `auth-schema.ts` (keep the time-zone timestamps and lint formatting) and generate a migration
 - [ ] **Finish the schema** (person), following the [database plan](plans/db-structure.md). `audit_events` waits for the audit work below.
-  - [ ] `template_steps`, `template_fields`, `template_access`
+  - [x] `template_steps`, `template_fields`, `template_access`
   - [ ] `schedules`
   - [ ] `runs`, `run_steps`, `run_field_values`, `step_notes`
   - [ ] `approval_requests`, `approval_decisions`
@@ -65,7 +65,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 
 ### Approvals
 
-- [ ] API: create an approval request when an approval step or a run needs sign-off (person)
+- [ ] API: create an approval request when an approval step is reached (person)
 - [ ] API: approve or reject with a comment; a rejection keeps the step open, an approval resolves it (person)
 - [ ] UI: "awaiting my approval" list and the approve or reject dialog (person)
 
@@ -96,7 +96,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 
 Following the [audit log plan](plans/audit-log.md):
 
-- [ ] `audit_events` table, with its scope check constraint and the append-only trigger (custom SQL in the migration) (person)
+- [ ] `audit_events` table, with the append-only trigger (custom SQL in the migration) (person)
 - [ ] `recordAudit` with per-action payload schemas (person)
 - [ ] Better Auth: turn on adapter transactions and test whether hooks share them, then wire up the audit hooks (person). Tests can be written by an agent.
 - [ ] Record events across everything built so far: organization, run, user and platform events (person)

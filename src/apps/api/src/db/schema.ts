@@ -1,5 +1,5 @@
-import { pgTable, text, integer, timestamp, unique, uniqueIndex, foreignKey, type PgTableExtraConfigValue } from "drizzle-orm/pg-core"
-import { organizations, users } from "./auth-schema.ts"
+import { pgTable, text, integer, boolean, timestamp, unique, uniqueIndex, foreignKey, type PgTableExtraConfigValue, interval, index, jsonb } from "drizzle-orm/pg-core"
+import { members, organizations, teams, users } from "./auth-schema.ts"
 import { sql } from "drizzle-orm"
 import { typeIdForTable } from "../util/typeid.ts"
 
@@ -36,6 +36,7 @@ export const templateVersions = pgTable("template_versions", {
 }, t => [
   // Target for the templates.current_version_id foreign key
   unique().on(t.id, t.templateId),
+  unique().on(t.id, t.organizationId),
   unique().on(t.templateId, t.version),
   uniqueIndex("template_versions_one_draft_idx").on(t.templateId).where(sql`${t.status} = 'draft'`),
   foreignKey({
@@ -45,9 +46,75 @@ export const templateVersions = pgTable("template_versions", {
   }).onDelete("restrict"),
 ])
 
-// export const templateSteps = pgTable("template_steps")
-// export const templateFields = pgTable("template_fields")
-// export const templateAccess = pgTable("template_access")
+export const templateSteps = pgTable("template_steps", {
+  id: text("id").primaryKey().$defaultFn(() => typeIdForTable("templateSteps").toString()),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  templateVersionId: text("template_version_id").notNull(),
+  kind: text("kind", { enum: ["task", "approval"] }).notNull().default("task"),
+  position: integer("position").notNull(),
+  title: text("title").notNull(),
+  instructions: text("instructions"),
+  isHalt: boolean("is_halt").notNull().default(false),
+  skippable: boolean("skippable").notNull().default(false),
+  assigneeType: text("assignee_type", { enum: ["user", "team", "role"] }),
+  assigneeRef: text("assignee_ref"),
+  dueOffset: interval("due_offset"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  unique().on(t.id, t.templateVersionId, t.organizationId),
+  index("template_steps_version_position_idx").on(t.templateVersionId, t.position),
+  foreignKey({
+    name: "template_steps_template_versions_id_fk",
+    columns: [t.templateVersionId, t.organizationId],
+    foreignColumns: [templateVersions.id, templateVersions.organizationId],
+  }).onDelete("cascade"),
+])
+
+export interface TemplateFieldOptions {
+  dropdownChoices?: string[]
+}
+
+export const templateFields = pgTable("template_fields", {
+  id: text("id").primaryKey().$defaultFn(() => typeIdForTable("templateFields").toString()),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  templateVersionId: text("template_version_id").notNull(),
+  templateStepId: text("template_step_id").notNull(),
+  position: integer("position").notNull(),
+  required: boolean("required").notNull().default(true),
+  key: text("key").notNull(),
+  label: text("label").notNull(),
+  type: text("type", { enum: ["text", "date", "dropdown", "checkbox"] }).notNull(),
+  options: jsonb("options").$type<TemplateFieldOptions>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  unique().on(t.templateVersionId, t.key), // Unique across the whole version for comparison
+  index("template_fields_step_position_idx").on(t.templateStepId, t.position),
+  foreignKey({
+    name: "template_fields_template_steps_id_fk",
+    columns: [t.templateStepId, t.templateVersionId, t.organizationId],
+    foreignColumns: [templateSteps.id, templateSteps.templateVersionId, templateSteps.organizationId],
+  }).onDelete("cascade"),
+])
+
+export const templateAccess = pgTable("template_access", {
+  id: text("id").primaryKey().$defaultFn(() => typeIdForTable("templateAccess").toString()),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  templateId: text("template_id").notNull(),
+  memberId: text("member_id").references(() => members.id, { onDelete: "cascade" }),
+  teamId: text("team_id").references(() => teams.id, { onDelete: "cascade" }),
+  level: text("level", { enum: ["view", "run", "edit"] }).notNull().default("view"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  unique().on(t.templateId, t.memberId),
+  unique().on(t.templateId, t.teamId),
+  index("template_access_member_idx").on(t.memberId),
+  index("template_access_team_idx").on(t.teamId),
+  foreignKey({
+    name: "template_access_template_id_fk",
+    columns: [t.templateId, t.organizationId],
+    foreignColumns: [templates.id, templates.organizationId],
+  }).onDelete("cascade"),
+])
 
 // export const schedules = pgTable("schedules")
 

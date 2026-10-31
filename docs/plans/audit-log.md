@@ -55,7 +55,7 @@ Everything goes through one function, for example `recordAudit(tx, event)`, whic
 
 - The caller commits. If anything fails, the whole transaction rolls back, so the change and its event either both exist or neither does.
 - There's no locking: events are independent rows, so concurrent writes don't wait for each other.
-- `recordAudit` validates each event with a Zod schema per action, so every event of a given action carries the payload the [event catalogue](#event-catalogue) requires, and checks the scope rules (for example, `organization` scope must have `organization_id`). A `check()` constraint on the table backs up the scope rules.
+- `recordAudit` validates each event with a Zod schema per action, so every event of a given action carries the payload the [event catalogue](#event-catalogue) requires, and checks the scope rules (for example, `organization` scope must have `organization_id`). These rules live in the API, not the database, in line with the [database plan](db-structure.md#decided).
 - Several events in one transaction (for example starting a run records `run.started` and then one event per step) just call `recordAudit` repeatedly.
 
 ## Keeping it append-only
@@ -226,7 +226,7 @@ Tests (which agents may write, reviewed by a person) should cover:
 
 ## Suggested order of work
 
-1. The `audit_events` table, its scope constraint and trigger, and `recordAudit` with per-action payload schemas
+1. The `audit_events` table and its trigger, and `recordAudit` with per-action payload schemas and scope rules
 2. Better Auth: turn on adapter transactions, test whether hooks share them, then wire up the hooks
 3. Recording organization, user and platform events for organization and account changes
 4. Soft delete: Better Auth `additionalFields` and `disableOrganizationDeletion`, the delete and restore endpoints, and the checks that hide deleted organizations

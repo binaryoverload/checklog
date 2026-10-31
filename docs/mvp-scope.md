@@ -10,7 +10,7 @@ The MVP is a self-hosted template-to-run loop with approvals and an audit trail.
 - Assignees per step (user or role) and due dates relative to run start
 - Notes on any step
 - Required fields and halt steps that block completion
-- Approvals: a named approver or role signs off a step or run, with a comment and timestamp in the audit log
+- Approvals: an approval step's assignee (a person, group or role) signs it off, with a comment and timestamp in the audit log
 - Append-only audit log covering organizations, runs, sign-ins and platform changes
 - Overdue flags and email notifications
 - Self-hostable from day one: Docker Compose deployment with Postgres; REST API

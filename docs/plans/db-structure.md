@@ -6,7 +6,7 @@ It covers the [MVP scope](../mvp-scope.md) and leaves room for v1 (proof upload,
 
 ## Principles
 
-- **Every tenant table carries `organization_id`.** Queries always filter on it, and foreign keys between tenant tables include it, so a row can't point at another tenant's data.
+- **Every tenant table carries `organization_id`.** Queries always filter on it, and foreign keys between tenant tables include it, so a row can't point at another tenant's data. The exception is links to Better Auth's own tables (`members`, `teams`), which are single-column foreign keys: adding the unique constraints a two-column key needs would be lost whenever Better Auth's schema is regenerated, so the API checks that they belong to the same organization.
 - **Organizations are soft-deleted.** Deleting one hides it at once and keeps everything for a grace period, during which it can be restored; a nightly job then hard-deletes it, audit log included. See the [audit log plan](audit-log.md#deleted-organizations).
 - **Templates are versioned and published versions are immutable.** A run points at the exact version it started from, which gives the "run snapshot" requirement without copying data.
 - **The audit log is append-only.** The app's database role gets no `UPDATE` or `DELETE` on it, and a trigger refuses edits and deletes from anyone else. There are no hash chains (decided); tamper evidence is a future feature.
@@ -61,9 +61,9 @@ What happens to accounts when an organization is deleted is in the [audit log pl
 | --- | --- | --- |
 | `templates` | `organization_id`, `name`, `description`, `status` (active, archived), `current_version_id` | The stable identity people see and schedule |
 | `template_versions` | `template_id`, `version` (1, 2, 3…), `status` (draft, published, archived), `published_at`, `published_by` | At most one draft per template. Published versions never change. Archiving a version stops new runs from it; runs already using it carry on (decided). |
-| `template_steps` | `template_version_id`, `position`, `title`, `instructions` (Markdown), `kind` (task, approval), `is_halt`, `skippable`, `assignee_type`, `assignee_ref`, `due_offset` (interval from run start) | `is_halt` blocks later steps until this one is done. `skippable` must be false for halt and approval steps (a `CHECK` constraint). |
+| `template_steps` | `template_version_id`, `position`, `title`, `instructions` (Markdown), `kind` (task, approval), `is_halt`, `skippable`, `assignee_type` (user, team, role), `assignee_ref`, `due_offset` (interval from run start) | `is_halt` blocks later steps until this one is done. `skippable` must be false for halt and approval steps (checked in the API). For an approval step, the assignee is the approver (decided). A `role` assignee is an organization role (owner, admin, member): anyone with that role can act on the step. |
 | `template_fields` | `template_step_id`, `position`, `key`, `label`, `type` (text, date, dropdown, checkbox), `required`, `options` (jsonb, dropdown choices) | `key` is stable across versions so values can be compared between runs |
-| `template_access` | `organization_id`, `template_id`, `principal_type` (user, team), `principal_id`, `level` (view, run, edit) | Who can see, run or edit a template. Unique on (`template_id`, `principal_type`, `principal_id`). |
+| `template_access` | `organization_id`, `template_id`, `member_id` or `team_id`, `level` (view, run, edit) | Who can see, run or edit a template. Exactly one of `member_id` and `team_id` is set (checked in the API). Grants point at the membership rather than the user, so removing someone from the organization or deleting a group removes their grants (`ON DELETE CASCADE`). Unique on (`template_id`, `member_id`) and (`template_id`, `team_id`). |
 
 Editing a template means editing its draft version; publishing copies nothing, it just freezes the draft and points `current_version_id` at it.
 
@@ -82,7 +82,7 @@ pg-boss does the firing: a recurring job finds schedules with `next_run_at <= no
 | Table | Key columns | Notes |
 | --- | --- | --- |
 | `runs` | `organization_id`, `template_version_id`, `schedule_id` (null if ad hoc), `name`, `status` (in progress, completed, cancelled), `started_by`, `started_at`, `completed_at` | |
-| `run_steps` | `run_id`, `template_step_id`, `status` (pending, done, skipped), `assignee_user_id` or `assignee_team_id`, `due_at`, `completed_by`, `completed_at`, `skip_reason` | One row per template step, created when the run starts. Assignee is resolved at start but can be reassigned. For a skipped step, `completed_by` and `completed_at` record who skipped it and when, and `skip_reason` is required (a `CHECK` constraint). |
+| `run_steps` | `run_id`, `template_step_id`, `status` (pending, done, skipped), `assignee_user_id`, `assignee_team_id` or `assignee_role`, `due_at`, `completed_by`, `completed_at`, `skip_reason` | One row per template step, created when the run starts. The assignee is copied from the template step at start and can be reassigned. For a skipped step, `completed_by` and `completed_at` record who skipped it and when, and `skip_reason` is required (checked in the API). |
 | `run_field_values` | `run_step_id`, `template_field_id`, `value` (jsonb), `updated_by`, `updated_at` | Current value only. Every change is an audit event, and the audit log is the history (decided). |
 | `step_notes` | `run_step_id`, `author_id`, `body`, `created_at` | Append-only. Corrections are new notes. |
 
@@ -94,7 +94,7 @@ pg-boss does the firing: a recurring job finds schedules with `next_run_at <= no
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
-| `approval_requests` | `run_id`, `run_step_id` (null means the whole run), `approver_type` (user, team, role), `approver_ref`, `status` (pending, approved, rejected) | Created when a step or run needs sign-off |
+| `approval_requests` | `run_id`, `run_step_id`, `approver_type` (user, team, role), `approver_ref`, `status` (pending, approved, rejected) | Created when an approval step needs sign-off. Approvals are always on a step; to sign off a whole run, a template puts an approval step last. For an approval step, the approver is the run step's current assignee, copied when the request is created, so reassigning the step before then changes who approves. |
 | `approval_decisions` | `approval_request_id`, `decided_by`, `decision`, `comment`, `decided_at` | Separate from the request so a rejection followed by a later approval keeps both |
 
 ### 6. Audit log
@@ -118,7 +118,7 @@ Every primary key is a TypeID: a lowercase prefix naming the type, an underscore
 - **Why:** an ID says what it is in logs, URLs and support requests, and passing a run ID where a template ID is expected is caught by the types. The UUIDv7 inside keeps IDs time-ordered, so they sort and index well even as text.
 - **Better Auth:** its `advanced.database.generateId` option takes a function that is told which model the ID is for, so Better Auth's own tables get prefixed TypeIDs too (`user_…`, `org_…`, `team_…`). Every ID in the system looks the same.
 - **Storage:** `text` columns. A native `uuid` column would be half the size, but then every ID would need converting at the API boundary, and Better Auth's endpoints would return the raw form. At Checklog's scale the extra index size doesn't matter.
-- **Generation:** in the app with `typeid-js`, not in Postgres. A `CHECK` constraint on each table can enforce the prefix.
+- **Generation:** in the app with `typeid-js`, not in Postgres. Each table's `$defaultFn` sets the right prefix; the database doesn't check it, in line with keeping value rules in the API.
 - **Prefixes:** short and fixed once chosen, because they are part of every stored ID. The list lives in `src/apps/api/src/util/typeid.ts`: `user`, `sess`, `acct`, `verif`, `org`, `mem`, `inv`, `team`, `tmem`, `tmpl`, `tver`, `tstep`, `tfield`, `tacc`, `sched`, `run`, `rstep`, `fval`, `note`, `apreq`, `apdec`, `aevt`, `notif`.
 
 ## Relationships
@@ -158,6 +158,9 @@ None of these are built in the MVP; the plan only makes sure they won't need a r
 
 ## Decided
 
+- **Approvers:** the assignee of an approval step is its approver; there are no separate approver columns on template steps
+- **No run-level approvals for now:** every approval belongs to an approval step; signing off a run means ending its template with an approval step
+- **Validation:** the database enforces keys, relationships and uniqueness; value rules such as statuses, which steps can be skippable and required skip reasons are checked in the API
 - **Groups:** Better Auth teams, called groups in the UI
 - **Permissions:** organization-wide permissions from member roles; per-template access for groups and people through `template_access`. Groups granting roles is planned for later.
 - **Skipping steps:** template steps can be marked skippable; skipping needs a reason. Halt and approval steps can't be skipped.
