@@ -1,13 +1,16 @@
 import { createApp } from "./app.ts"
-import { pool } from "./db/index.ts"
-import { env } from "./env.ts"
-
-// TODO: when env.migrateOnStart is set, run the migration function under a Postgres advisory lock before listening
+import { pool, migrateDB } from "./db/index.ts"
+import { config } from "./config.ts"
 
 const app = createApp()
 
-const server = app.listen(env.port, () => {
-  console.log(`API listening on http://localhost:${env.port}`)
+if (config.migrateOnStart) {
+  console.log("Running database migrations...")
+  await migrateDB()
+}
+
+const server = app.listen(config.port, () => {
+  console.log(`API listening on http://localhost:${config.port}`)
 })
 
 function shutdown(signal: string) {

@@ -4,12 +4,15 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter"
 import { db } from "./db/index.ts"
 import { typeid } from "typeid-js"
 import { prefixForTable } from "./util/typeid.ts"
-import { env } from "./env.ts"
+import { config } from "./config.ts"
 
 export const auth = betterAuth({
-  secret: env.betterAuth.secret,
-  baseURL: env.publicUrl,
+  secret: config.betterAuth.secret,
+  baseURL: config.publicUrl,
   basePath: "/api/auth",
+  emailAndPassword: {
+    enabled: true,
+  },
   database: drizzleAdapter(db, {
     provider: "pg",
   }),

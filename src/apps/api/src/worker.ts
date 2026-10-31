@@ -1,8 +1,8 @@
 import { PgBoss } from "pg-boss"
-import { env } from "./env.ts"
+import { config } from "./config.ts"
 
 // pg-boss workers run from the API image as their own Kubernetes deployment
-const boss = new PgBoss(env.databaseUrl)
+const boss = new PgBoss(config.databaseUrl)
 
 boss.on("error", (error) => {
   console.error("pg-boss error", error)

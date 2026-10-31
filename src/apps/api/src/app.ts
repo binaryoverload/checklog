@@ -1,5 +1,9 @@
 import express from "express"
 import { pool } from "./db/index.ts"
+import cors from "cors"
+import { toNodeHandler } from "better-auth/node"
+import { auth } from "./auth.ts"
+import { config } from "./config.ts"
 
 export function createApp() {
   const app = express()
@@ -20,7 +24,12 @@ export function createApp() {
     }
   })
 
-  // TODO: mount the Better Auth handler at /api/auth here, before express.json() (auth is written by a person, see AGENTS.md)
+  app.use(cors({
+    origin: config.publicUrl,
+    credentials: true,
+  }))
+
+  app.all("/api/auth/*splat", toNodeHandler(auth))
 
   app.use(express.json())
 

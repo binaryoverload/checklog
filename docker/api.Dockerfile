@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 # API image. Build from the repo root: docker build -f docker/api.Dockerfile .
-# Runs the API by default; the pg-boss worker deployment overrides the command with
-# ["node", "dist/worker.mjs"].
+# Runs the API by default. Other deployments override the command:
+#   pg-boss worker:  ["node", "dist/worker.mjs"]
+#   migrate Job:     ["node", "dist/migrate.mjs"]
 
 FROM node:24-trixie-slim AS base
 ENV PNPM_HOME=/pnpm

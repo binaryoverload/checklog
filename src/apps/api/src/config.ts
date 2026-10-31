@@ -6,7 +6,7 @@ function required(name: string): string {
   return value
 }
 
-export const env = {
+export const config = {
   port: Number(process.env.PORT ?? 3001),
   publicUrl: required("PUBLIC_URL"),
   databaseUrl: required("DATABASE_URL"),
