@@ -1,5 +1,6 @@
 # Checklog docs
 
+- [To do](todo.md): the running list of what to work on next
 - [Decisions](decisions.md): what has been decided, and what is still open
 - [Implementation notes](implementation-notes.md): setup details agreed alongside the decisions; the repo scaffold follows them
 - [MVP scope](mvp-scope.md): what ships in the MVP, v1 and later

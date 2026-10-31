@@ -30,7 +30,7 @@ pnpm build
 Agents assist; people write Checklog's core logic. The full rules are in [AGENTS.md](AGENTS.md) and apply to everyone. In short:
 
 - Agents may write boilerplate, config, CI, tests (reviewed by a person), docs, and behaviour-neutral refactors.
-- Agents may not write business logic, the data model or API behaviour, including auth, the audit log and migrations, and may not apply fixes to application code.
+- Agents may not write business logic, the data model, API behaviour or UI screens, including auth, the audit log and migrations, and may not apply fixes to application code. They may set up the web app's shell and other UI boilerplate.
 - Tick the AI-use box in the PR template and say what it was used for.
 
 ## Commits

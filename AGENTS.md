@@ -17,6 +17,7 @@ These rules apply to every AI coding agent working in this repository, and to th
 ## What agents may not do
 
 - **Write core logic.** Business logic, the data model and API behaviour are written by a person. This already covers auth, the audit log and migrations, so there are no extra no-go areas.
+- **Build UI screens.** Pages and the components that make up a feature's UI are written by a person. Agents may set up the app shell (layout, navigation, shared helpers and plugins) and other UI boilerplate.
 - **Apply fixes to application code.** An agent explains the fix or shows a diff, and a person applies it.
 
 When a task would cross these lines, stop and say so. Leave a `TODO` marking where the person's code goes instead of writing it.
@@ -39,4 +40,5 @@ The same principle applies to AI features in the product: product AI may suggest
 - **Frontend:** Nuxt renders the UI only. No Nuxt server routes; all data goes through the Express API via TanStack Query (not `useFetch`).
 - **Configuration:** environment variables only. Each app has its own `.env.example`; in development the API loads its `.env` with the `dotenv` package and Nuxt loads its own. Production never reads `.env` files.
 - **Commits:** single-line [Conventional Commits](https://www.conventionalcommits.org/), for example `feat(api): add run scheduling` or `chore: update renovate config`. Subject line only: no body and no trailers. Use a `!` after the type for breaking changes (`feat(api)!: ...`).
+- **To do:** [`docs/todo.md`](docs/todo.md) is the running list of work. Tick items off and add new ones as part of finishing a task.
 - **Decisions:** see [`docs/decisions.md`](docs/decisions.md) and [`docs/implementation-notes.md`](docs/implementation-notes.md) before proposing changes to the stack.

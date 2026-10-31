@@ -17,7 +17,7 @@ Recorded 2026-10-31. Add new decisions to the end of the list with a date; when 
 | Scripts | Cross-platform only, since development may happen on Windows or Unix |
 | Rendering | Nuxt renders the UI only: SSR allowed, no server routes; all data goes through the Express API |
 | UI | Use a mature component framework rather than building our own; Nuxt UI chosen |
-| AI use | Assistive, not replacing. Rules in [AGENTS.md](../AGENTS.md). |
+| AI use | Assistive, not replacing. Rules in [AGENTS.md](../AGENTS.md). UI screens count as core work and are written by a person; agents may set up the app shell and UI boilerplate. |
 | Competitor research | Work from what is known; unknown cells stay unknown |
 | Data model | See the [database structure plan](plans/db-structure.md): TypeIDs for every key; Better Auth teams shown as Groups; permissions from member roles plus per-template access, with group roles later; skippable steps need a reason; app-level tenant isolation for the MVP |
 | Commits | Single-line Conventional Commits for everyone, people and agents: `type(scope): summary`, no body or trailers |
