@@ -6,6 +6,7 @@ import {
   boolean,
   integer,
   index,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core"
 
 export const users = pgTable("users", {
@@ -14,6 +15,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
+  managedByOrganizationId: text("managed_by_organization_id").references((): AnyPgColumn => organizations.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
@@ -86,10 +88,16 @@ export const organizations = pgTable("organizations", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
+  accountType: text("account_type", { enum: ["personal", "managed"] }).notNull().default("personal"),
   logo: text("logo"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  deletedBy: text("deleted_by").references(() => users.id, { onDelete: "set null" }),
+  purgeAfter: timestamp("purge_after", { withTimezone: true }),
   metadata: text("metadata"),
-})
+}, t => [
+  index("organizations_purgeAfter_idx").on(t.purgeAfter),
+])
 
 export const teams = pgTable(
   "teams",

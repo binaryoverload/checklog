@@ -6,11 +6,11 @@ Each item is marked with who does it under the [AI use policy](../AGENTS.md): **
 
 ## Now
 
-- [ ] **Better Auth additional fields** (person). See [Personal and managed accounts](plans/db-structure.md#personal-and-managed-accounts) and [Deleted organizations](plans/audit-log.md#deleted-organizations).
-  - [ ] `organizations`: `accountType` (personal or managed), `deletedAt`, `deletedBy`, `purgeAfter`
-  - [ ] `users`: `managedByOrganizationId`, referencing `organizations` with `ON DELETE RESTRICT`
-  - [ ] `disableOrganizationDeletion: true` on the organization plugin
-  - [ ] Regenerate `auth-schema.ts` (keep the time-zone timestamps and lint formatting) and generate a migration
+- [x] **Better Auth additional fields** (person). See [Personal and managed accounts](plans/db-structure.md#personal-and-managed-accounts) and [Deleted organizations](plans/audit-log.md#deleted-organizations).
+  - [x] `organizations`: `accountType` (personal or managed), `deletedAt`, `deletedBy`, `purgeAfter`
+  - [x] `users`: `managedByOrganizationId`, referencing `organizations` with `ON DELETE RESTRICT`
+  - [x] `disableOrganizationDeletion: true` on the organization plugin
+  - [x] Regenerate `auth-schema.ts` (keep the time-zone timestamps and lint formatting) and generate a migration
 - [ ] **Finish the schema** (person), following the [database plan](plans/db-structure.md). `audit_events` waits for the audit work below.
   - [ ] `template_steps`, `template_fields`, `template_access`
   - [ ] `schedules`
