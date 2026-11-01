@@ -13,8 +13,11 @@ Each item is marked with who does it under the [AI use policy](../AGENTS.md): **
   - [x] Regenerate `auth-schema.ts` (keep the time-zone timestamps and lint formatting) and generate a migration
 - [ ] **Finish the schema** (person), following the [database plan](plans/db-structure.md). `audit_events` waits for the audit work below.
   - [x] `template_steps`, `template_fields`, `template_access`
-  - [ ] `schedules`
-  - [ ] `runs`, `run_steps`, `run_field_values`, `step_notes`
+  - [x] `schedules`
+  - [x] `runs`, `run_steps`
+  - [x] `template_steps`: separate assignee columns with `ON DELETE SET NULL`, `assignee_type` (member, team, role)
+  - [ ] `run_steps`: add `assignee_type`, matching `template_steps`
+  - [ ] `run_field_values`, `step_notes`
   - [ ] `approval_requests`, `approval_decisions`
   - [ ] `notifications`
   - [ ] Generate the migration and apply it to a fresh dev database
@@ -56,6 +59,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 ### Runs
 
 - [ ] API: start a run from a template's current version, creating its run steps with resolved assignees and due dates (person)
+- [ ] API: run start check that refuses a version with a missing assignee (`assignee_type` set but its column null) and says which steps to fix in a new version; also check assigned members and groups belong to the organization (person). See [Missing assignees](plans/db-structure.md#missing-assignees).
 - [ ] API: list runs (mine, my groups', all) and get one run with its steps (person)
 - [ ] API: set field values and complete a step, enforcing required fields and halt steps (person)
 - [ ] API: skip a skippable step with a reason (person)
@@ -72,7 +76,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 ### Schedules
 
 - [ ] API: create, edit, pause and resume a schedule (RRULE and time zone) for a template, and calculate `next_run_at` (person)
-- [ ] Job: pg-boss recurring job that starts due runs and advances `next_run_at` (person)
+- [ ] Job: pg-boss recurring job that starts due runs and advances `next_run_at`; a run that fails the start check is skipped and the template's editors are notified (person)
 - [ ] UI: schedule settings on a template (person)
 
 ### Notifications

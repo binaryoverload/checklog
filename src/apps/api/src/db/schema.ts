@@ -67,8 +67,10 @@ export const templateSteps = pgTable("template_steps", {
   instructions: text("instructions"),
   isHalt: boolean("is_halt").notNull().default(false),
   skippable: boolean("skippable").notNull().default(false),
-  assigneeType: text("assignee_type", { enum: ["user", "team", "role"] }),
-  assigneeRef: text("assignee_ref"),
+  assigneeType: text("assignee_type", { enum: ["member", "team", "role"] }),
+  assigneeMemberId: text("assignee_member_id").references(() => members.id, { onDelete: "set null" }),
+  assigneeTeamId: text("assignee_team_id").references(() => teams.id, { onDelete: "set null" }),
+  assigneeRole: text("assignee_role"),
   dueOffset: interval("due_offset"),
   ...createdFields,
   ...updatedFields,
@@ -162,6 +164,8 @@ export const runs = pgTable("runs", {
   ...createdFields,
   ...updatedFields,
 }, t => [
+  unique().on(t.id, t.organizationId),
+  unique().on(t.id, t.templateVersionId, t.organizationId),
   index("runs_organization_status_idx").on(t.organizationId, t.status),
   index("runs_template_version_idx").on(t.templateVersionId),
   index("runs_schedule_idx").on(t.scheduleId),
@@ -177,7 +181,41 @@ export const runs = pgTable("runs", {
   }).onDelete("restrict"),
 ])
 
-// export const runSteps = pgTable("run_steps")
+export const runSteps = pgTable("run_steps", {
+  id: text("id").primaryKey().$defaultFn(() => typeIdForTable("runSteps").toString()),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  runId: text("run_id").notNull(),
+  templateVersionId: text("template_version_id").notNull(),
+  templateStepId: text("template_step_id").notNull(),
+  status: text("status", { enum: ["pending", "completed", "skipped"] }).notNull().default("pending"),
+  assigneeType: text("assignee_type", { enum: ["member", "team", "role"] }),
+  assigneeMemberId: text("assignee_member_id").references(() => members.id, { onDelete: "set null" }),
+  assigneeTeamId: text("assignee_team_id").references(() => teams.id, { onDelete: "set null" }),
+  assigneeRole: text("assignee_role"),
+  dueAt: timestamp("due_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  completedBy: text("completed_by"),
+  skipReason: text("skip_reason"),
+  ...createdFields,
+  ...updatedFields,
+}, t => [
+  unique().on(t.id, t.organizationId),
+  unique().on(t.runId, t.templateStepId), // Only one step per run per template step
+  index("run_steps_template_step_id_idx").on(t.templateStepId),
+  index("run_steps_assignee_member_id_idx").on(t.assigneeMemberId),
+  index("run_steps_assignee_team_id_idx").on(t.assigneeTeamId),
+  foreignKey({
+    name: "run_steps_run_id_fk",
+    columns: [t.runId, t.templateVersionId, t.organizationId],
+    foreignColumns: [runs.id, runs.templateVersionId, runs.organizationId],
+  }).onDelete("cascade"),
+  foreignKey({
+    name: "run_steps_template_step_id_fk",
+    columns: [t.templateStepId, t.templateVersionId, t.organizationId],
+    foreignColumns: [templateSteps.id, templateSteps.templateVersionId, templateSteps.organizationId],
+  }).onDelete("restrict"),
+])
+
 // export const runFieldValues = pgTable("run_field_values")
 // export const stepNotes = pgTable("step_notes")
 
