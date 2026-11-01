@@ -36,6 +36,7 @@ The same principle applies to AI features in the product: product AI may suggest
 - **Layout:** pnpm workspace. `src/apps/api` (Express, Drizzle, Better Auth, pg-boss), `src/apps/web` (Nuxt, Nuxt UI, TanStack Query), `src/packages/shared` (types and validation schemas shipped as TypeScript source, no build step).
 - **Dependencies:** shared versions live in the `catalog:` in `pnpm-workspace.yaml`. Apps depend on the shared package with `workspace:*`.
 - **Scripts must be cross-platform.** Development happens on Windows and Unix. `pnpm-workspace.yaml` enables `shellEmulator`; anything longer than a one-liner is a small Node script.
+- **Comments:** only where the code isn't self-explanatory, or where it departs from the norm or a default for a reason. One or two concise sentences, describing the code as it is now: no history, past decisions or conversation context.
 - **Linting:** one ESLint config with Stylistic (`eslint.shared.js`); no Prettier. Run `pnpm lint` and `pnpm typecheck` before handing work back.
 - **Frontend:** Nuxt renders the UI only. No Nuxt server routes; all data goes through the Express API via TanStack Query (not `useFetch`).
 - **Configuration:** environment variables only. Each app has its own `.env.example`; in development the API loads its `.env` with the `dotenv` package and Nuxt loads its own. Production never reads `.env` files.
