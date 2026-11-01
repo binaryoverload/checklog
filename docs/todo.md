@@ -17,10 +17,10 @@ Each item is marked with who does it under the [AI use policy](../AGENTS.md): **
   - [x] `runs`, `run_steps`
   - [x] `template_steps`: separate assignee columns with `ON DELETE SET NULL`, `assignee_type` (member, team, role)
   - [x] `run_steps`: add `assignee_type`, matching `template_steps`
-  - [ ] `run_field_values`, `step_notes`
-  - [ ] `approval_requests`, `approval_decisions`
+  - [x] `run_field_values`, `step_notes`
+  - [x] `approval_requests`, `approval_decisions`: drop the approver columns and `run_id`, make `run_step_id` unique (one request per step)
   - [ ] `notifications`
-  - [ ] Generate the migration and apply it to a fresh dev database
+  - [x] Replace migrations `0000`–`0009` with one baseline migration (the old ones fail on a fresh database), reset the dev database and apply it
 - [x] Remove the unused `auditChains` prefix from `src/apps/api/src/util/typeid.ts` (person)
 
 ## Next: core app
@@ -69,8 +69,8 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 
 ### Approvals
 
-- [ ] API: create an approval request when an approval step is reached (person)
-- [ ] API: approve or reject with a comment; a rejection keeps the step open, an approval resolves it (person)
+- [ ] API: create an approval request when an approval step is reached, as an upsert on `run_step_id`; the approver is the step's current assignee (person)
+- [ ] API: approve or reject, with a comment required on rejection; the request's status follows the latest decision, a rejection keeps the step open and an approval resolves it (person)
 - [ ] UI: "awaiting my approval" list and the approve or reject dialog (person)
 
 ### Schedules

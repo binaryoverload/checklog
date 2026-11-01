@@ -39,3 +39,11 @@ export type AssigneeType = z.infer<typeof assigneeTypeSchema>
 export const dateTypes = ["date", "datetime", "time"] as const
 export const dateTypeSchema = z.enum(dateTypes)
 export type DateType = z.infer<typeof dateTypeSchema>
+
+export const approvalStatuses = ["pending", "approved", "rejected"] as const
+export const approvalStatusSchema = z.enum(approvalStatuses)
+export type ApprovalStatus = z.infer<typeof approvalStatusSchema>
+
+export const approvalDecisionStatuses = ["approved", "rejected"] as const
+export const approvalDecisionStatusSchema = z.enum(approvalDecisionStatuses)
+export type ApprovalDecisionStatus = z.infer<typeof approvalDecisionStatusSchema>

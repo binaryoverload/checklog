@@ -102,8 +102,8 @@ pg-boss does the firing: a recurring job finds schedules with `next_run_at <= no
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
-| `approval_requests` | `organization_id`, `run_id`, `run_step_id`, `approver_type` (member, team, role), `approver_member_id`, `approver_team_id`, `approver_role`, `status` (pending, approved, rejected) | Created when an approval step needs sign-off. Approvals are always on a step; to sign off a whole run, a template puts an approval step last. The foreign key to `run_steps` includes `organization_id`, like other tenant tables. For an approval step, the approver is the run step's current assignee, copied when the request is created, so reassigning the step before then changes who approves. The approver columns match the assignee columns, including `ON DELETE SET NULL` on the member and group, so a removed approver shows the same way as a [missing assignee](#missing-assignees). |
-| `approval_decisions` | `approval_request_id`, `decided_by`, `decision`, `comment`, `decided_at` | Separate from the request so a rejection followed by a later approval keeps both |
+| `approval_requests` | `organization_id`, `run_step_id`, `status` (pending, approved, rejected) | Created when an approval step is reached. Approvals are always on a step; to sign off a whole run, a template puts an approval step last. One request per step (decided): unique on `run_step_id`, so creating it is a safe upsert. `status` is pending until the first decision, then follows the latest one, so a rejected request can be approved later. There are no approver columns or `run_id` (decided): the approver is the run step's current assignee, so reassigning the step changes who approves and a removed approver is a [missing assignee](#missing-assignees); the run comes from the step. |
+| `approval_decisions` | `organization_id`, `approval_request_id`, `decision` (approved, rejected), `comment` | Append-only. Who decided and when are the shared `created_by` and `created_at`. Separate from the request so a rejection followed by a later approval keeps both. Whether a comment is required (for example only on rejection) is checked in the API. |
 
 ### 6. Audit log
 
@@ -146,7 +146,7 @@ erDiagram
   run_steps ||--o{ run_field_values : has
   template_fields ||--o{ run_field_values : "value of"
   run_steps ||--o{ step_notes : has
-  runs ||--o{ approval_requests : needs
+  run_steps ||--o| approval_requests : needs
   approval_requests ||--o{ approval_decisions : gets
   organizations ||--o{ audit_events : logs
   runs ||--o{ audit_events : logs
@@ -166,9 +166,9 @@ None of these are built in the MVP; the plan only makes sure they won't need a r
 
 ## Decided
 
-- **Approvers:** the assignee of an approval step is its approver; there are no separate approver columns on template steps
+- **Approvers:** the assignee of an approval step is its approver; there are no separate approver columns on template steps or approval requests
 - **No run-level approvals for now:** every approval belongs to an approval step; signing off a run means ending its template with an approval step
-- **Timestamps and history:** both (decided). Every table edited in place has `updated_at`, for "last changed" lists and edit-conflict checks (save only if `updated_at` hasn't changed since loading). The audit log is the full history of who changed what. There's no `updated_by`; the audit log covers it. `created_by` isn't a foreign key to `users`, because the purge deletes a managed organization's accounts before its data; rows created by jobs use the job's name.
+- **Timestamps and history:** both (decided). Every table edited in place has `updated_at`, for "last changed" lists and edit-conflict checks (save only if `updated_at` hasn't changed since loading). The audit log is the full history of who changed what. There's no `updated_by`; the audit log covers it. `created_by` isn't a foreign key to `users`, because the purge deletes a managed organization's accounts before its data. It holds the ID of whatever caused the row: a user, or a schedule for runs and steps the scheduler creates. The TypeID prefix (`user_` or `sched_`) says which. Rows created as a side effect take their cause's ID: an approval request is created by the user who completed the step before it, or by the schedule if it's the first step of a scheduled run.
 - **Validation:** the database enforces keys, relationships and uniqueness; value rules such as statuses, which steps can be skippable and required skip reasons are checked in the API
 - **Groups:** Better Auth teams, called groups in the UI
 - **Permissions:** organization-wide permissions from member roles; per-template access for groups and people through `template_access`. Groups granting roles is planned for later.

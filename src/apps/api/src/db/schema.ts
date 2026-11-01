@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm"
 import { pgTable, text, integer, boolean, timestamp, unique, uniqueIndex, foreignKey, interval, index, jsonb } from "drizzle-orm/pg-core"
 import type { PgTableExtraConfigValue } from "drizzle-orm/pg-core"
 
-import { assigneeTypes, fieldTypes, runStatuses, runStepStatuses, scheduleStatuses, templateAccessLevels, templateStatuses, templateStepKinds, templateVersionStatuses } from "@checklog/shared"
+import { approvalDecisionStatuses, approvalStatuses, assigneeTypes, fieldTypes, runStatuses, runStepStatuses, scheduleStatuses, templateAccessLevels, templateStatuses, templateStepKinds, templateVersionStatuses } from "@checklog/shared"
 import type { FieldOptions, FieldValue } from "@checklog/shared"
 
 import { members, organizations, teams, users } from "./auth-schema.ts"
@@ -258,8 +258,39 @@ export const stepNotes = pgTable("step_notes", {
   }).onDelete("cascade"),
 ])
 
-// export const approvalRequests = pgTable("approval_requests")
-// export const approvalDecisions = pgTable("approval_decisions")
+export const approvalRequests = pgTable("approval_requests", {
+  id: text("id").primaryKey().$defaultFn(() => typeIdForTable("approvalRequests").toString()),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  runStepId: text("run_step_id").notNull(),
+  status: text("status", { enum: approvalStatuses }).notNull().default("pending"),
+  ...createdFields,
+  ...updatedFields,
+}, t => [
+  unique().on(t.organizationId, t.id),
+  unique().on(t.organizationId, t.runStepId), // Only one request per run step
+  index("approval_requests_run_step_id_idx").on(t.runStepId),
+  foreignKey({
+    name: "approval_requests_run_step_id_fk",
+    columns: [t.organizationId, t.runStepId],
+    foreignColumns: [runSteps.organizationId, runSteps.id],
+  }).onDelete("cascade"),
+])
+
+export const approvalDecisions = pgTable("approval_decisions", {
+  id: text("id").primaryKey().$defaultFn(() => typeIdForTable("approvalDecisions").toString()),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  approvalRequestId: text("approval_request_id").notNull(),
+  decision: text("decision", { enum: approvalDecisionStatuses }).notNull(),
+  comment: text("comment"),
+  ...createdFields,
+}, t => [
+  index("approval_decisions_approval_request_id_idx").on(t.approvalRequestId),
+  foreignKey({
+    name: "approval_decisions_approval_request_id_fk",
+    columns: [t.organizationId, t.approvalRequestId],
+    foreignColumns: [approvalRequests.organizationId, approvalRequests.id],
+  }).onDelete("cascade"),
+])
 
 // export const auditEvents = pgTable("audit_events")
 

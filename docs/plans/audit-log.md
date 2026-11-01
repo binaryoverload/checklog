@@ -149,7 +149,7 @@ Action names are `entity.past_tense_verb`. The payload lists what each event mus
 | Organization (run) | `run_step.reopened` | Reason, if reopening is allowed |
 | Organization (run) | `field.value_set` | Field key, old value, new value |
 | Organization (run) | `note.added` | Note ID, body |
-| Organization (run) | `approval.requested` | Approver type and reference |
+| Organization (run) | `approval.requested` | The run step's assignee at the time (type and ID) |
 | Organization (run) | `approval.decided` | Decision, comment |
 | Organization (run) | `run_step.overdue` | Due at (written by the overdue job, actor `system`) |
 | User | `user.created` | Managed organization ID for a managed account |
