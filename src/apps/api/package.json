@@ -21,9 +21,11 @@
     "cors": "catalog:",
     "drizzle-orm": "catalog:",
     "express": "catalog:",
+    "nodemailer": "catalog:",
     "pg": "catalog:",
     "pg-boss": "catalog:",
-    "typeid-js": "catalog:"
+    "typeid-js": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/cors": "catalog:",

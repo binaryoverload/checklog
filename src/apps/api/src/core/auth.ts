@@ -3,12 +3,12 @@ import { betterAuth } from "better-auth"
 import { organization } from "better-auth/plugins"
 
 import { config } from "./config.ts"
-import { db } from "./db/index.ts"
-import { typeIdForModel } from "./util/typeid.ts"
+import { db } from "../db/index.ts"
+import { typeIdForModel } from "../util/typeid.ts"
 
 export const auth = betterAuth({
-  secret: config.betterAuth.secret,
-  baseURL: config.publicUrl,
+  secret: config.BETTER_AUTH_SECRET,
+  baseURL: config.PUBLIC_URL,
   basePath: "/api/auth",
   emailAndPassword: {
     enabled: true,

@@ -33,7 +33,8 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 
 ### Foundations
 
-- [ ] Email sending: SMTP config through environment variables, a mail catcher (for example Mailpit) in `docker-compose.yaml` for development, and one `sendEmail` helper (agent)
+- [ ] Logging
+- [x] Email sending: SMTP config through environment variables, a mail catcher (for example Mailpit) in `docker-compose.yaml` for development, and one `sendEmail` helper (person)
 - [ ] API structure: routers per area under `/api`, request validation middleware using Zod schemas from `packages/shared`, one error response format, and a not-found handler (agent)
 - [ ] Session middleware: read the Better Auth session on every API request and expose the user and active organization to handlers (person)
 - [ ] The permission function: one place that answers "can this user do this in this organization", from the member's role and `template_access` (person)

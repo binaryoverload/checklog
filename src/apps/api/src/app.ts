@@ -2,8 +2,8 @@ import { toNodeHandler } from "better-auth/node"
 import cors from "cors"
 import express from "express"
 
-import { auth } from "./auth.ts"
-import { config } from "./config.ts"
+import { auth } from "./core/auth.ts"
+import { config } from "./core/config.ts"
 import { pool } from "./db/index.ts"
 
 export function createApp() {
@@ -26,7 +26,7 @@ export function createApp() {
   })
 
   app.use(cors({
-    origin: config.publicUrl,
+    origin: config.PUBLIC_URL,
     credentials: true,
   }))
 
