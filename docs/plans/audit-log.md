@@ -140,7 +140,7 @@ Action names are `entity.past_tense_verb`. The payload lists what each event mus
 | Organization | `template.created`, `template.archived` | |
 | Organization | `template_version.published`, `template_version.archived` | Version number |
 | Organization | `template_access.granted`, `template_access.changed`, `template_access.revoked` | Principal, old and new level |
-| Organization | `schedule.created`, `schedule.updated`, `schedule.paused`, `schedule.resumed` | Changed fields |
+| Organization | `schedule.created`, `schedule.updated`, `schedule.paused`, `schedule.resumed`, `schedule.archived` | Changed fields |
 | Organization (run) | `run.started` | Template version, schedule ID if scheduled |
 | Organization (run) | `run.completed`, `run.cancelled` | Reason for cancellation |
 | Organization (run) | `run_step.assigned` | Old and new assignee |

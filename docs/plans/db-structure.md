@@ -73,7 +73,7 @@ Editing a template means editing its draft version; publishing copies nothing, i
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
-| `schedules` | `template_id`, `rrule` (RFC 5545), `timezone`, `next_run_at`, `active`, `run_name_pattern`, `created_by` | Covers daily, weekly, monthly and custom. Always uses the template's current version when it fires. |
+| `schedules` | `template_id`, `status` (active, paused, archived), `rrule` (RFC 5545), `timezone`, `next_run_at`, `run_name_pattern` | Covers daily, weekly, monthly and custom. Always uses the template's current version when it fires. Only `active` schedules fire. Schedules are archived, never deleted, because runs keep a link to the schedule that started them (`ON DELETE RESTRICT`). |
 
 pg-boss does the firing: a recurring job finds schedules with `next_run_at <= now()`, starts runs and advances `next_run_at`. The `schedules` table stays the source of truth, so the UI can list and edit schedules without reading pg-boss internals.
 

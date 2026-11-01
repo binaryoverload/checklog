@@ -134,14 +134,16 @@ export const schedules = pgTable("schedules", {
   id: text("id").primaryKey().$defaultFn(() => typeIdForTable("schedules").toString()),
   organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   templateId: text("template_id").notNull(),
+  status: text("status", { enum: ["active", "paused", "archived"] }).notNull().default("active"),
   rrule: text("rrule").notNull(),
   timezone: text("timezone").notNull(),
-  next_run_at: timestamp("next_run_at", { withTimezone: true }),
-  active: boolean("active").notNull().default(true),
-  run_name_pattern: text("run_name_pattern").notNull(),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+  runNamePattern: text("run_name_pattern").notNull(),
   ...createdFields,
   ...updatedFields,
 }, t => [
+  unique().on(t.id, t.organizationId),
+  index("schedules_due_idx").on(t.nextRunAt),
   foreignKey({
     name: "schedules_template_id_fk",
     columns: [t.templateId, t.organizationId],
@@ -149,7 +151,32 @@ export const schedules = pgTable("schedules", {
   }).onDelete("cascade"),
 ])
 
-// export const runs = pgTable("runs")
+export const runs = pgTable("runs", {
+  id: text("id").primaryKey().$defaultFn(() => typeIdForTable("runs").toString()),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  templateVersionId: text("template_version_id").notNull(),
+  scheduleId: text("schedule_id"),
+  name: text("name").notNull(),
+  status: text("status", { enum: ["in_progress", "completed", "cancelled"] }).notNull().default("in_progress"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  ...createdFields,
+  ...updatedFields,
+}, t => [
+  index("runs_organization_status_idx").on(t.organizationId, t.status),
+  index("runs_template_version_idx").on(t.templateVersionId),
+  index("runs_schedule_idx").on(t.scheduleId),
+  foreignKey({
+    name: "runs_template_version_id_fk",
+    columns: [t.templateVersionId, t.organizationId],
+    foreignColumns: [templateVersions.id, templateVersions.organizationId],
+  }).onDelete("restrict"),
+  foreignKey({
+    name: "runs_schedule_id_fk",
+    columns: [t.scheduleId, t.organizationId],
+    foreignColumns: [schedules.id, schedules.organizationId],
+  }).onDelete("restrict"),
+])
+
 // export const runSteps = pgTable("run_steps")
 // export const runFieldValues = pgTable("run_field_values")
 // export const stepNotes = pgTable("step_notes")
