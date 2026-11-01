@@ -28,6 +28,8 @@ export default defineConfig(
     rules: {
       // Type-only imports use `import type`, matching verbatimModuleSyntax
       "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "separate-type-imports" }],
+      // A warning, so unfinished code still lints
+      "@typescript-eslint/no-unused-vars": "warn",
     },
   },
   {
@@ -77,4 +79,14 @@ export default defineConfig(
     braceStyle: "1tbs",
     quoteProps: "consistent-as-needed",
   }),
+  // Braces, brackets and their items go all on one line or one per line, never mixed
+  {
+    name: "checklog/stylistic-newlines",
+    rules: {
+      "@stylistic/object-curly-newline": ["error", { multiline: true, consistent: true }],
+      "@stylistic/object-property-newline": ["error", { allowAllPropertiesOnSameLine: true }],
+      "@stylistic/array-bracket-newline": ["error", "consistent"],
+      "@stylistic/array-element-newline": ["error", "consistent"],
+    },
+  },
 )
