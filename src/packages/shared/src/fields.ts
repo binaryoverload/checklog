@@ -28,8 +28,8 @@ export const fieldOptionsSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("number"),
     decimalPlaces: z.number().int().nonnegative().optional(),
-    min: z.number().int().nonnegative().optional(),
-    max: z.number().int().nonnegative().optional(),
+    min: z.number().optional(),
+    max: z.number().optional(),
     unit: z.string().optional(),
   }).superRefine((data, ctx) => {
     if (data.min !== undefined && data.max !== undefined && data.min > data.max) {
