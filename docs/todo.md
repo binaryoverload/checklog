@@ -16,7 +16,7 @@ Each item is marked with who does it under the [AI use policy](../AGENTS.md): **
   - [x] `schedules`
   - [x] `runs`, `run_steps`
   - [x] `template_steps`: separate assignee columns with `ON DELETE SET NULL`, `assignee_type` (member, team, role)
-  - [ ] `run_steps`: add `assignee_type`, matching `template_steps`
+  - [x] `run_steps`: add `assignee_type`, matching `template_steps`
   - [ ] `run_field_values`, `step_notes`
   - [ ] `approval_requests`, `approval_decisions`
   - [ ] `notifications`

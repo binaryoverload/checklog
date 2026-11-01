@@ -2,6 +2,7 @@ import { pgTable, text, integer, boolean, timestamp, unique, uniqueIndex, foreig
 import { members, organizations, teams, users } from "./auth-schema.ts"
 import { sql } from "drizzle-orm"
 import { typeIdForTable } from "../util/typeid.ts"
+import { assigneeTypes, fieldTypes, runStatuses, runStepStatuses, scheduleStatuses, templateAccessLevels, templateStatuses, templateStepKinds, templateVersionStatuses, type FieldOptions } from "@checklog/shared"
 
 const createdFields = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -17,7 +18,7 @@ export const templates = pgTable("templates", {
   organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
-  status: text("status", { enum: ["active", "archived"] }).notNull(),
+  status: text("status", { enum: templateStatuses }).notNull(),
   currentVersionId: text("current_version_id"),
   ...createdFields,
   ...updatedFields,
@@ -39,7 +40,7 @@ export const templateVersions = pgTable("template_versions", {
   organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   templateId: text("template_id").notNull(),
   version: integer("version").notNull(),
-  status: text("status", { enum: ["draft", "published", "archived"] }).notNull(),
+  status: text("status", { enum: templateVersionStatuses }).notNull(),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   publishedBy: text("published_by").references(() => users.id, { onDelete: "set null" }),
   ...createdFields,
@@ -61,13 +62,13 @@ export const templateSteps = pgTable("template_steps", {
   id: text("id").primaryKey().$defaultFn(() => typeIdForTable("templateSteps").toString()),
   organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   templateVersionId: text("template_version_id").notNull(),
-  kind: text("kind", { enum: ["task", "approval"] }).notNull().default("task"),
+  kind: text("kind", { enum: templateStepKinds }).notNull().default("task"),
   position: integer("position").notNull(),
   title: text("title").notNull(),
   instructions: text("instructions"),
   isHalt: boolean("is_halt").notNull().default(false),
   skippable: boolean("skippable").notNull().default(false),
-  assigneeType: text("assignee_type", { enum: ["member", "team", "role"] }),
+  assigneeType: text("assignee_type", { enum: assigneeTypes }),
   assigneeMemberId: text("assignee_member_id").references(() => members.id, { onDelete: "set null" }),
   assigneeTeamId: text("assignee_team_id").references(() => teams.id, { onDelete: "set null" }),
   assigneeRole: text("assignee_role"),
@@ -84,10 +85,6 @@ export const templateSteps = pgTable("template_steps", {
   }).onDelete("cascade"),
 ])
 
-export interface TemplateFieldOptions {
-  dropdownChoices?: string[]
-}
-
 export const templateFields = pgTable("template_fields", {
   id: text("id").primaryKey().$defaultFn(() => typeIdForTable("templateFields").toString()),
   organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
@@ -97,8 +94,9 @@ export const templateFields = pgTable("template_fields", {
   required: boolean("required").notNull().default(true),
   key: text("key").notNull(),
   label: text("label").notNull(),
-  type: text("type", { enum: ["text", "date", "dropdown", "checkbox"] }).notNull(),
-  options: jsonb("options").$type<TemplateFieldOptions>(),
+  helpText: text("help_text"),
+  type: text("type", { enum: fieldTypes }).notNull(),
+  options: jsonb("options").$type<FieldOptions>().notNull(),
   ...createdFields,
   ...updatedFields,
 }, t => [
@@ -117,7 +115,7 @@ export const templateAccess = pgTable("template_access", {
   templateId: text("template_id").notNull(),
   memberId: text("member_id").references(() => members.id, { onDelete: "cascade" }),
   teamId: text("team_id").references(() => teams.id, { onDelete: "cascade" }),
-  level: text("level", { enum: ["view", "run", "edit"] }).notNull().default("view"),
+  level: text("level", { enum: templateAccessLevels }).notNull().default("view"),
   ...createdFields,
   ...updatedFields,
 }, t => [
@@ -136,7 +134,7 @@ export const schedules = pgTable("schedules", {
   id: text("id").primaryKey().$defaultFn(() => typeIdForTable("schedules").toString()),
   organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   templateId: text("template_id").notNull(),
-  status: text("status", { enum: ["active", "paused", "archived"] }).notNull().default("active"),
+  status: text("status", { enum: scheduleStatuses }).notNull().default("active"),
   rrule: text("rrule").notNull(),
   timezone: text("timezone").notNull(),
   nextRunAt: timestamp("next_run_at", { withTimezone: true }),
@@ -159,7 +157,7 @@ export const runs = pgTable("runs", {
   templateVersionId: text("template_version_id").notNull(),
   scheduleId: text("schedule_id"),
   name: text("name").notNull(),
-  status: text("status", { enum: ["in_progress", "completed", "cancelled"] }).notNull().default("in_progress"),
+  status: text("status", { enum: runStatuses }).notNull().default("in_progress"),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   ...createdFields,
   ...updatedFields,
@@ -187,8 +185,8 @@ export const runSteps = pgTable("run_steps", {
   runId: text("run_id").notNull(),
   templateVersionId: text("template_version_id").notNull(),
   templateStepId: text("template_step_id").notNull(),
-  status: text("status", { enum: ["pending", "completed", "skipped"] }).notNull().default("pending"),
-  assigneeType: text("assignee_type", { enum: ["member", "team", "role"] }),
+  status: text("status", { enum: runStepStatuses }).notNull().default("pending"),
+  assigneeType: text("assignee_type", { enum: assigneeTypes }),
   assigneeMemberId: text("assignee_member_id").references(() => members.id, { onDelete: "set null" }),
   assigneeTeamId: text("assignee_team_id").references(() => teams.id, { onDelete: "set null" }),
   assigneeRole: text("assignee_role"),
