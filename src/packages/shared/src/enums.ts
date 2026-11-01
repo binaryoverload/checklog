@@ -47,3 +47,19 @@ export type ApprovalStatus = z.infer<typeof approvalStatusSchema>
 export const approvalDecisionStatuses = ["approved", "rejected"] as const
 export const approvalDecisionStatusSchema = z.enum(approvalDecisionStatuses)
 export type ApprovalDecisionStatus = z.infer<typeof approvalDecisionStatusSchema>
+
+export const notificationTypes = ["assigned_step", "overdue_step", "approval_needed", "schedule_skipped"] as const
+export const notificationTypeSchema = z.enum(notificationTypes)
+export type NotificationType = z.infer<typeof notificationTypeSchema>
+
+export const notificationSubjectTypes = ["run_step", "schedule"] as const
+export const notificationSubjectTypeSchema = z.enum(notificationSubjectTypes)
+export type NotificationSubjectType = z.infer<typeof notificationSubjectTypeSchema>
+
+export const notificationChannels = ["email"] as const
+export const notificationChannelSchema = z.enum(notificationChannels)
+export type NotificationChannel = z.infer<typeof notificationChannelSchema>
+
+export const notificationDeliveryStatuses = ["pending", "sent", "failed"] as const
+export const notificationDeliveryStatusSchema = z.enum(notificationDeliveryStatuses)
+export type NotificationDeliveryStatus = z.infer<typeof notificationDeliveryStatusSchema>

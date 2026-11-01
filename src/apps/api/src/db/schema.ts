@@ -2,8 +2,8 @@ import { sql } from "drizzle-orm"
 import { pgTable, text, integer, boolean, timestamp, unique, uniqueIndex, foreignKey, interval, index, jsonb } from "drizzle-orm/pg-core"
 import type { PgTableExtraConfigValue } from "drizzle-orm/pg-core"
 
-import { approvalDecisionStatuses, approvalStatuses, assigneeTypes, fieldTypes, runStatuses, runStepStatuses, scheduleStatuses, templateAccessLevels, templateStatuses, templateStepKinds, templateVersionStatuses } from "@checklog/shared"
-import type { FieldOptions, FieldValue } from "@checklog/shared"
+import { approvalDecisionStatuses, approvalStatuses, assigneeTypes, fieldTypes, notificationChannels, notificationDeliveryStatuses, notificationSubjectTypes, notificationTypes, runStatuses, runStepStatuses, scheduleStatuses, templateAccessLevels, templateStatuses, templateStepKinds, templateVersionStatuses } from "@checklog/shared"
+import type { FieldOptions, FieldValue, NotificationPayload } from "@checklog/shared"
 
 import { members, organizations, teams, users } from "./auth-schema.ts"
 import { typeIdForTable } from "../util/typeid.ts"
@@ -292,6 +292,45 @@ export const approvalDecisions = pgTable("approval_decisions", {
   }).onDelete("cascade"),
 ])
 
-// export const auditEvents = pgTable("audit_events")
+export const notifications = pgTable("notifications", {
+  id: text("id").primaryKey().$defaultFn(() => typeIdForTable("notifications").toString()),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  memberId: text("member_id").notNull().references(() => members.id, { onDelete: "cascade" }),
+  type: text("type", { enum: notificationTypes }).notNull(),
+  payload: jsonb("payload").$type<NotificationPayload>().notNull(),
+  subjectType: text("subject_type", { enum: notificationSubjectTypes }).notNull(),
+  subjectId: text("subject_id").notNull(),
+  dedupeKey: text("dedupe_key"),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  ...createdFields,
+  ...updatedFields,
+}, t => [
+  unique().on(t.organizationId, t.id),
+  unique().on(t.memberId, t.dedupeKey),
+  index("notifications_member_id_created_at_idx").on(t.memberId, t.createdAt),
+  index("notifications_subject_type_subject_id_idx").on(t.subjectType, t.subjectId),
+])
 
-// export const notifications = pgTable("notifications")
+export const notificationDeliveries = pgTable("notification_deliveries", {
+  id: text("id").primaryKey().$defaultFn(() => typeIdForTable("notificationDeliveries").toString()),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  notificationId: text("notification_id").notNull(),
+  recipient: text("recipient").notNull(),
+  channel: text("channel", { enum: notificationChannels }).notNull(),
+  status: text("status", { enum: notificationDeliveryStatuses }).notNull().default("pending"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  attempts: integer("attempts").notNull().default(0),
+  lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  ...createdFields,
+  ...updatedFields,
+}, t => [
+  unique().on(t.notificationId, t.channel),
+  foreignKey({
+    name: "notification_deliveries_notification_id_fk",
+    columns: [t.organizationId, t.notificationId],
+    foreignColumns: [notifications.organizationId, notifications.id],
+  }).onDelete("cascade"),
+])
+
+// export const auditEvents = pgTable("audit_events")

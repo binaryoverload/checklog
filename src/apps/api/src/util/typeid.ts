@@ -31,6 +31,7 @@ const tableToPrefix = {
   approvalDecisions: "apdec",
   auditEvents: "aevt",
   notifications: "notif",
+  notificationDeliveries: "ndel",
 }
 
 export function typeIdForModel(modelName: string) {

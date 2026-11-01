@@ -15,6 +15,13 @@
       "when": 1793549832858,
       "tag": "0001_approvals",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793559459858,
+      "tag": "0002_notifications",
+      "breakpoints": true
     }
   ]
 }
