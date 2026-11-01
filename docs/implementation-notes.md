@@ -31,6 +31,9 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 - Nuxt has no server routes; every data call goes to the Express API
 - Serve web and API under one domain behind a reverse proxy (for example `/api` to Express) so session cookies stay first-party and SSR requests work
 - Mount the Better Auth handler before `express.json()`
+- One router per area under `/api` (templates, runs, approvals, schedules, notifications, members), all created up front
+- Route handlers use a typed `route()` helper that validates `params`, `query` and `body` with Zod schemas from `packages/shared` and passes the parsed values in; Express 5's `req.query` is read-only, so plain validation middleware can't hand handlers typed input
+- Every API error except Better Auth's (`/api/auth/*` keeps its own format) uses one shape: `{ "error": { "code": "not_found", "message": "Run not found", "details": [] } }`, with `details` holding the Zod issues on validation errors only. Unexpected errors are logged and return a generic `internal` 500
 - Use Better Auth's organization plugin for tenants, members, roles and invitations
 - Write sign-ins, role changes and invitations to the audit log via Better Auth hooks
 - SAML is community-maintained in Better Auth; OIDC covers most identity providers

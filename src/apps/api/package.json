@@ -12,7 +12,8 @@
     "start:worker": "node dist/worker.mjs",
     "db:generate": "drizzle-kit generate",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "catalog:",
@@ -33,10 +34,13 @@
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
+    "@types/supertest": "catalog:",
     "dotenv": "catalog:",
     "drizzle-kit": "catalog:",
+    "supertest": "catalog:",
     "tsdown": "catalog:",
     "tsx": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
