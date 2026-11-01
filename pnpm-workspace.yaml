@@ -42,5 +42,6 @@ catalog:
   # typescript-eslint supports TypeScript <6.1; hold here until it supports 7.x
   typescript: ~6.0.3
   typescript-eslint: ^8.72.1
+  vitest: ^5.0.5
   vue-tsc: ^3.3.14
   zod: ^4.6.7

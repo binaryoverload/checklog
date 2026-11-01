@@ -1,7 +1,6 @@
 import z from "zod"
 
 import { dateTypeSchema } from "./enums"
-import type { FieldType } from "./enums"
 
 export const fieldOptionsSchema = z.discriminatedUnion("type", [
   z.object({
@@ -54,11 +53,6 @@ export const fieldOptionsSchema = z.discriminatedUnion("type", [
 
 export type FieldOptions = z.infer<typeof fieldOptionsSchema>
 
-type _OptionTypesCovered = Exclude<FieldType, FieldOptions["type"]> extends never ? true : never
-// If this failed type checking, it means not all FieldTypes are covered in FieldOption["type"]
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- only exists for the compile-time check above
-const _optionTypesCovered: _OptionTypesCovered = true
-
 export const fieldValueSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("text"),
@@ -84,8 +78,3 @@ export const fieldValueSchema = z.discriminatedUnion("type", [
 ])
 
 export type FieldValue = z.infer<typeof fieldValueSchema>
-
-type _ValueTypesCovered = Exclude<FieldType, FieldValue["type"]> extends never ? true : never
-// If this failed type checking, it means not all FieldTypes are covered in FieldValue["type"]
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- only exists for the compile-time check above
-const _valueTypesCovered: _ValueTypesCovered = true
