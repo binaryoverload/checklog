@@ -1,0 +1,1 @@
+ALTER TABLE "templates" ALTER COLUMN "status" SET DEFAULT 'active';

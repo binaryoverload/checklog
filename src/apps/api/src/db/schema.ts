@@ -18,7 +18,7 @@ export const templates = pgTable("templates", {
   organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
-  status: text("status", { enum: templateStatuses }).notNull(),
+  status: text("status", { enum: templateStatuses }).notNull().default("active"),
   currentVersionId: text("current_version_id"),
   ...createdFields,
   ...updatedFields,

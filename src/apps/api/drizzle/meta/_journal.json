@@ -64,6 +64,13 @@
       "when": 1793545007905,
       "tag": "0008_template_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793545125917,
+      "tag": "0009_template_status",
+      "breakpoints": true
     }
   ]
 }
