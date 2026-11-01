@@ -33,7 +33,8 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 
 ### Foundations
 
-- [ ] Logging
+- [x] Logging: winston logger in `core/logger.ts`, readable by default and JSON with `LOG_FORMAT=json`, with `LOG_LEVEL` (agent)
+- [ ] Request logging: one `http`-level line per API request (method, path, status, duration) (agent)
 - [x] Email sending: SMTP config through environment variables, a mail catcher (for example Mailpit) in `docker-compose.yaml` for development, and one `sendEmail` helper (person)
 - [ ] API structure: routers per area under `/api`, request validation middleware using Zod schemas from `packages/shared`, one error response format, and a not-found handler (agent)
 - [ ] Session middleware: read the Better Auth session on every API request and expose the user and active organization to handlers (person)

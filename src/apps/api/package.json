@@ -25,6 +25,7 @@
     "pg": "catalog:",
     "pg-boss": "catalog:",
     "typeid-js": "catalog:",
+    "winston": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

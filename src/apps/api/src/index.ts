@@ -1,21 +1,22 @@
 import { createApp } from "./app.ts"
 import { config } from "./core/config.ts"
+import { logger } from "./core/logger.ts"
 import { pool, migrateDB } from "./db/index.ts"
 
 const app = createApp()
 
 if (config.MIGRATE_ON_START) {
-  console.log("Running database migrations...")
+  logger.info("Running database migrations")
   await migrateDB()
 }
 
 const server = app.listen(config.PORT, (error) => {
   if (error) throw error
-  console.log(`API listening on http://localhost:${config.PORT}`)
+  logger.info(`API listening on http://localhost:${config.PORT}`)
 })
 
 function shutdown(signal: string) {
-  console.log(`${signal} received, shutting down`)
+  logger.info(`${signal} received, shutting down`)
   server.close(async () => {
     await pool.end()
     process.exit(0)

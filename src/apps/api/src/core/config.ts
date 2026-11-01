@@ -1,6 +1,9 @@
 import { z } from "zod"
 
 const configSchema = z.object({
+  LOG_LEVEL: z.enum(["error", "warn", "info", "http", "verbose", "debug", "silly"]).default("info"),
+  LOG_FORMAT: z.enum(["pretty", "json"]).default("pretty"),
+
   PORT: z.coerce.number().default(3001),
   // httpUrl() needs a dotted hostname, so it rejects localhost
   PUBLIC_URL: z.url({ protocol: /^https?$/ }),
