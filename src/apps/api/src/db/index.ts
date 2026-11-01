@@ -1,9 +1,10 @@
 import { drizzle } from "drizzle-orm/node-postgres"
 import { migrate } from "drizzle-orm/node-postgres/migrator"
 import pg from "pg"
+
 import { config } from "../config.ts"
-import * as appSchema from "./schema.ts"
 import * as authSchema from "./auth-schema.ts"
+import * as appSchema from "./schema.ts"
 
 export const pool = new pg.Pool({ connectionString: config.databaseUrl })
 

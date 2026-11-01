@@ -1,5 +1,5 @@
-import shared from "../../../eslint.shared.js"
 import withNuxt from "./.nuxt/eslint.config.mjs"
+import shared from "../../../eslint.shared.js"
 
 export default withNuxt(
   shared,

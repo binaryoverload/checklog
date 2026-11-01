@@ -25,8 +25,9 @@ export default defineNuxtConfig({
 
   eslint: {
     config: {
-      // Formatting comes from the shared Stylistic config; Nuxt supplies the Vue and Nuxt rules
+      // Formatting and import rules come from the shared config; Nuxt supplies the Vue and Nuxt rules
       stylistic: false,
+      import: false,
     },
   },
 })

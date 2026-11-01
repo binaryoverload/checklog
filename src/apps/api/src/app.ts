@@ -1,9 +1,10 @@
-import express from "express"
-import { pool } from "./db/index.ts"
-import cors from "cors"
 import { toNodeHandler } from "better-auth/node"
+import cors from "cors"
+import express from "express"
+
 import { auth } from "./auth.ts"
 import { config } from "./config.ts"
+import { pool } from "./db/index.ts"
 
 export function createApp() {
   const app = express()

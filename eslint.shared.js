@@ -1,6 +1,8 @@
 // Shared ESLint config for every package. The web app wraps it with withNuxt().
+import eslintCommentPlugin from "@eslint-community/eslint-plugin-eslint-comments/configs"
 import js from "@eslint/js"
 import stylistic from "@stylistic/eslint-plugin"
+import importPlugin from "eslint-plugin-import-x"
 import { defineConfig, globalIgnores } from "eslint/config"
 import globals from "globals"
 import tseslint from "typescript-eslint"
@@ -23,10 +25,48 @@ export default defineConfig(
   {
     files: tsFiles,
     extends: [tseslint.configs.recommended],
+    rules: {
+      // Type-only imports use `import type`, matching verbatimModuleSyntax
+      "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "separate-type-imports" }],
+    },
   },
   {
     languageOptions: {
       globals: globals.node,
+    },
+  },
+  // Every eslint-disable comment must say why, and must not be left open
+  {
+    name: "checklog/eslint-comments",
+    extends: [eslintCommentPlugin.recommended],
+    rules: {
+      "@eslint-community/eslint-comments/disable-enable-pair": ["error", { allowWholeFile: true }],
+      "@eslint-community/eslint-comments/require-description": "error",
+    },
+  },
+  // Import order and style only; TypeScript already checks that imports resolve
+  {
+    name: "checklog/imports",
+    plugins: { "import-x": importPlugin },
+    rules: {
+      "import-x/consistent-type-specifier-style": ["error", "prefer-top-level"],
+      "import-x/first": "error",
+      "import-x/newline-after-import": "error",
+      "import-x/no-duplicates": "error",
+      "import-x/no-mutable-exports": "error",
+      "import-x/no-named-default": "error",
+      "import-x/order": ["error", {
+        "groups": ["builtin", "external", "internal", ["parent", "sibling", "index"]],
+        // Workspace packages and Nuxt's ~ and # aliases count as internal
+        "pathGroups": [
+          { pattern: "@checklog/**", group: "internal" },
+          { pattern: "~/**", group: "internal" },
+          { pattern: "#*", group: "internal" },
+        ],
+        "pathGroupsExcludedImportTypes": ["builtin"],
+        "newlines-between": "always",
+        "alphabetize": { order: "asc", caseInsensitive: true },
+      }],
     },
   },
   stylistic.configs.customize({

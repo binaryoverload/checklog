@@ -1,5 +1,5 @@
-import type { DehydratedState, VueQueryPluginOptions } from "@tanstack/vue-query"
 import { QueryClient, VueQueryPlugin, dehydrate, hydrate } from "@tanstack/vue-query"
+import type { DehydratedState, VueQueryPluginOptions } from "@tanstack/vue-query"
 
 // Queries fetched during SSR are dehydrated into the payload and hydrated in the browser,
 // so pages do not fetch the same data twice

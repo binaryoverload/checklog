@@ -21,7 +21,9 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 ## Linting
 
 - One flat ESLint config at the root with Stylistic; Prettier is not used
-- The web app wraps it with `withNuxt(sharedConfig)`; `@nuxt/eslint` stylistic and other optional tooling stay off
+- The web app wraps it with `withNuxt(sharedConfig)`; `@nuxt/eslint` stylistic, import rules and other optional tooling stay off
+- Imports: `eslint-plugin-import-x` sorts them into groups (built-in, external, internal `@checklog/*`/`~`/`#`, relative) with a blank line between, and type-only imports use top-level `import type`. Resolution checks are left to TypeScript
+- Every `eslint-disable` comment needs a `-- reason` and must be closed (`@eslint-community/eslint-plugin-eslint-comments`)
 - Stylistic does not format `<template>` blocks, so `vue/*` layout rules live in the web app's ESLint config as a Nuxt-specific override
 
 ## API and auth

@@ -1,6 +1,6 @@
 import { createApp } from "./app.ts"
-import { pool, migrateDB } from "./db/index.ts"
 import { config } from "./config.ts"
+import { pool, migrateDB } from "./db/index.ts"
 
 const app = createApp()
 

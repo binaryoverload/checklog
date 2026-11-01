@@ -20,9 +20,11 @@
     "db:down": "docker compose down"
   },
   "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "catalog:",
     "@eslint/js": "catalog:",
     "@stylistic/eslint-plugin": "catalog:",
     "eslint": "catalog:",
+    "eslint-plugin-import-x": "catalog:",
     "globals": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:"

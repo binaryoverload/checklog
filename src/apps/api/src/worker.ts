@@ -1,4 +1,5 @@
 import { PgBoss } from "pg-boss"
+
 import { config } from "./config.ts"
 
 // pg-boss workers run from the API image as their own Kubernetes deployment

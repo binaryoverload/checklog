@@ -167,6 +167,9 @@ catalogs:
     '@better-auth/drizzle-adapter':
       specifier: ^1.7.14
       version: 1.7.14
+    '@eslint-community/eslint-plugin-eslint-comments':
+      specifier: ^4.8.1
+      version: 4.8.1
     '@eslint/js':
       specifier: ^10.0.0
       version: 10.0.1
@@ -212,6 +215,9 @@ catalogs:
     eslint:
       specifier: ^10.14.0
       version: 10.14.0
+    eslint-plugin-import-x:
+      specifier: ^4.17.1
+      version: 4.17.1
     express:
       specifier: ^5.3.0
       version: 5.3.0
@@ -256,6 +262,9 @@ importers:
 
   .:
     devDependencies:
+      '@eslint-community/eslint-plugin-eslint-comments':
+        specifier: 'catalog:'
+        version: 4.8.1(eslint@10.14.0(jiti@2.7.0)(supports-color@10.2.2))
       '@eslint/js':
         specifier: 'catalog:'
         version: 10.0.1(eslint@10.14.0(jiti@2.7.0)(supports-color@10.2.2))
@@ -265,6 +274,9 @@ importers:
       eslint:
         specifier: 'catalog:'
         version: 10.14.0(jiti@2.7.0)(supports-color@10.2.2)
+      eslint-plugin-import-x:
+        specifier: 'catalog:'
+        version: 4.17.1(@typescript-eslint/utils@8.72.1(eslint@10.14.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3))(eslint@10.14.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)
       globals:
         specifier: 'catalog:'
         version: 17.13.0
@@ -1266,6 +1278,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@eslint-community/eslint-plugin-eslint-comments@4.8.1':
+    resolution: {integrity: sha512-vafrdi15JHBFh1qWOAucyJwlEEuhdoMof28jOdKdgnwZ7bXwd6v4wzHYSmAVLwnx0yc7bqAtfJ0EZQV1WAzV/Q==}
+    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+    peerDependencies:
+      eslint: ^6.0.0 || ^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0
 
   '@eslint-community/eslint-utils@4.10.1':
     resolution: {integrity: sha512-cuadcxVFE8sDK6iWJbs8Sn0av2Nrh2QSGQhVlBW9AaAHqHwjWsZHT8LJ4hFGPh7ASBV2deFdM7H/DPjulmh8rg==}
@@ -7064,6 +7082,12 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@eslint-community/eslint-plugin-eslint-comments@4.8.1(eslint@10.14.0(jiti@2.7.0)(supports-color@10.2.2))':
+    dependencies:
+      escape-string-regexp: 4.0.0
+      eslint: 10.14.0(jiti@2.7.0)(supports-color@10.2.2)
+      ignore: 7.0.14
 
   '@eslint-community/eslint-utils@4.10.1(eslint@10.14.0(jiti@2.7.0)(supports-color@10.2.2))':
     dependencies:

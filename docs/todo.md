@@ -117,4 +117,5 @@ Following the [audit log plan](plans/audit-log.md):
 
 ## Housekeeping
 
+- [x] ESLint: require reasons on disable comments, and enforce import order and `import type` (agent)
 - [ ] Push local commits to `origin/main` (5 commits ahead when this list was started)
