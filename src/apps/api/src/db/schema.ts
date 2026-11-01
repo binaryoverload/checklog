@@ -1,8 +1,13 @@
-import { pgTable, text, integer, boolean, timestamp, unique, uniqueIndex, foreignKey, type PgTableExtraConfigValue, interval, index, jsonb } from "drizzle-orm/pg-core"
-import { members, organizations, teams, users } from "./auth-schema.ts"
 import { sql } from "drizzle-orm"
+import { pgTable, text, integer, boolean, timestamp, unique, uniqueIndex, foreignKey, interval, index, jsonb } from "drizzle-orm/pg-core"
+
+import { assigneeTypes, fieldTypes, runStatuses, runStepStatuses, scheduleStatuses, templateAccessLevels, templateStatuses, templateStepKinds, templateVersionStatuses } from "@checklog/shared"
+
+import { members, organizations, teams, users } from "./auth-schema.ts"
 import { typeIdForTable } from "../util/typeid.ts"
-import { assigneeTypes, fieldTypes, runStatuses, runStepStatuses, scheduleStatuses, templateAccessLevels, templateStatuses, templateStepKinds, templateVersionStatuses, type FieldOptions } from "@checklog/shared"
+
+import type { FieldOptions, FieldValue } from "@checklog/shared"
+import type { PgTableExtraConfigValue } from "drizzle-orm/pg-core"
 
 const createdFields = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -25,8 +30,8 @@ export const templates = pgTable("templates", {
 
 }, (t): PgTableExtraConfigValue[] => [
   // Target for the templateVersions table's foreign key to templates
-  unique().on(t.id, t.organizationId),
-  uniqueIndex("templates_name_unique_idx").on(t.name, t.organizationId).where(sql`${t.status} = 'active'`),
+  unique().on(t.organizationId, t.id),
+  uniqueIndex("templates_name_unique_idx").on(t.organizationId, t.name).where(sql`${t.status} = 'active'`),
   // The current version must be one of this template's own versions.
   foreignKey({
     name: "templates_current_version_id_fk",
@@ -48,13 +53,13 @@ export const templateVersions = pgTable("template_versions", {
 }, t => [
   // Target for the templates.current_version_id foreign key
   unique().on(t.id, t.templateId),
-  unique().on(t.id, t.organizationId),
+  unique().on(t.organizationId, t.id),
   unique().on(t.templateId, t.version),
   uniqueIndex("template_versions_one_draft_idx").on(t.templateId).where(sql`${t.status} = 'draft'`),
   foreignKey({
     name: "template_versions_template_id_fk",
-    columns: [t.templateId, t.organizationId],
-    foreignColumns: [templates.id, templates.organizationId],
+    columns: [t.organizationId, t.templateId],
+    foreignColumns: [templates.organizationId, templates.id],
   }).onDelete("restrict"),
 ])
 
@@ -76,12 +81,12 @@ export const templateSteps = pgTable("template_steps", {
   ...createdFields,
   ...updatedFields,
 }, t => [
-  unique().on(t.id, t.templateVersionId, t.organizationId),
+  unique().on(t.organizationId, t.id, t.templateVersionId),
   index("template_steps_version_position_idx").on(t.templateVersionId, t.position),
   foreignKey({
     name: "template_steps_template_versions_id_fk",
-    columns: [t.templateVersionId, t.organizationId],
-    foreignColumns: [templateVersions.id, templateVersions.organizationId],
+    columns: [t.organizationId, t.templateVersionId],
+    foreignColumns: [templateVersions.organizationId, templateVersions.id],
   }).onDelete("cascade"),
 ])
 
@@ -100,12 +105,13 @@ export const templateFields = pgTable("template_fields", {
   ...createdFields,
   ...updatedFields,
 }, t => [
+  unique().on(t.organizationId, t.id),
   unique().on(t.templateVersionId, t.key), // Unique across the whole version for comparison
   index("template_fields_step_position_idx").on(t.templateStepId, t.position),
   foreignKey({
     name: "template_fields_template_steps_id_fk",
-    columns: [t.templateStepId, t.templateVersionId, t.organizationId],
-    foreignColumns: [templateSteps.id, templateSteps.templateVersionId, templateSteps.organizationId],
+    columns: [t.organizationId, t.templateStepId, t.templateVersionId],
+    foreignColumns: [templateSteps.organizationId, templateSteps.id, templateSteps.templateVersionId],
   }).onDelete("cascade"),
 ])
 
@@ -125,8 +131,8 @@ export const templateAccess = pgTable("template_access", {
   index("template_access_team_idx").on(t.teamId),
   foreignKey({
     name: "template_access_template_id_fk",
-    columns: [t.templateId, t.organizationId],
-    foreignColumns: [templates.id, templates.organizationId],
+    columns: [t.organizationId, t.templateId],
+    foreignColumns: [templates.organizationId, templates.id],
   }).onDelete("cascade"),
 ])
 
@@ -142,12 +148,12 @@ export const schedules = pgTable("schedules", {
   ...createdFields,
   ...updatedFields,
 }, t => [
-  unique().on(t.id, t.organizationId),
+  unique().on(t.organizationId, t.id),
   index("schedules_due_idx").on(t.nextRunAt),
   foreignKey({
     name: "schedules_template_id_fk",
-    columns: [t.templateId, t.organizationId],
-    foreignColumns: [templates.id, templates.organizationId],
+    columns: [t.organizationId, t.templateId],
+    foreignColumns: [templates.organizationId, templates.id],
   }).onDelete("cascade"),
 ])
 
@@ -162,20 +168,20 @@ export const runs = pgTable("runs", {
   ...createdFields,
   ...updatedFields,
 }, t => [
-  unique().on(t.id, t.organizationId),
-  unique().on(t.id, t.templateVersionId, t.organizationId),
+  unique().on(t.organizationId, t.id),
+  unique().on(t.organizationId, t.id, t.templateVersionId),
   index("runs_organization_status_idx").on(t.organizationId, t.status),
   index("runs_template_version_idx").on(t.templateVersionId),
   index("runs_schedule_idx").on(t.scheduleId),
   foreignKey({
     name: "runs_template_version_id_fk",
-    columns: [t.templateVersionId, t.organizationId],
-    foreignColumns: [templateVersions.id, templateVersions.organizationId],
+    columns: [t.organizationId, t.templateVersionId],
+    foreignColumns: [templateVersions.organizationId, templateVersions.id],
   }).onDelete("restrict"),
   foreignKey({
     name: "runs_schedule_id_fk",
-    columns: [t.scheduleId, t.organizationId],
-    foreignColumns: [schedules.id, schedules.organizationId],
+    columns: [t.organizationId, t.scheduleId],
+    foreignColumns: [schedules.organizationId, schedules.id],
   }).onDelete("restrict"),
 ])
 
@@ -197,25 +203,61 @@ export const runSteps = pgTable("run_steps", {
   ...createdFields,
   ...updatedFields,
 }, t => [
-  unique().on(t.id, t.organizationId),
+  unique().on(t.organizationId, t.id),
   unique().on(t.runId, t.templateStepId), // Only one step per run per template step
   index("run_steps_template_step_id_idx").on(t.templateStepId),
   index("run_steps_assignee_member_id_idx").on(t.assigneeMemberId),
   index("run_steps_assignee_team_id_idx").on(t.assigneeTeamId),
   foreignKey({
     name: "run_steps_run_id_fk",
-    columns: [t.runId, t.templateVersionId, t.organizationId],
-    foreignColumns: [runs.id, runs.templateVersionId, runs.organizationId],
+    columns: [t.organizationId, t.runId, t.templateVersionId],
+    foreignColumns: [runs.organizationId, runs.id, runs.templateVersionId],
   }).onDelete("cascade"),
   foreignKey({
     name: "run_steps_template_step_id_fk",
-    columns: [t.templateStepId, t.templateVersionId, t.organizationId],
-    foreignColumns: [templateSteps.id, templateSteps.templateVersionId, templateSteps.organizationId],
+    columns: [t.organizationId, t.templateStepId, t.templateVersionId],
+    foreignColumns: [templateSteps.organizationId, templateSteps.id, templateSteps.templateVersionId],
   }).onDelete("restrict"),
 ])
 
-// export const runFieldValues = pgTable("run_field_values")
-// export const stepNotes = pgTable("step_notes")
+export const runFieldValues = pgTable("run_field_values", {
+  id: text("id").primaryKey().$defaultFn(() => typeIdForTable("runFieldValues").toString()),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  runStepId: text("run_step_id").notNull(),
+  templateFieldId: text("template_field_id").notNull(),
+  value: jsonb("value").$type<FieldValue>(),
+  ...createdFields,
+  ...updatedFields,
+  updatedBy: text("updated_by"),
+}, t => [
+  unique().on(t.runStepId, t.templateFieldId), // Only one value per run step per template field
+  index("run_field_values_template_field_id_idx").on(t.templateFieldId),
+  foreignKey({
+    name: "run_field_values_run_step_id_fk",
+    columns: [t.organizationId, t.runStepId],
+    foreignColumns: [runSteps.organizationId, runSteps.id],
+  }).onDelete("cascade"),
+  foreignKey({
+    name: "run_field_values_template_field_id_fk",
+    columns: [t.organizationId, t.templateFieldId],
+    foreignColumns: [templateFields.organizationId, templateFields.id],
+  }).onDelete("restrict"),
+])
+
+export const stepNotes = pgTable("step_notes", {
+  id: text("id").primaryKey().$defaultFn(() => typeIdForTable("stepNotes").toString()),
+  organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  runStepId: text("run_step_id").notNull(),
+  body: text("body").notNull(),
+  ...createdFields,
+}, t => [
+  index("step_notes_run_step_id_idx").on(t.runStepId),
+  foreignKey({
+    name: "step_notes_run_step_id_fk",
+    columns: [t.organizationId, t.runStepId],
+    foreignColumns: [runSteps.organizationId, runSteps.id],
+  }).onDelete("cascade"),
+])
 
 // export const approvalRequests = pgTable("approval_requests")
 // export const approvalDecisions = pgTable("approval_decisions")
