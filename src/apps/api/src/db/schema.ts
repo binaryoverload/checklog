@@ -1,13 +1,12 @@
 import { sql } from "drizzle-orm"
 import { pgTable, text, integer, boolean, timestamp, unique, uniqueIndex, foreignKey, interval, index, jsonb } from "drizzle-orm/pg-core"
+import type { PgTableExtraConfigValue } from "drizzle-orm/pg-core"
 
 import { assigneeTypes, fieldTypes, runStatuses, runStepStatuses, scheduleStatuses, templateAccessLevels, templateStatuses, templateStepKinds, templateVersionStatuses } from "@checklog/shared"
+import type { FieldOptions, FieldValue } from "@checklog/shared"
 
 import { members, organizations, teams, users } from "./auth-schema.ts"
 import { typeIdForTable } from "../util/typeid.ts"
-
-import type { FieldOptions, FieldValue } from "@checklog/shared"
-import type { PgTableExtraConfigValue } from "drizzle-orm/pg-core"
 
 const createdFields = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
