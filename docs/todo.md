@@ -11,7 +11,7 @@ Each item is marked with who does it under the [AI use policy](../AGENTS.md): **
   - [x] `users`: `managedByOrganizationId`, referencing `organizations` with `ON DELETE RESTRICT`
   - [x] `disableOrganizationDeletion: true` on the organization plugin
   - [x] Regenerate `auth-schema.ts` (keep the time-zone timestamps and lint formatting) and generate a migration
-- [ ] **Finish the schema** (person), following the [database plan](plans/db-structure.md). `audit_events` waits for the audit work below.
+- [x] **Finish the schema** (person), following the [database plan](plans/db-structure.md). `audit_events` waits for the audit work below.
   - [x] `template_steps`, `template_fields`, `template_access`
   - [x] `schedules`
   - [x] `runs`, `run_steps`
@@ -19,7 +19,7 @@ Each item is marked with who does it under the [AI use policy](../AGENTS.md): **
   - [x] `run_steps`: add `assignee_type`, matching `template_steps`
   - [x] `run_field_values`, `step_notes`
   - [x] `approval_requests`, `approval_decisions`: drop the approver columns and `run_id`, make `run_step_id` unique (one request per step)
-  - [ ] `notifications`
+  - [x] `notifications` and `notification_deliveries`, following [Notifications](plans/db-structure.md#7-notifications): typed payload, subject, dedupe key; add `schedule_skipped` to `notificationTypes`, the `NotificationPayload` union to `packages/shared`, and the `ndel` prefix to `typeid.ts`
   - [x] Replace migrations `0000`–`0009` with one baseline migration (the old ones fail on a fresh database), reset the dev database and apply it
 - [x] Remove the unused `auditChains` prefix from `src/apps/api/src/util/typeid.ts` (person)
 
@@ -81,10 +81,13 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 
 ### Notifications
 
+- [ ] One `notify` function: inserts the notification with its dedupe key and creates its deliveries only if the insert happened (person)
+- [ ] Sending job: one pg-boss job per delivery, queued in the transaction that creates it; records `attempts`, `last_attempt_at` and `last_error`, sets `sent` or, after the last retry, `failed` (person)
 - [ ] Assignment emails when a step is assigned to someone or their group (person)
-- [ ] Overdue job: flags overdue steps and emails assignees once, using `notifications` to avoid repeats (person)
+- [ ] Overdue job: flags overdue steps and emails assignees once, using the `overdue:<run step ID>` dedupe key (person)
 - [ ] Approval-needed emails to approvers (person)
-- [ ] UI: overdue badges on runs and steps (person)
+- [ ] Skipped-schedule notification to the template's editors (person)
+- [ ] UI: notification inbox with unread state, and overdue badges on runs and steps (person)
 
 ### Checking it works
 

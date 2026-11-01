@@ -117,7 +117,20 @@ Writing an event inserts one row in the same transaction as the change being rec
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
-| `notifications` | `organization_id`, `user_id`, `type` (assigned, overdue, approval needed), `run_step_id` or `approval_request_id`, `sent_at`, `read_at` | Also stops the overdue job emailing the same person twice |
+| `notifications` | `organization_id`, `member_id`, `type`, `payload` (jsonb), `subject_type`, `subject_id`, `dedupe_key`, `read_at` | One inbox item for one person. `member_id` cascades, so removing someone from the organization clears their notifications. Edited in place (`read_at`), so it has `updated_at`. |
+| `notification_deliveries` | `organization_id`, `notification_id`, `channel` (email), `status` (pending, sent, failed), `recipient`, `attempts`, `last_attempt_at`, `sent_at`, `last_error` | One row per channel per notification (unique on `notification_id`, `channel`), cascading from it. Sending, retries and failures live here, not on the notification. `recipient` is the address it actually went to, since people change their email. Only `email` in the MVP. |
+
+New kinds of notification need no schema change (decided):
+
+- **Types** live in `notificationTypes` in `packages/shared`: `assigned_step`, `overdue_step`, `approval_needed` and `schedule_skipped` to begin with.
+- **Payload:** a Zod discriminated union on `type` in `packages/shared` (`NotificationPayload`), stored with `$type<NotificationPayload>()` in the same way as field values. Each variant carries the IDs it links to plus a small snapshot for display (for example the run name and step title), so the inbox renders without joins and still reads sensibly if the run is renamed.
+- **Subject:** `subject_type` and `subject_id` point at the main thing the notification is about (for example `run_step` and its ID, or `schedule` for a skipped run) for links and lookups. There's deliberately no foreign key, so new subject types need no new column. Nothing is lost in practice: runs and steps are cancelled rather than deleted, and deleting an organization or removing a member still cascades. The inbox copes with a subject that no longer exists.
+- **Repeats:** `dedupe_key` is unique on (`member_id`, `dedupe_key`), and null means no check. The code creating the notification decides what counts as a repeat: `overdue:<run step ID>` sends once ever, while assignments have no key, because each assignment happens once in its own transaction, so reassigning back notifies again. Inserts use `ON CONFLICT DO NOTHING`, and a delivery is only created when the insert happened, so overlapping job runs can't email twice.
+- **Indexes:** (`member_id`, `created_at`) for the inbox; (`subject_type`, `subject_id`) for lookups; deliveries need no extra index, because the unique on (`notification_id`, `channel`) covers lookups and the sending job never searches the table.
+
+**Sending (decided):** creating a delivery also queues a pg-boss job for it, with the delivery's ID, in the same transaction (pg-boss's `send` takes the transaction's connection), so a delivery is never left without a job or a job without a delivery. pg-boss handles retries, backoff and concurrency; the job records each attempt on the row (`attempts`, `last_attempt_at`, `last_error`). `status` is `pending` while sending or retrying, `sent` once delivered (with `sent_at`), and `failed` only after the last retry, so `failed` means someone needs to look.
+
+**Later:** more channels (Slack, push, webhooks) are new `channel` values, and per-person preferences are a `notification_preferences` table (`member_id`, `type`, `channel`, `enabled`) that the job checks before creating a delivery.
 
 ## IDs
 
@@ -127,7 +140,7 @@ Every primary key is a TypeID: a lowercase prefix naming the type, an underscore
 - **Better Auth:** its `advanced.database.generateId` option takes a function that is told which model the ID is for, so Better Auth's own tables get prefixed TypeIDs too (`user_…`, `org_…`, `team_…`). Every ID in the system looks the same.
 - **Storage:** `text` columns. A native `uuid` column would be half the size, but then every ID would need converting at the API boundary, and Better Auth's endpoints would return the raw form. At Checklog's scale the extra index size doesn't matter.
 - **Generation:** in the app with `typeid-js`, not in Postgres. Each table's `$defaultFn` sets the right prefix; the database doesn't check it, in line with keeping value rules in the API.
-- **Prefixes:** short and fixed once chosen, because they are part of every stored ID. The list lives in `src/apps/api/src/util/typeid.ts`: `user`, `sess`, `acct`, `verif`, `org`, `mem`, `inv`, `team`, `tmem`, `tmpl`, `tver`, `tstep`, `tfield`, `tacc`, `sched`, `run`, `rstep`, `fval`, `note`, `apreq`, `apdec`, `aevt`, `notif`.
+- **Prefixes:** short and fixed once chosen, because they are part of every stored ID. The list lives in `src/apps/api/src/util/typeid.ts`: `user`, `sess`, `acct`, `verif`, `org`, `mem`, `inv`, `team`, `tmem`, `tmpl`, `tver`, `tstep`, `tfield`, `tacc`, `sched`, `run`, `rstep`, `fval`, `note`, `apreq`, `apdec`, `aevt`, `notif`, `ndel`.
 
 ## Relationships
 
@@ -148,6 +161,8 @@ erDiagram
   run_steps ||--o{ step_notes : has
   run_steps ||--o| approval_requests : needs
   approval_requests ||--o{ approval_decisions : gets
+  members ||--o{ notifications : receives
+  notifications ||--o{ notification_deliveries : "sent by"
   organizations ||--o{ audit_events : logs
   runs ||--o{ audit_events : logs
   users ||--o{ audit_events : logs
