@@ -11,7 +11,7 @@ It covers the [MVP scope](../mvp-scope.md) and leaves room for v1 (proof upload,
 - **Templates are versioned and published versions are immutable.** A run points at the exact version it started from, which gives the "run snapshot" requirement without copying data.
 - **The audit log is append-only.** The app's database role gets no `UPDATE` or `DELETE` on it, and a trigger refuses edits and deletes from anyone else. There are no hash chains (decided); tamper evidence is a future feature.
 - **Store facts, derive state where cheap.** For example, a step's `due_at` is stored because the overdue job queries it, but "is the run overdue" is computed.
-- **Conventions:** snake_case names, `timestamptz` everywhere, `created_at` on every table, archive instead of delete for anything a run references.
+- **Conventions:** snake_case names, `timestamptz` everywhere, `created_at` and `created_by` on every table, `updated_at` on every table that's edited in place, archive instead of delete for anything a run references.
 - **IDs are [TypeIDs](https://github.com/jetify-com/typeid):** a type prefix plus a UUIDv7, such as `run_01jbx…`. Stored as `text`. See [IDs](#ids).
 - **Tenant isolation is enforced in the app** for the MVP: every query filters on `organization_id`. Postgres row-level security may be added later, and having the column on every table keeps that option open.
 
@@ -160,6 +160,7 @@ None of these are built in the MVP; the plan only makes sure they won't need a r
 
 - **Approvers:** the assignee of an approval step is its approver; there are no separate approver columns on template steps
 - **No run-level approvals for now:** every approval belongs to an approval step; signing off a run means ending its template with an approval step
+- **Timestamps and history:** both (decided). Every table edited in place has `updated_at`, for "last changed" lists and edit-conflict checks (save only if `updated_at` hasn't changed since loading). The audit log is the full history of who changed what. There's no `updated_by`; the audit log covers it. `created_by` isn't a foreign key to `users`, because the purge deletes a managed organization's accounts before its data; rows created by jobs use the job's name.
 - **Validation:** the database enforces keys, relationships and uniqueness; value rules such as statuses, which steps can be skippable and required skip reasons are checked in the API
 - **Groups:** Better Auth teams, called groups in the UI
 - **Permissions:** organization-wide permissions from member roles; per-template access for groups and people through `template_access`. Groups granting roles is planned for later.
