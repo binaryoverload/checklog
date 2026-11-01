@@ -6,6 +6,8 @@ const statusByCode: Record<ApiErrorCode, number> = {
   validation_failed: 400,
   unauthorized: 401,
   forbidden: 403,
+  no_active_organization: 403,
+  organization_deleted: 403,
   not_found: 404,
   conflict: 409,
   payload_too_large: 413,

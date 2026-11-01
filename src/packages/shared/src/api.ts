@@ -8,6 +8,8 @@ export const apiErrorCodes = [
   "validation_failed",
   "unauthorized",
   "forbidden",
+  "no_active_organization",
+  "organization_deleted",
   "not_found",
   "conflict",
   "payload_too_large",
