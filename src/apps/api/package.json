@@ -11,6 +11,7 @@
     "start": "node dist/index.mjs",
     "start:worker": "node dist/worker.mjs",
     "db:generate": "drizzle-kit generate",
+    "db:seed": "tsx --import dotenv/config src/seed.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

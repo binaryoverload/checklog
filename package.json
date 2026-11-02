@@ -18,7 +18,8 @@
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
     "db:up": "docker compose up -d --wait postgres",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "db:seed": "pnpm --filter @checklog/api db:seed"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "catalog:",

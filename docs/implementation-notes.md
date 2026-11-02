@@ -37,6 +37,7 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 - Use Better Auth's organization plugin for tenants, members, roles and invitations
 - Write sign-ins, role changes and invitations to the audit log via Better Auth hooks
 - SAML is community-maintained in Better Auth; OIDC covers most identity providers
+- The development seed (`pnpm db:seed`) creates users and organizations through `auth.api` rather than inserting rows, so passwords are hashed and IDs are TypeIDs; it skips anything that already exists and refuses to run with `NODE_ENV=production`
 
 ## Frontend data
 

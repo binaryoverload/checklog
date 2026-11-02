@@ -38,6 +38,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 - [x] Email sending: SMTP config through environment variables, a mail catcher (for example Mailpit) in `docker-compose.yaml` for development, and one `sendEmail` helper (person)
 - [x] API structure: a router per area under `/api`, the typed `route()` helper validating with Zod schemas from `packages/shared`, the error format with an error handler, and a not-found handler; see [API and auth](implementation-notes.md#api-and-auth) (agent)
 - [x] Session middleware: read the Better Auth session on every API request and expose the user and active organization to handlers (person)
+- [x] Development seed: `pnpm db:seed` creates sign-in accounts and an organization through Better Auth (agent)
 - [ ] The permission function: one place that answers "can this user do this in this organization", from the member's role and `template_access` (person)
 - [ ] Shared Zod schemas in `packages/shared` for each area's request and response bodies, added as each area is built (person)
 
