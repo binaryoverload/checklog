@@ -133,7 +133,7 @@ Following the [audit log plan](plans/audit-log.md):
 ## Before the first production deployment
 
 - [ ] Split the app and owner database roles, and add `MIGRATION_DATABASE_URL` (person, with an agent for the compose, `.env` and Kubernetes config)
-- [ ] Publish Docker images from CI (agent)
+- [x] Publish Docker images from CI: `main` and `sha-<commit>` tags on GHCR, for amd64 and arm64 (agent)
 - [ ] Kubernetes manifests: API, worker, web, migrate Job, probes (agent)
 - [ ] Register domains and the `checklog-app` GitHub organization (person; deferred until the MVP, see [decisions](decisions.md))
 

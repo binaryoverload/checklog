@@ -53,7 +53,7 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 
 - Dockerfiles live in `docker/` (`api.Dockerfile`, `web.Dockerfile`) and build from the repo root. Both use `node:24-trixie-slim`, install with the pinned pnpm through Corepack, and copy only build output into the runtime stage, owned by root and run as the `node` user. The API image is built with `pnpm deploy --prod` and also carries `drizzle/` for the migrate Job.
 - `docker-compose.yaml` runs Postgres for local development only (`pnpm db:up`); it is not the production deployment.
-- CI (`.github/workflows/ci.yml`) runs lint, typecheck and build, and builds both images without publishing them.
+- CI (`.github/workflows/ci.yml`) runs lint, typecheck, test and build, and builds both images for `linux/amd64` and `linux/arm64` on native runners. Pull requests only build. Pushes to `main` publish `ghcr.io/<owner>/checklog-api` and `checklog-web` to GHCR as multi-platform images tagged `main` and `sha-<commit>`, once every check has passed. Release tags aren't published yet.
 - Two images, `api` and `web`, multi-stage, running as a non-root user; pg-boss workers run from the api image as their own deployment, scaled separately from the API
 - Liveness and readiness endpoints; graceful shutdown on SIGTERM for requests and jobs
 - All configuration through environment variables
