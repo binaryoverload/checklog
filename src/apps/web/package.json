@@ -15,8 +15,10 @@
   },
   "dependencies": {
     "@checklog/shared": "workspace:*",
+    "@iconify-json/lucide": "catalog:",
     "@nuxt/ui": "catalog:",
     "@tanstack/vue-query": "catalog:",
+    "better-auth": "catalog:",
     "nuxt": "catalog:",
     "tailwindcss": "catalog:"
   },

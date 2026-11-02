@@ -1,7 +1,9 @@
+<script setup lang="ts">
+definePageMeta({ title: "Home" })
+</script>
+
 <template>
-  <UContainer class="py-16">
-    <h1 class="text-3xl font-semibold">
-      Checklog
-    </h1>
-  </UContainer>
+  <div>
+    <!-- TODO (person): the home page -->
+  </div>
 </template>

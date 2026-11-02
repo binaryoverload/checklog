@@ -14,6 +14,11 @@ export default defineNuxtConfig({
     },
   },
 
+  // Nuxt Icon's endpoint defaults to /api/_nuxt_icon, but /api belongs to the Express API
+  icon: {
+    localApiEndpoint: "/_nuxt_icon",
+  },
+
   compatibilityDate: "2026-10-01",
 
   // Nuxt renders the UI only; in dev, forward /api to the Express API like the production proxy does

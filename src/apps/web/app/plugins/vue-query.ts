@@ -26,4 +26,7 @@ export default defineNuxtPlugin((nuxt) => {
       }
     })
   }
+
+  // Route middleware runs outside components, where useQueryClient() isn't available
+  return { provide: { queryClient } }
 })

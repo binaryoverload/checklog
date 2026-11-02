@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "API",
+      "type": "shell",
+      "command": "pnpm --filter @checklog/api dev",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "dev", "panel": "dedicated" }
+    },
+    {
+      "label": "Worker",
+      "type": "shell",
+      "command": "pnpm --filter @checklog/api dev:worker",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "dev", "panel": "dedicated" }
+    },
+    {
+      "label": "Web",
+      "type": "shell",
+      "command": "pnpm --filter @checklog/web dev",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "dev", "panel": "dedicated" }
+    },
+    {
+      "label": "API and web",
+      "dependsOn": ["API", "Web"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Everything",
+      "dependsOn": ["API", "Worker", "Web"],
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    }
+  ]
+}

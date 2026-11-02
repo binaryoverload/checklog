@@ -43,7 +43,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 
 ### Web app
 
-- [ ] App shell: layout, navigation and organization switcher with Nuxt UI, Better Auth client, shared TanStack Query fetch helper with SSR hydration (agent)
+- [x] App shell: layout, navigation and organization switcher with Nuxt UI, Better Auth client, shared TanStack Query fetch helper with SSR hydration (agent)
 - [ ] Sign-up, sign-in, sign-out and password reset pages using Better Auth's endpoints (person)
 - [ ] Create a personal organization after sign-up, and the empty state when a user has none (person)
 - [ ] Members: list, invite by email, change role, remove; accept-invitation page (person)
