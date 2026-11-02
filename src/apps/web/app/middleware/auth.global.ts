@@ -1,7 +1,7 @@
-const signInPath = "/sign-in"
+const signInPath = "/login"
 
 // Pages are signed-in only unless they set `definePageMeta({ auth: "public" })`.
-// The sign-in path is always let through, so a missing or misconfigured page can't loop.
+// The login path is always let through, so a missing or misconfigured page can't loop.
 export default defineNuxtRouteMiddleware(async (to) => {
   if (to.meta.auth === "public" || to.path === signInPath) return
 

@@ -53,7 +53,12 @@ export function useSignOut() {
     mutationFn: async () => unwrap(await $authClient.signOut()),
     onSuccess: async () => {
       queryClient.clear()
-      await navigateTo("/sign-in")
+      await navigateTo("/login")
     },
   })
+}
+
+export function useAuth() {
+  const { $authClient } = useNuxtApp()
+  return $authClient
 }

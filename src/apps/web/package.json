@@ -20,7 +20,8 @@
     "@tanstack/vue-query": "catalog:",
     "better-auth": "catalog:",
     "nuxt": "catalog:",
-    "tailwindcss": "catalog:"
+    "tailwindcss": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@nuxt/eslint": "catalog:",
