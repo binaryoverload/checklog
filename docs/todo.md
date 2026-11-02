@@ -101,18 +101,34 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 
 - [ ] Organization types: managed-organization sign-up, same-type membership hooks (person). See [Personal and managed accounts](plans/db-structure.md#personal-and-managed-accounts).
 - [ ] Soft delete: delete and restore endpoints, the checks that hide deleted organizations, the block screen, the sign-in block for deleted managed organizations, and the purge job (person). See [Deleted organizations](plans/audit-log.md#deleted-organizations).
+- [ ] **Account deletion** (person), following [Deleted accounts](plans/operators-and-account-deletion.md#deleted-accounts):
+  - [ ] `users`: `deletedAt`, `deletedBy`, `purgeAfter` through `additionalFields`, and `DELETED_ACCOUNT_GRACE_DAYS`
+  - [ ] `before` hook refusing `deleteUser` and `removeUser`
+  - [ ] Personal account delete and restore endpoints, with a preflight check, the last owner rule, and deleting and restoring sole-member organizations
+  - [ ] Managed account delete and restore endpoints for owners, and the deleted members list
+  - [ ] Sign-in hook and block screen for deleted personal accounts; refuse deleted managed accounts
+  - [ ] Hide deleted accounts from member lists and pickers
+  - [ ] Account purge in the nightly job, deleting the account's user events
 
 ## Then: audit log
 
 Following the [audit log plan](plans/audit-log.md):
 
-- [ ] `audit_events` table, with the append-only trigger (custom SQL in the migration) (person)
+- [ ] `audit_events` table, with the append-only trigger (custom SQL in the migration); `user_id` as a plain column, an `impersonated_by` column, and the trigger's purge rule for users (person)
 - [ ] `recordAudit` with per-action payload schemas (person)
 - [ ] Better Auth: turn on adapter transactions and test whether hooks share them, then wire up the audit hooks (person). Tests can be written by an agent.
 - [ ] Record events across everything built so far: organization, run, user and platform events (person)
 - [ ] Context expiry job, and audit events in the purge job (person)
 - [ ] Reconciliation job, if the transaction test showed it's needed (person)
-- [ ] Operators: Better Auth `admin` plugin, platform audit view (person)
+- [ ] **Operators** (person unless marked), following the [operators plan](plans/operators-and-account-deletion.md):
+  - [ ] Access controller with `platform-admin` in `@checklog/shared`; `admin()` and `adminClient()`; schema migration
+  - [ ] `before` hooks refusing `set-role`, `remove-user`, `create-user`, `update-user`, `set-user-password` and direct `impersonate-user`
+  - [ ] Grant script for `platform-admin` (or `create-admin`, if it uses `generateId`) and a platform admin in the development seed
+  - [ ] Impersonation endpoint with a justification, `impersonated_by` in `recordAudit`, start and stop events; confirm the `ctx.request` check first ([open question](plans/operators-and-account-deletion.md#open-questions))
+  - [ ] Impersonation limits: the Better Auth `before` hook and an `impersonation` option on `route()`
+  - [ ] `operator.*` events for bans and session revokes
+  - [ ] Page option and middleware for platform admin pages (agent)
+  - [ ] Platform admin screens and the platform audit view
 
 ## Before the first production deployment
 

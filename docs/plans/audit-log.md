@@ -2,12 +2,12 @@
 
 Status: **agreed plan**, ready to be built. This is a plan, not the implementation. Under the [AI use policy](../../AGENTS.md) the audit log is core logic and is written by a person; this doc is the spec for that work.
 
-It expands section 6 of the [database structure plan](db-structure.md): one append-only `audit_events` table, with events written in the same transaction as the change they record.
+It expands section 6 of the [database structure plan](db-structure.md): one append-only `audit_events` table, with events written in the same transaction as the change they record. Operators, impersonation and account deletion are planned in the [operators and account deletion plan](operators-and-account-deletion.md), which this plan reflects.
 
 ## What it has to do
 
 1. **Record every change that matters to an auditor**: who did what, to which thing, when, and what changed.
-2. **Be append-only.** Nothing in the app can edit or delete an event, and events are kept for as long as their organization exists (decided). There are two exceptions, both handled by jobs under strict rules: `context` is erased after a set period ([Context expiry](#context-expiry)), and an organization that was soft-deleted is purged, audit log included, once its grace period ends ([Deleted organizations](#deleted-organizations)).
+2. **Be append-only.** Nothing in the app can edit or delete an event, and events are kept for as long as their organization exists (decided). There are two exceptions, both handled by jobs under strict rules: `context` is erased after a set period ([Context expiry](#context-expiry)), and an organization or account that was soft-deleted is purged, its own events included, once its grace period ends ([Deleted organizations](#deleted-organizations), [Deleted accounts](operators-and-account-deletion.md#deleted-accounts)).
 3. **Be hard to alter.** The app can only add events, and the database refuses edits and deletes from anyone else (see [Keeping it append-only](#keeping-it-append-only)). That's what comparable products do, and what SOC 2 and ISO 27001 auditors expect. Cryptographic tamper evidence, which would also detect changes made directly in the database, is a [future feature](#future-tamper-evidence), not part of the MVP or v1 (decided).
 4. **Never miss an event.** If the change commits, its event commits; if the event can't be written, the change fails.
 5. **Be the history.** Field values only store the current value ([decided](db-structure.md#decided)), so the log must hold old and new values.
@@ -39,13 +39,14 @@ Every event has a scope, which says whose log it belongs to:
 | `occurred_at` | timestamptz | Defaults to `now()` |
 | `actor_type` | text | `user`, `system` (jobs, schedules) or `guest` (v1) |
 | `actor_id` | text, null | User ID for `user`; job name for `system` |
+| `impersonated_by` | text, null | The platform admin's user ID on events done while impersonating; set by `recordAudit` from the session. A column rather than part of `context`, which expires. |
 | `action` | text | From the [event catalogue](#event-catalogue), e.g. `run_step.completed` |
 | `entity_type` | text | e.g. `run_step` |
 | `entity_id` | text | The TypeID of the thing acted on |
 | `payload` | jsonb | Action-specific details, such as old and new values |
 | `context` | jsonb, null | Request details: session ID, IP address, user agent. Erased after a set period; see [Personal data](#personal-data). |
 
-**Foreign keys:** `organization_id` references `organizations`, `run_id` references `runs` and `user_id` references `users`, all with `ON DELETE RESTRICT`. Audit history must never disappear as a side effect: an organization or account can only be hard-deleted once its events have been purged on purpose. In practice organizations are soft-deleted and runs and users are never hard-deleted, so `RESTRICT` acts as a safety net. `entity_id` and `actor_id` stay plain columns, because they point at different tables depending on the type, and platform events must outlive what they describe.
+**Foreign keys:** `organization_id` references `organizations` and `run_id` references `runs`, both with `ON DELETE RESTRICT`. Audit history must never disappear as a side effect: an organization can only be hard-deleted once its events have been purged on purpose. In practice organizations are soft-deleted and runs are never hard-deleted, so `RESTRICT` acts as a safety net. `user_id` (decided), `entity_id`, `actor_id` and `impersonated_by` stay plain columns: `entity_id` and `actor_id` point at different tables depending on the type, platform events must outlive what they describe, and a purged account's organization events keep an ID that no longer resolves.
 
 **Indexes:** (`organization_id`, `occurred_at`) for the organization audit view; (`run_id`, `occurred_at`) for a run's timeline; (`user_id`, `occurred_at`) for a user's activity; (`scope`, `occurred_at`) for the platform view; (`entity_type`, `entity_id`) for "history of this thing".
 
@@ -117,9 +118,9 @@ The Recently deleted list, the block screen and the restore endpoint are the onl
 4. Record `organization.purged`, and `user.purged` for each managed account removed, as platform events.
 5. Delete the organization row. Its templates, runs, members, invitations and teams cascade away with it. This only succeeds because steps 2 and 3 removed its events and any managed accounts first; otherwise `RESTRICT` blocks it.
 
-**How the trigger allows it:** with the purge flag set, the trigger allows deleting an event only if its organization has `deleted_at` set and `purge_after` in the past. For organization events that's the event's `organization_id`; for user events it's the user's `managed_by_organization_id`. It reads this from the `organizations` row, which still exists until step 5. Platform events can never be deleted. Every other delete still fails.
+**How the trigger allows it:** with the purge flag set, the trigger allows deleting an event only if what it belongs to has `deleted_at` set and `purge_after` in the past. For organization events that's the event's `organization_id`; for user events it's either the user's `managed_by_organization_id` or, for a deleted account, the user themselves. It reads this from the `organizations` or `users` row, which still exists until the purge's last step deletes it. Platform events can never be deleted. Every other delete still fails.
 
-**Personal accounts' events aren't affected.** Personal accounts aren't deleted with an organization, so their sign-in history stays, and is never purged; if a user is erased, their `users` row is anonymised as described in [Personal data](#personal-data).
+**Personal accounts' events aren't affected.** Personal accounts aren't deleted with an organization, so their sign-in history stays until the account itself is deleted and purged ([Deleted accounts](operators-and-account-deletion.md#deleted-accounts)).
 
 **Leaving a trace:** once purged, nothing about the organization remains in its own tables, but its platform events stay: when it was created, deleted and purged, with its ID, slug and type, and a `user.purged` for each managed account removed with it.
 
@@ -136,6 +137,8 @@ Action names are `entity.past_tense_verb`. The payload lists what each event mus
 | Organization | `member.role_changed` | User ID, old role, new role |
 | Organization | `invitation.created`, `invitation.cancelled`, `invitation.accepted`, `invitation.rejected` | Invitation ID, role, group (see [Personal data](#personal-data) for the email address) |
 | Organization | `team.created`, `team.updated`, `team.deleted` | Name, old and new for updates |
+| Organization | `user.deleted`, `user.restored` | Managed accounts only: user ID, purge date |
+| Organization | `operator.impersonation_started`, `operator.impersonation_stopped` | Impersonated user ID, platform admin ID, justification, session ID |
 | Organization | `team_member.added`, `team_member.removed` | Team ID, user ID |
 | Organization | `template.created`, `template.archived` | |
 | Organization | `template_version.published`, `template_version.archived` | Version number |
@@ -153,14 +156,17 @@ Action names are `entity.past_tense_verb`. The payload lists what each event mus
 | Organization (run) | `approval.decided` | Decision, comment |
 | Organization (run) | `run_step.overdue` | Due at (written by the overdue job, actor `system`) |
 | User | `user.created` | Managed organization ID for a managed account |
-| User | `user.sign_in_refused` | Reason (organization deleted) |
+| User | `user.deleted`, `user.restored` | Purge date; organizations deleted with the account |
+| User | `user.sign_in_refused` | Reason: organization deleted, account deleted |
 | User | `user.signed_in`, `user.signed_out` | Sign-in method (password, OIDC provider), organization made active |
 | User | `user.password_changed`, `user.email_changed`, `user.two_factor_enabled`, `user.two_factor_disabled` | |
+| User | `operator.impersonation_started`, `operator.impersonation_stopped` | Platform admin ID, justification, session ID |
 | Platform | `organization.created`, `organization.updated`, `organization.deleted`, `organization.restored` | Organization ID, slug, type; changed fields for updates |
 | Platform | `organization.purged` | Organization ID, slug, type, deleted at, accounts removed |
-| Platform | `user.created`, `user.email_changed`, `user.anonymised` | User ID, managed organization ID if any |
-| Platform | `user.purged` | User ID, managed organization ID (written by the purge job) |
-| Platform | `operator.*` | Operator actions, for example `operator.exported_organization`, `operator.banned_user`, `operator.role_changed` |
+| Platform | `user.created`, `user.email_changed` | User ID, managed organization ID if any |
+| Platform | `user.deleted`, `user.restored` | User ID, managed organization ID if any, purge date, organizations deleted with it |
+| Platform | `user.purged` | User ID, managed organization ID if any (written by the purge job) |
+| Platform | `operator.*` | Operator actions: `operator.impersonation_started`, `operator.impersonation_stopped`, `operator.banned_user`, `operator.unbanned_user`, `operator.revoked_sessions`; `operator.exported_organization` once operators can export an organization's data (not planned yet) |
 
 Draft edits to templates aren't logged event by event; publishing a version logs the whole frozen version's ID, and the version itself is immutable, so it is the record.
 
@@ -172,7 +178,7 @@ Membership, role, invitation, team and account changes happen inside Better Auth
 
 - **Organization plugin hooks:** `afterCreateOrganization`, `afterAddMember`, `afterRemoveMember`, `afterUpdateMemberRole`, `afterCreateInvitation`, `afterCancelInvitation`, `afterAcceptInvitation`, `afterRejectInvitation`, `afterCreateTeam`, `afterUpdateTeam`, `afterDeleteTeam`, `afterAddTeamMember`, `afterRemoveTeamMember` and `afterUpdateOrganization`. Organization deletion doesn't go through Better Auth at all (see [Deleted organizations](#deleted-organizations)).
 - **Database hooks:** `user.create.after` records `user.created`; `session.create.after` records sign-ins.
-- **Endpoint hooks:** `before` hooks on sign-in (blocking managed accounts of deleted organizations), and on adding members, accepting invitations and creating organizations (an account only joins an organization of its own type, and a managed account only its own).
+- **Endpoint hooks:** `before` hooks on sign-in (blocking managed accounts of deleted organizations and deleted managed accounts, and limiting deleted personal accounts to their block screen), and on adding members, accepting invitations and creating organizations (an account only joins an organization of its own type, and a managed account only its own).
 
 **Atomicity** (decided: test, then reconcile). These hooks run after Better Auth's own write. Unless that write and the hook share a transaction, a crash in between leaves a change with no event. The first step is to turn on the Drizzle adapter's `transaction` option and test whether the hooks run inside the same transaction:
 
@@ -183,7 +189,7 @@ Membership, role, invitation, team and account changes happen inside Better Auth
 
 An append-only log and the right to erasure (GDPR) pull in opposite directions. The plan keeps personal data out of the log as far as possible:
 
-- **Actors and subjects are stored as IDs**, never names or email addresses. The UI looks names up when displaying events. If a user is erased, their `users` row is anonymised and the log keeps an opaque ID, which counts as pseudonymised.
+- **Actors and subjects are stored as IDs**, never names or email addresses. The UI looks names up when displaying events. Erasure is account deletion (decided): once a deleted account is purged, its user events are gone and its organization events keep an ID that no longer resolves, which counts as pseudonymised.
 - **Invitation email addresses** are the exception: there's no user ID yet. The payload stores a salted hash of the address instead, so an auditor can confirm "this invitation went to x@example.com" if they already know the address, but the log doesn't reveal it.
 - **`context` (IP address, user agent)** is recorded for auth events only, and is erased after `AUDIT_CONTEXT_RETENTION_DAYS` or on an erasure request (decided).
 - **Note bodies and text field values** are user content. If someone types personal data into a note, it stays in the log permanently. That's the same trade-off every audit system makes.
@@ -194,7 +200,7 @@ An append-only log and the right to erasure (GDPR) pull in opposite directions. 
 - **Organization audit view:** owners and admins can filter the organization's events by date, actor, action and entity. Sign-ins come from the user events of the organization's current members.
 - **Entity history:** "show history" on a template, schedule or member reads by (`entity_type`, `entity_id`).
 - **Your activity:** each user can see their own user events (sign-ins and security changes).
-- **Platform audit view:** operators can browse and filter platform events. Operators are platform administrators, separate from organization roles; Better Auth's `admin` plugin provides the role (`users.role = "admin"`) along with banning users, which is recorded as an `operator.*` event.
+- **Platform audit view:** operators can browse and filter platform events. Operators are platform administrators, separate from organization roles; Better Auth's `admin` plugin provides the role (`users.role = "platform-admin"`) along with banning and impersonation, recorded as `operator.*` events. See the [operators and account deletion plan](operators-and-account-deletion.md).
 - Reading the log is itself not logged in the MVP.
 
 ## Evidence pack export (v1)
@@ -223,6 +229,7 @@ Tests (which agents may write, reviewed by a person) should cover:
 - A personal account can't join a managed organization, a managed account can't join or create any other organization, and an invitation to a managed organization for an email that already has an account is refused.
 - The purge job removes an organization, its data and its events only after `purge_after`, plus all its accounts and their user events if it's managed, and leaves other organizations and personal accounts alone. Hard-deleting an organization whose events or managed accounts still exist fails.
 - Purging an organization leaves `organization.purged` and `user.purged` platform events.
+- Operator, impersonation and account deletion tests are listed in the [operators and account deletion plan](operators-and-account-deletion.md).
 
 ## Suggested order of work
 
@@ -234,7 +241,7 @@ Tests (which agents may write, reviewed by a person) should cover:
 6. The nightly context expiry and purge jobs, once pg-boss jobs exist
 7. Reconciliation, if step 2 showed it's needed
 8. Template, run and approval events as those features are built
-9. Operators: Better Auth's `admin` plugin, the platform audit view, and `operator.*` events
+9. Operators and account deletion: see the [order of work](operators-and-account-deletion.md#order-of-work) in their plan
 10. Before the first production deployment: split the app and owner database roles, and add `MIGRATION_DATABASE_URL`
 
 ## Decided
@@ -249,6 +256,8 @@ Tests (which agents may write, reviewed by a person) should cover:
 - **Sign-ins:** recorded as user events
 - **Platform events:** a deployment-wide record of organization and user lifecycle changes and operator actions, never purged
 - **Owners of a deleted organization:** can sign in, but only to restore it
+- **`user_id`:** a plain column, not a foreign key, so accounts can be purged; account deletion replaces anonymisation
+- **Impersonation:** recorded in the platform, user and organization logs, with `impersonated_by` on every event in the session
 
 ## Open questions
 

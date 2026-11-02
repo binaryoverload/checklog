@@ -6,3 +6,4 @@ Plans for upcoming work. Each one sets out the proposed design, records what was
 | --- | --- |
 | [Database structure](db-structure.md) | Agreed |
 | [Audit log](audit-log.md) | Agreed |
+| [Operators and account deletion](operators-and-account-deletion.md) | Agreed, one open question |
