@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm"
 
-import { auth } from "./core/auth.ts"
-import { logger } from "./core/logger.ts"
-import { organizations, users } from "./db/auth-schema.ts"
-import { db, pool } from "./db/index.ts"
+import { auth } from "@/core/auth.ts"
+import { logger } from "@/core/logger.ts"
+import { organizations, users } from "@/db/auth-schema.ts"
+import { db, pool } from "@/db/index.ts"
 
 // Development sign-ins. Every seeded account shares this password.
 const password = "checklog-dev"

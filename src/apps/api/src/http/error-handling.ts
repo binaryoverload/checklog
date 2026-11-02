@@ -1,9 +1,9 @@
 import type { ErrorRequestHandler, RequestHandler, Response } from "express"
 
+import { logger } from "@/core/logger.ts"
 import type { ApiErrorResponse } from "@checklog/shared"
 
 import { HttpError } from "./errors.ts"
-import { logger } from "../core/logger.ts"
 
 export const notFound: RequestHandler = (req) => {
   const path = req.originalUrl.split("?")[0]

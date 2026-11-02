@@ -59,9 +59,10 @@ export default defineConfig(
       "import-x/no-named-default": "error",
       "import-x/order": ["error", {
         "groups": ["builtin", "external", "internal", ["parent", "sibling", "index"]],
-        // Workspace packages and Nuxt's ~ and # aliases count as internal
+        // Workspace packages, the @ alias and Nuxt's ~ and # aliases count as internal
         "pathGroups": [
           { pattern: "@checklog/**", group: "internal" },
+          { pattern: "@/**", group: "internal" },
           { pattern: "~/**", group: "internal" },
           { pattern: "#*", group: "internal" },
         ],
@@ -69,6 +70,14 @@ export default defineConfig(
         "newlines-between": "always",
         "alphabetize": { order: "asc", caseInsensitive: true },
       }],
+    },
+  },
+  // App source reaches other folders through an alias; config files may still import from parent folders
+  {
+    name: "checklog/no-parent-imports",
+    files: ["src/**", "app/**"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [{ group: ["../*"], message: "Import from another folder with the @/ alias (~/ in the web app)." }] }],
     },
   },
   stylistic.configs.customize({

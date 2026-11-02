@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express"
 
-import { logger } from "../core/logger.ts"
+import { logger } from "@/core/logger.ts"
 
 export const requestLogging: RequestHandler = (req, res, next) => {
   const start = performance.now()

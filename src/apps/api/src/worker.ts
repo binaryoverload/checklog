@@ -1,7 +1,7 @@
 import { PgBoss } from "pg-boss"
 
-import { config } from "./core/config.ts"
-import { logger } from "./core/logger.ts"
+import { config } from "@/core/config.ts"
+import { logger } from "@/core/logger.ts"
 
 // pg-boss workers run from the API image as their own Kubernetes deployment
 const boss = new PgBoss(config.DATABASE_URL)

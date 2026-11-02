@@ -1,7 +1,8 @@
+import { config } from "@/core/config.ts"
+import { logger } from "@/core/logger.ts"
+import { pool, migrateDB } from "@/db/index.ts"
+
 import { createApp } from "./app.ts"
-import { config } from "./core/config.ts"
-import { logger } from "./core/logger.ts"
-import { pool, migrateDB } from "./db/index.ts"
 
 const app = createApp()
 

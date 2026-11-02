@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config"
 
 export default defineConfig({
+  resolve: { tsconfigPaths: true },
   test: {
     // Placeholder values so core/config.ts parses; these tests don't connect to anything
     env: {

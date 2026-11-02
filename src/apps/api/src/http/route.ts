@@ -3,13 +3,13 @@ import { and, eq } from "drizzle-orm"
 import type { Request, RequestHandler, Response } from "express"
 import type { z } from "zod"
 
+import { auth } from "@/core/auth.ts"
+import type { organizations } from "@/db/auth-schema.ts"
+import { members } from "@/db/auth-schema.ts"
+import { db } from "@/db/index.ts"
 import type { ApiErrorDetail } from "@checklog/shared"
 
 import { HttpError } from "./errors.ts"
-import { auth } from "../core/auth.ts"
-import type { organizations } from "../db/auth-schema.ts"
-import { members } from "../db/auth-schema.ts"
-import { db } from "../db/index.ts"
 
 type RouteOptions = {
   /**
