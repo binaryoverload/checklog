@@ -121,13 +121,13 @@ Following the [audit log plan](plans/audit-log.md):
 - [ ] Context expiry job, and audit events in the purge job (person)
 - [ ] Reconciliation job, if the transaction test showed it's needed (person)
 - [ ] **Operators** (person unless marked), following the [operators plan](plans/operators-and-account-deletion.md):
-  - [ ] Access controller with `platform-admin` in `@checklog/shared`; `admin()` and `adminClient()`; schema migration
+  - [x] Access controller with `platform-admin` in `@checklog/shared`; `admin()` and `adminClient()`; schema migration
   - [ ] `before` hooks refusing `set-role`, `remove-user`, `create-user`, `update-user`, `set-user-password` and direct `impersonate-user`
   - [ ] Grant script for `platform-admin` (or `create-admin`, if it uses `generateId`) and a platform admin in the development seed
   - [ ] Impersonation endpoint with a justification, `impersonated_by` in `recordAudit`, start and stop events; confirm the `ctx.request` check first ([open question](plans/operators-and-account-deletion.md#open-questions))
   - [ ] Impersonation limits: the Better Auth `before` hook and an `impersonation` option on `route()`
   - [ ] `operator.*` events for bans and session revokes
-  - [ ] Page option and middleware for platform admin pages (agent)
+  - [x] Page option and middleware for platform admin pages (agent)
   - [ ] Platform admin screens and the platform audit view
 
 ## Before the first production deployment

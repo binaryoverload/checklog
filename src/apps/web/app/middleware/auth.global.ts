@@ -11,4 +11,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (!session) {
     return navigateTo({ path: signInPath, query: { redirect: to.fullPath } })
   }
+
+  // A not-found error rather than a redirect, so platform admin pages don't reveal that they exist
+  if (to.meta.auth === "platform-admin" && !isPlatformAdmin(session.user)) {
+    return abortNavigation(createError({ statusCode: 404, statusMessage: "Page not found", fatal: true }))
+  }
 })

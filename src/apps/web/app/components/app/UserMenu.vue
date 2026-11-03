@@ -24,6 +24,7 @@ const appearance = (["system", "light", "dark"] as const).map(mode => ({
 
 const items = computed<DropdownMenuItem[][]>(() => [
   [{ type: "label", label: user.value?.name, description: user.value?.email }],
+  ...(isPlatformAdmin(user.value) ? [[{ label: "Platform admin", icon: "i-lucide-shield", to: "/platform-admin" }]] : []),
   [{ label: "Appearance", icon: "i-lucide-sun-moon", children: appearance }],
   [{ label: "Sign out", icon: "i-lucide-log-out", onSelect: () => signOut.mutate() }],
 ])

@@ -46,7 +46,8 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 - A Nuxt plugin dehydrates server-fetched queries and hydrates them in the browser so SSR pages do not fetch twice
 - `useApi()` calls the API: during SSR it goes straight to `NUXT_API_INTERNAL_URL` with the visitor's cookie, in the browser through `/api`. Errors throw an `ApiError` parsed with the shared error schema
 - Better Auth's client is used for auth calls only; the session and organization list live in TanStack Query (`useSessionQuery`, `useOrganizationsQuery`), and switching organization refetches every query
-- Pages are signed-in only; `definePageMeta({ auth: "public" })` opts out, matching the API's `route()` option. The guard never redirects `/sign-in` itself, so a missing sign-in page can't loop
+- Pages are signed-in only; `definePageMeta({ auth: "public" })` opts out, matching the API's `route()` option. The guard never redirects `/login` itself, so a missing sign-in page can't loop
+- `definePageMeta({ auth: "platform-admin" })` limits a page to platform admins (`isPlatformAdmin`, which reads the comma-separated `user.role`). Anyone else gets a 404 rather than a redirect, so the pages don't reveal that they exist. They live under `/platform-admin`, linked from the user menu for platform admins only
 - Icons come from the locally installed `@iconify-json/lucide`, never Iconify's public API, and Nuxt Icon's endpoint sits at `/_nuxt_icon` because `/api` belongs to Express
 
 ## Kubernetes and Docker
