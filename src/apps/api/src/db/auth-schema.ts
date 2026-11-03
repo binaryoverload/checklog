@@ -16,12 +16,16 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
-  managedByOrganizationId: text("managed_by_organization_id").references((): AnyPgColumn => organizations.id, { onDelete: "restrict" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
+  role: text("role"),
+  banned: boolean("banned").default(false),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires", { withTimezone: true }),
+  managedByOrganizationId: text("managed_by_organization_id").references((): AnyPgColumn => organizations.id, { onDelete: "restrict" }),
 })
 
 export const sessions = pgTable(
@@ -39,6 +43,7 @@ export const sessions = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    impersonatedBy: text("impersonated_by"),
     activeOrganizationId: text("active_organization_id"),
     activeTeamId: text("active_team_id"),
   },
@@ -89,13 +94,13 @@ export const organizations = pgTable("organizations", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
-  accountType: text("account_type", { enum: ["personal", "managed"] }).notNull().default("personal"),
   logo: text("logo"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  metadata: text("metadata"),
+  accountType: text("account_type", { enum: ["personal", "managed"] }).notNull().default("personal"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   deletedBy: text("deleted_by").references(() => users.id, { onDelete: "set null" }),
   purgeAfter: timestamp("purge_after", { withTimezone: true }),
-  metadata: text("metadata"),
 }, t => [
   index("organizations_purgeAfter_idx").on(t.purgeAfter),
 ])

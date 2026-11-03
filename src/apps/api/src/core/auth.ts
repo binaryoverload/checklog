@@ -1,9 +1,10 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter"
 import { betterAuth } from "better-auth"
-import { organization } from "better-auth/plugins"
+import { admin, organization } from "better-auth/plugins"
 
 import { db } from "@/db/index.ts"
 import { typeIdForModel } from "@/util/typeid.ts"
+import { betterAuthAccessControl, betterAuthRoles, platformAdminRoleName } from "@checklog/shared"
 
 import { config } from "./config.ts"
 
@@ -19,6 +20,13 @@ export const auth = betterAuth({
     usePlural: true,
   }),
   plugins: [
+    admin({
+      ac: betterAuthAccessControl,
+      roles: betterAuthRoles,
+      defaultRole: "user",
+      adminRoles: [platformAdminRoleName],
+      bannedUserMessage: "Your account has been banned from Checklog",
+    }),
     organization({
       disableOrganizationDeletion: true,
       teams: {
