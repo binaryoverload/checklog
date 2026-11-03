@@ -71,9 +71,9 @@ What none of this stops: someone with superuser access to the database can disab
 
 ## Context expiry
 
-Audit events are kept for as long as their organization exists (decided). Apart from a deleted organization's log, the only thing that expires is `context` (IP address, user agent, session ID), because it's personal data that's only useful for recent investigations.
+Audit events are kept for as long as their organization exists, and a user's own events as long as their account exists (decided). Apart from a deleted organization's or account's events, the only thing that expires is `context` (IP address, user agent, session ID), because it's personal data that's only useful for recent investigations.
 
-- A nightly job sets `context` to null on events older than `AUDIT_CONTEXT_RETENTION_DAYS` (deployment-wide, default 90). It also clears a user's `context` early on an erasure request.
+- A nightly job sets `context` to null on events older than `AUDIT_CONTEXT_RETENTION_DAYS` (deployment-wide, default 90). A purged account's user events, where its `context` is, are deleted with it.
 - **How the trigger allows it:** the job sets a transaction-local flag (`SET LOCAL checklog.audit_context_expiry = 'on'`). With that flag, the trigger allows an `UPDATE` that changes `context` to null and nothing else. Any other update, any delete and any truncate still fail. Before the role split, any connection could set the flag, so it guards against mistakes rather than attacks; after the split, the app role has no `UPDATE` at all.
 
 ## Deleted organizations
@@ -191,7 +191,7 @@ An append-only log and the right to erasure (GDPR) pull in opposite directions. 
 
 - **Actors and subjects are stored as IDs**, never names or email addresses. The UI looks names up when displaying events. Erasure is account deletion (decided): once a deleted account is purged, its user events are gone and its organization events keep an ID that no longer resolves, which counts as pseudonymised.
 - **Invitation email addresses** are the exception: there's no user ID yet. The payload stores a salted hash of the address instead, so an auditor can confirm "this invitation went to x@example.com" if they already know the address, but the log doesn't reveal it.
-- **`context` (IP address, user agent)** is recorded for auth events only, and is erased after `AUDIT_CONTEXT_RETENTION_DAYS` or on an erasure request (decided).
+- **`context` (IP address, user agent)** is recorded for auth events only, and is erased after `AUDIT_CONTEXT_RETENTION_DAYS` or when the account is purged (decided).
 - **Note bodies and text field values** are user content. If someone types personal data into a note, it stays in the log permanently. That's the same trade-off every audit system makes.
 
 ## Reading the log
@@ -249,7 +249,7 @@ Tests (which agents may write, reviewed by a person) should cover:
 - **No hash chains:** a plain append-only table, as comparable products use; cryptographic tamper evidence is a future feature, not MVP or v1
 - **Better Auth atomicity:** test whether hooks share Better Auth's transaction; if not, record from hooks and reconcile nightly
 - **IP addresses and user agents:** stored in `context` and erased after a deployment-wide period
-- **Retention:** audit events are kept for as long as their organization exists; `context` expires after a set period
+- **Retention:** audit events are kept for as long as their organization exists, and a user's own events as long as their account exists; `context` expires after a set period
 - **Deleted organizations:** soft-deleted, hidden at once, restorable by their owners during a deployment-wide grace period (default 90 days), then purged with their audit log and managed accounts; personal accounts and their events are kept
 - **Organization types:** each organization is personal or managed, fixed at creation; managed organizations contain only managed accounts, created by the managed sign-up flow or by accepting an invitation (domain verification, SSO and SCIM in v1); outsiders use guest links (v1); in a deleted managed organization only owners can sign in
 - **Database roles:** one role plus the trigger during MVP development; split before the first production deployment
