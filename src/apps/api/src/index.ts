@@ -7,7 +7,6 @@ import { createApp } from "./app.ts"
 const app = createApp()
 
 if (config.MIGRATE_ON_START) {
-  logger.info("Running database migrations")
   await migrateDB()
 }
 
