@@ -23,6 +23,15 @@ const appStatements = {
     "create", // Can create new templates
     "manage", // Can view and edit all templates
   ],
+  audit: [
+    "read", // Can read audit logs
+  ],
+  // These are separate permissions because they involve a whole user account
+  // rather than just membership in the organization
+  managedAccount: [
+    "delete", // Can delete managed accounts
+    "restore", // Can restore managed accounts
+  ],
 } as const
 
 export const orgAccessControl = createAccessControl({
@@ -39,6 +48,7 @@ const orgAdminRole = orgAccessControl.newRole({
   ...defaultOrgStatements, // All better-auth permissions other than...
   organization: ["update"], // Org admins cannot delete the organization
   ...appStatements, // All app permissions
+  managedAccount: [], // Only org owners can delete or restore managed accounts
 })
 
 const orgEditorRole = orgAccessControl.newRole({
