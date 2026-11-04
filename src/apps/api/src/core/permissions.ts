@@ -1,5 +1,5 @@
-import { HttpError } from "@/http/errors"
-import type { Member, User } from "@/util/types"
+import { HttpError } from "@/http/errors.ts"
+import type { Member, User } from "@/util/types.ts"
 import { orgRoles, platformRoles } from "@checklog/shared"
 import type { OrgStatementsCheckInput, PlatformStatementsCheckInput } from "@checklog/shared"
 

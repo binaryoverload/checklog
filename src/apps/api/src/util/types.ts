@@ -1,6 +1,6 @@
-import type { auth } from "@/core/auth"
-import type { db } from "@/db"
-import type { organizations, members, teams, users, invitations } from "@/db/auth-schema"
+import type { auth } from "@/core/auth.ts"
+import type { organizations, members, teams, users, invitations } from "@/db/auth-schema.ts"
+import type { db } from "@/db/index.ts"
 
 export type Session = typeof auth.$Infer.Session
 

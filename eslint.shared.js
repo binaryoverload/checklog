@@ -1,9 +1,9 @@
 // Shared ESLint config for every package. The web app wraps it with withNuxt().
-import eslintCommentPlugin from "@eslint-community/eslint-plugin-eslint-comments/configs"
 import js from "@eslint/js"
+import eslintCommentPlugin from "@eslint-community/eslint-plugin-eslint-comments/configs"
 import stylistic from "@stylistic/eslint-plugin"
-import importPlugin from "eslint-plugin-import-x"
 import { defineConfig, globalIgnores } from "eslint/config"
+import importPlugin from "eslint-plugin-import-x"
 import globals from "globals"
 import tseslint from "typescript-eslint"
 
