@@ -4,6 +4,11 @@ import { defaultStatements as defaultOrgStatements } from "better-auth/plugins/o
 
 export const platformAccessControl = createAccessControl(defaultAdminStatements)
 
+export type PlatformStatements = typeof platformAccessControl.statements
+export type PlatformStatementsCheckInput = {
+  [K in keyof PlatformStatements]?: PlatformStatements[K][number][]
+}
+
 const platformAdminRole = platformAccessControl.newRole({
   user: ["list", "get", "ban", "impersonate"],
   session: ["list", "revoke"],
@@ -38,6 +43,11 @@ export const orgAccessControl = createAccessControl({
   ...defaultOrgStatements,
   ...appStatements,
 })
+
+export type OrgStatements = typeof orgAccessControl.statements
+export type OrgStatementsCheckInput = {
+  [K in keyof OrgStatements]?: OrgStatements[K][number][]
+}
 
 const orgOwnerRole = orgAccessControl.newRole({
   ...defaultOrgStatements, // All better-auth permissions
