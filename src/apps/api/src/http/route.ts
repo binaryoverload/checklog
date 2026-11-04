@@ -4,9 +4,9 @@ import type { Request, RequestHandler, Response } from "express"
 import type { z } from "zod"
 
 import { auth } from "@/core/auth.ts"
-import type { organizations } from "@/db/auth-schema.ts"
 import { members } from "@/db/auth-schema.ts"
 import { db } from "@/db/index.ts"
+import type { Member, Organization, Session } from "@/util/types.ts"
 import type { ApiErrorDetail } from "@checklog/shared"
 
 import { HttpError } from "./errors.ts"
@@ -34,9 +34,6 @@ type ParsedSchemas<S extends RouteOptions> = {
   [K in keyof S as S[K] extends z.ZodType ? K : never]: z.output<S[K]>
 }
 
-type Session = typeof auth.$Infer.Session
-type Organization = typeof organizations.$inferSelect
-type Member = typeof members.$inferSelect
 type ActiveOrganization = {
   organization: Organization
   member: Member
