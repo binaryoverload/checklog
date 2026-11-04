@@ -12,14 +12,14 @@ const password = "checklog"
 
 type OrganizationRole = keyof typeof orgRoles
 
-const platformAdmin = { name: "Platform Admin", email: "platform-admin@example.com", role: platformAdminRoleName }
+const platformAdmin = { name: "Platform Admin", email: "platform-admin@checklog.co.uk", role: platformAdminRoleName }
 
 // One account per organization role, each a member of every seeded organization with that role
 const organizationUsers: { name: string, email: string, organizationRole: OrganizationRole }[] = [
-  { name: "Dev Owner", email: "owner@example.com", organizationRole: "owner" },
-  { name: "Dev Admin", email: "admin@example.com", organizationRole: "admin" },
-  { name: "Dev Editor", email: "editor@example.com", organizationRole: "editor" },
-  { name: "Dev Viewer", email: "viewer@example.com", organizationRole: "viewer" },
+  { name: "Dev Owner", email: "owner@checklog.co.uk", organizationRole: "owner" },
+  { name: "Dev Admin", email: "admin@checklog.co.uk", organizationRole: "admin" },
+  { name: "Dev Editor", email: "editor@checklog.co.uk", organizationRole: "editor" },
+  { name: "Dev Viewer", email: "viewer@checklog.co.uk", organizationRole: "viewer" },
 ]
 
 // More than one, so there's always another organization to switch to
