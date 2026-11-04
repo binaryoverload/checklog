@@ -1,0 +1,13 @@
+{
+  // ESLint is the formatter (Stylistic, no Prettier), so its fixes run on save
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "eslint.useFlatConfig": true,
+  "eslint.workingDirectories": [{ "mode": "auto" }],
+  "eslint.validate": ["javascript", "typescript", "vue"],
+  // Auto-imports use the @/ (or ~/) alias and the full file name, so folder imports become @/db/index.ts.
+  // With allowImportingTsExtensions on, the "js" ending writes .ts.
+  "js/ts.preferences.importModuleSpecifier": "non-relative",
+  "js/ts.preferences.importModuleSpecifierEnding": "js"
+}
