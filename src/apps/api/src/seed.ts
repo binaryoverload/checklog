@@ -13,7 +13,11 @@ const platformAdmin = { name: "Platform Admin", email: "admin@example.com", role
 const owner = { name: "Dev Owner", email: "owner@example.com", role: "user" }
 const member = { name: "Dev Member", email: "member@example.com", role: "user" }
 
-const seedOrganization = { name: "Acme", slug: "acme" }
+// Each gets the owner and member below, so there's always another organization to switch to
+const seedOrganizations = [
+  { name: "Acme", slug: "acme" },
+  { name: "Globex", slug: "globex" },
+]
 
 if (process.env.NODE_ENV === "production") {
   throw new Error("Refusing to seed a production database")
@@ -34,12 +38,18 @@ await findOrCreateUser(platformAdmin)
 const ownerId = await findOrCreateUser(owner)
 const memberId = await findOrCreateUser(member)
 
-const existingOrganization = await db.query.organizations.findFirst({ where: eq(organizations.slug, seedOrganization.slug) })
-const organizationId = existingOrganization?.id ?? (await auth.api.createOrganization({ body: { ...seedOrganization, userId: ownerId } })).id
-if (!existingOrganization) logger.info(`Seeded organization ${seedOrganization.name}`)
+// Creating an organization through Better Auth also makes its creator the owner
+async function findOrCreateOrganization({ name, slug }: { name: string, slug: string }, ownerId: string) {
+  const existing = await db.query.organizations.findFirst({ where: eq(organizations.slug, slug) })
+  if (existing) return existing.id
+
+  const organization = await auth.api.createOrganization({ body: { name, slug, userId: ownerId } })
+  logger.info(`Seeded organization ${name}`)
+  return organization.id
+}
 
 // Adds a missing membership through Better Auth, and puts back a role that was changed since
-async function ensureMembership(userId: string, role: "owner" | "member") {
+async function ensureMembership(organizationId: string, userId: string, role: "owner" | "member") {
   logger.info(`Ensuring membership for user ${userId} as ${role} in organization ${organizationId}`)
   const membership = await db.query.members.findFirst({ where: and(eq(members.userId, userId), eq(members.organizationId, organizationId)) })
   if (!membership) {
@@ -49,8 +59,11 @@ async function ensureMembership(userId: string, role: "owner" | "member") {
   }
 }
 
-await ensureMembership(ownerId, "owner")
-await ensureMembership(memberId, "member")
+for (const seedOrganization of seedOrganizations) {
+  const organizationId = await findOrCreateOrganization(seedOrganization, ownerId)
+  await ensureMembership(organizationId, ownerId, "owner")
+  await ensureMembership(organizationId, memberId, "member")
+}
 
 logger.info(`Seed complete; sign in with ${platformAdmin.email}, ${owner.email} or ${member.email}`)
 await pool.end()
