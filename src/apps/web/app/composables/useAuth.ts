@@ -36,12 +36,18 @@ export function useOrganizationsQuery() {
   return query
 }
 
+export function useActiveOrganization() {
+  const { data: organizations } = useOrganizationsQuery()
+  const { data: session } = useSessionQuery()
+  return computed(() => organizations.value?.find(org => org.id === session.value?.session.activeOrganizationId) ?? null)
+}
+
 // Everything cached belongs to the old organization, so all queries are refetched after switching
 export function useSetActiveOrganization() {
   const { $authClient } = useNuxtApp()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (organizationId: string) => unwrap(await $authClient.organization.setActive({ organizationId })),
+    mutationFn: async (organizationId: string | null) => unwrap(await $authClient.organization.setActive({ organizationId })),
     onSuccess: () => queryClient.invalidateQueries(),
   })
 }

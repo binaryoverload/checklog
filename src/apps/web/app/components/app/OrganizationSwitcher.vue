@@ -12,6 +12,16 @@ const active = computed(() =>
 )
 
 const items = computed<DropdownMenuItem[][]>(() => [
+  // TODO: Remove - just for test
+  [{
+    label: "No organization selected",
+    avatar: { alt: "No organization selected" },
+    type: "checkbox" as const,
+    checked: !active.value,
+    onSelect: () => {
+      if (active.value) setActive.mutate(null)
+    },
+  }],
   (organizations.value ?? []).map(org => ({
     label: org.name,
     avatar: { alt: org.name },

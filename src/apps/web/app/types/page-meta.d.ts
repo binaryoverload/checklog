@@ -7,6 +7,11 @@ declare module "#app" {
     auth?: "public" | "private" | "platform-admin"
     /** Shown in the navbar of the default layout */
     title?: string
+    /**
+     * Whether an organization is required for the page or not
+     * @default "required"
+     */
+    organization?: "required" | "none"
   }
 }
 

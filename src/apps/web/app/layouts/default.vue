@@ -15,6 +15,8 @@ const organization: NavigationMenuItem[] = [
   { label: "Members", icon: "i-lucide-users", to: "/members" },
   { label: "Groups", icon: "i-lucide-users-round", to: "/groups" },
 ]
+
+const activeOrganization = useActiveOrganization()
 </script>
 
 <template>
@@ -59,7 +61,8 @@ const organization: NavigationMenuItem[] = [
       </template>
 
       <template #body>
-        <slot />
+        <SelectOrganizationScreen v-if="!activeOrganization?.id && route.meta.organization !== 'none'" />
+        <slot v-else/>
       </template>
     </UDashboardPanel>
   </UDashboardGroup>

@@ -1,5 +1,9 @@
 <script setup lang="ts">
-definePageMeta({ auth: "platform-admin", title: "Platform admin" })
+definePageMeta({
+  auth: "platform-admin",
+  title: "Platform admin",
+  organization: "none",
+})
 </script>
 
 <template>

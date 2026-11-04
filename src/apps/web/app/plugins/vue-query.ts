@@ -7,7 +7,15 @@ export default defineNuxtPlugin((nuxt) => {
   const vueQueryState = useState<DehydratedState | null>("vue-query")
 
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { staleTime: 5000 } },
+    defaultOptions: {
+      queries: {
+        staleTime: 5000,
+        networkMode: "always", // Don't pause queries when offline
+      },
+      mutations: {
+        networkMode: "always", // Don't pause queries when offline
+      },
+    },
   })
   const options: VueQueryPluginOptions = { queryClient }
 
