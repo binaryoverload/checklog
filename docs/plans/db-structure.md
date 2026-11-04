@@ -79,20 +79,20 @@ The `SET NULL` is the one change a published version can receive. A run can't st
 
 | Role | Organization-wide permissions |
 | --- | --- |
-| `owner` | Everything: all of Better Auth's organization permissions and all of Checklog's (`template: create`). The organization's creator is its owner. |
-| `admin` | The same as owner, except deleting the organization |
+| `owner` | Everything: all of Better Auth's organization permissions and all of Checklog's (`template: create, manage`, `audit: read` and `managedAccount: delete, restore`). The organization's creator is its owner. |
+| `admin` | The same as owner, except deleting the organization and deleting or restoring managed accounts |
 | `editor` | Creating templates |
 | `viewer` | None beyond reading the organization's roles |
 
 Every role can read the organization's roles (`ac: read`), which only applies if Better Auth's dynamic access control is turned on later. The roles list each permission explicitly rather than building on Better Auth's default roles.
 
-Access to an individual template comes from `template_access`: each level includes the ones below it (edit includes run, run includes view). Owners and admins can reach every template. A template with no access rows is visible only to them and its creator. All permission checks go through one function in the API, so group-granted roles can be added later without touching callers (see [Leaving room for v1](#leaving-room-for-v1)).
+Access to an individual template comes from `template_access`: each level includes the ones below it (edit includes run, run includes view). `template: manage` (owners and admins) reaches every template, and a template's creator can always edit it. A template with no access rows is visible only to those people. Role permissions cover what isn't tied to one template; what someone can do with a particular template, and with its schedules and runs, comes from their access level on it. All permission checks go through one function in the API, so group-granted roles can be added later without touching callers (see [Leaving room for v1](#leaving-room-for-v1)).
 
 ### 3. Schedules
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
-| `schedules` | `template_id`, `status` (active, paused, archived), `rrule` (RFC 5545), `timezone`, `next_run_at`, `run_name_pattern` | Covers daily, weekly, monthly and custom. Always uses the template's current version when it fires. Only `active` schedules fire. Schedules are archived, never deleted, because runs keep a link to the schedule that started them (`ON DELETE RESTRICT`). |
+| `schedules` | `template_id`, `status` (active, paused, archived), `rrule` (RFC 5545), `timezone`, `next_run_at`, `run_name_pattern` | Covers daily, weekly, monthly and custom. Always uses the template's current version when it fires. Only `active` schedules fire. Schedules are archived, never deleted, because runs keep a link to the schedule that started them (`ON DELETE RESTRICT`). Managing a template's schedules needs edit access to the template; there are no schedule role permissions. |
 
 pg-boss does the firing: a recurring job finds schedules with `next_run_at <= now()`, starts runs and advances `next_run_at`. The `schedules` table stays the source of truth, so the UI can list and edit schedules without reading pg-boss internals.
 
