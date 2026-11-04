@@ -79,7 +79,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 ### Schedules
 
 - [ ] API: create, edit, pause and resume a schedule (RRULE and time zone) for a template, and calculate `next_run_at` (person)
-- [ ] Job: pg-boss recurring job that starts due runs and advances `next_run_at`; a run that fails the start check is skipped and the template's editors are notified (person)
+- [ ] Job: pg-boss recurring job that starts due runs and advances `next_run_at`; a run that fails the start check is skipped and the people who can edit the template are notified (person)
 - [ ] UI: schedule settings on a template (person)
 
 ### Notifications
@@ -89,7 +89,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 - [ ] Assignment emails when a step is assigned to someone or their group (person)
 - [ ] Overdue job: flags overdue steps and emails assignees once, using the `overdue:<run step ID>` dedupe key (person)
 - [ ] Approval-needed emails to approvers (person)
-- [ ] Skipped-schedule notification to the template's editors (person)
+- [ ] Skipped-schedule notification to the people who can edit the template (person)
 - [ ] UI: notification inbox with unread state, and overdue badges on runs and steps (person)
 
 ### Checking it works

@@ -1,7 +1,7 @@
 import { createAuthClient } from "better-auth/client"
 import { adminClient, organizationClient } from "better-auth/client/plugins"
 
-import { betterAuthAccessControl, betterAuthRoles } from "@checklog/shared"
+import { orgAccessControl, orgRoles, platformAccessControl, platformRoles } from "@checklog/shared"
 
 // One Better Auth client per request on the server, so each carries that visitor's cookie.
 // Session state lives in TanStack Query (see useSessionQuery), not in Better Auth's own stores.
@@ -15,8 +15,12 @@ export default defineNuxtPlugin(() => {
       headers: import.meta.server ? useRequestHeaders(["cookie"]) : undefined,
     },
     plugins: [
-      adminClient({ ac: betterAuthAccessControl, roles: betterAuthRoles }),
-      organizationClient({ teams: { enabled: true } }),
+      adminClient({ ac: platformAccessControl, roles: platformRoles }),
+      organizationClient({
+        ac: orgAccessControl,
+        roles: orgRoles,
+        teams: { enabled: true },
+      }),
     ],
   })
 

@@ -151,7 +151,7 @@ export const members = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    role: text("role").default("member").notNull(),
+    role: text("role").default("viewer").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   },
   table => [

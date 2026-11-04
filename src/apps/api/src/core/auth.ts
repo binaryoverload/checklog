@@ -4,7 +4,7 @@ import { admin, organization } from "better-auth/plugins"
 
 import { db } from "@/db/index.ts"
 import { typeIdForModel } from "@/util/typeid.ts"
-import { betterAuthAccessControl, betterAuthRoles, platformAdminRoleName } from "@checklog/shared"
+import { platformAccessControl, platformRoles, platformAdminRoleName, orgRoles, orgAccessControl } from "@checklog/shared"
 
 import { config } from "./config.ts"
 
@@ -21,13 +21,16 @@ export const auth = betterAuth({
   }),
   plugins: [
     admin({
-      ac: betterAuthAccessControl,
-      roles: betterAuthRoles,
+      ac: platformAccessControl,
+      roles: platformRoles,
       defaultRole: "user",
       adminRoles: [platformAdminRoleName],
       bannedUserMessage: "Your account has been banned from Checklog",
     }),
     organization({
+      ac: orgAccessControl,
+      roles: orgRoles,
+      creatorRole: "owner",
       disableOrganizationDeletion: true,
       teams: {
         enabled: true,

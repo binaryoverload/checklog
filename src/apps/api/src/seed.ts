@@ -4,16 +4,25 @@ import { auth } from "@/core/auth.ts"
 import { logger } from "@/core/logger.ts"
 import { members, organizations, users } from "@/db/auth-schema.ts"
 import { db, pool } from "@/db/index.ts"
+import type { orgRoles } from "@checklog/shared"
 import { platformAdminRoleName } from "@checklog/shared"
 
 // Development sign-ins. Every seeded account shares this password.
 const password = "checklog"
 
-const platformAdmin = { name: "Platform Admin", email: "admin@example.com", role: platformAdminRoleName }
-const owner = { name: "Dev Owner", email: "owner@example.com", role: "user" }
-const member = { name: "Dev Member", email: "member@example.com", role: "user" }
+type OrganizationRole = keyof typeof orgRoles
 
-// Each gets the owner and member below, so there's always another organization to switch to
+const platformAdmin = { name: "Platform Admin", email: "platform-admin@example.com", role: platformAdminRoleName }
+
+// One account per organization role, each a member of every seeded organization with that role
+const organizationUsers: { name: string, email: string, organizationRole: OrganizationRole }[] = [
+  { name: "Dev Owner", email: "owner@example.com", organizationRole: "owner" },
+  { name: "Dev Admin", email: "admin@example.com", organizationRole: "admin" },
+  { name: "Dev Editor", email: "editor@example.com", organizationRole: "editor" },
+  { name: "Dev Viewer", email: "viewer@example.com", organizationRole: "viewer" },
+]
+
+// More than one, so there's always another organization to switch to
 const seedOrganizations = [
   { name: "Acme", slug: "acme" },
   { name: "Globex", slug: "globex" },
@@ -35,8 +44,11 @@ async function findOrCreateUser({ name, email, role }: { name: string, email: st
 }
 
 await findOrCreateUser(platformAdmin)
-const ownerId = await findOrCreateUser(owner)
-const memberId = await findOrCreateUser(member)
+const seededMembers = []
+for (const { organizationRole, ...user } of organizationUsers) {
+  seededMembers.push({ userId: await findOrCreateUser({ ...user, role: "user" }), organizationRole })
+}
+const ownerId = seededMembers.find(({ organizationRole }) => organizationRole === "owner")!.userId
 
 // Creating an organization through Better Auth also makes its creator the owner
 async function findOrCreateOrganization({ name, slug }: { name: string, slug: string }, ownerId: string) {
@@ -49,8 +61,7 @@ async function findOrCreateOrganization({ name, slug }: { name: string, slug: st
 }
 
 // Adds a missing membership through Better Auth, and puts back a role that was changed since
-async function ensureMembership(organizationId: string, userId: string, role: "owner" | "member") {
-  logger.info(`Ensuring membership for user ${userId} as ${role} in organization ${organizationId}`)
+async function ensureMembership(organizationId: string, userId: string, role: OrganizationRole) {
   const membership = await db.query.members.findFirst({ where: and(eq(members.userId, userId), eq(members.organizationId, organizationId)) })
   if (!membership) {
     await auth.api.addMember({ body: { organizationId, userId, role } })
@@ -61,9 +72,10 @@ async function ensureMembership(organizationId: string, userId: string, role: "o
 
 for (const seedOrganization of seedOrganizations) {
   const organizationId = await findOrCreateOrganization(seedOrganization, ownerId)
-  await ensureMembership(organizationId, ownerId, "owner")
-  await ensureMembership(organizationId, memberId, "member")
+  for (const { userId, organizationRole } of seededMembers) {
+    await ensureMembership(organizationId, userId, organizationRole)
+  }
 }
 
-logger.info(`Seed complete; sign in with ${platformAdmin.email}, ${owner.email} or ${member.email}`)
+logger.info(`Seed complete; sign in with ${[platformAdmin, ...organizationUsers].map(({ email }) => email).join(", ")}`)
 await pool.end()
