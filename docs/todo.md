@@ -39,7 +39,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 - [x] API structure: a router per area under `/api`, the typed `route()` helper validating with Zod schemas from `packages/shared`, the error format with an error handler, and a not-found handler; see [API and auth](implementation-notes.md#api-and-auth) (agent)
 - [x] Session middleware: read the Better Auth session on every API request and expose the user and active organization to handlers (person)
 - [x] Development seed: `pnpm db:seed` creates sign-in accounts and an organization through Better Auth (agent)
-- [ ] The permission function: one place that answers "can this user do this in this organization", from the member's role and `template_access` (person)
+- [x] The permission function: one place that answers "can this user do this in this organization", from the member's role and `template_access`, in `core/permissions.ts` (person)
 - [ ] Shared Zod schemas in `packages/shared` for each area's request and response bodies, added as each area is built (person)
 
 ### Web app
@@ -64,6 +64,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 - [ ] API: start a run from a template's current version, creating its run steps with resolved assignees and due dates (person)
 - [ ] API: run start check that refuses a version with a missing assignee (`assignee_type` set but its column null) and says which steps to fix in a new version; also check assigned members and groups belong to the organization (person). See [Missing assignees](plans/db-structure.md#missing-assignees).
 - [ ] API: list runs (mine, my groups', all) and get one run with its steps (person)
+- [ ] Run step permission check in `core/permissions.ts`: who can complete, skip or approve a step, from its assignee (member, group or role) (person)
 - [ ] API: set field values and complete a step, enforcing required fields and halt steps (person)
 - [ ] API: skip a skippable step with a reason (person)
 - [ ] API: add notes to a step (person)
