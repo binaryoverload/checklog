@@ -16,9 +16,19 @@ export const templateStepKinds = ["task", "approval"] as const
 export const templateStepKindSchema = z.enum(templateStepKinds)
 export type TemplateStepKind = z.infer<typeof templateStepKindSchema>
 
+// Order is important, each level includes the permissions of the previous levels
 export const templateAccessLevels = ["view", "run", "edit"] as const
 export const templateAccessLevelSchema = z.enum(templateAccessLevels)
 export type TemplateAccessLevel = z.infer<typeof templateAccessLevelSchema>
+
+export function templateAccessIncludes(has: TemplateAccessLevel, needs: TemplateAccessLevel): boolean {
+  return templateAccessLevels.indexOf(has) >= templateAccessLevels.indexOf(needs)
+}
+
+export function highestTemplateAccessLevel(levels: TemplateAccessLevel[]): TemplateAccessLevel | null {
+  if (levels.length === 0) return null
+  return levels.reduce((highest, level) => (templateAccessIncludes(highest, level) ? highest : level))
+}
 
 export const runStatuses = ["in_progress", "completed", "cancelled"] as const
 export const runStatusSchema = z.enum(runStatuses)

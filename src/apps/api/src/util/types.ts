@@ -10,4 +10,9 @@ export type User = typeof users.$inferSelect
 export type Team = typeof teams.$inferSelect
 export type Invitation = typeof invitations.$inferSelect
 
+export interface PermissionContext {
+  organization: Organization
+  member: Member
+}
+
 export type Database = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
