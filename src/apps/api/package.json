@@ -32,6 +32,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@testcontainers/postgresql": "catalog:",
     "@types/cors": "catalog:",
     "@types/express": "catalog:",
     "@types/node": "catalog:",

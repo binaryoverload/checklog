@@ -3,8 +3,7 @@ import { z } from "zod"
 
 import type { auth } from "@/core/auth.ts"
 import type { members, organizations } from "@/db/auth-schema.ts"
-
-import { route } from "./route.ts"
+import { route } from "@/http/route.ts"
 
 type Session = typeof auth.$Infer.Session
 type Organization = typeof organizations.$inferSelect

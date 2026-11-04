@@ -10,6 +10,10 @@ allowBuilds:
   esbuild: true
   unrs-resolver: true
   vue-demi: true
+  # Optional native add-ons for the Docker client Testcontainers uses; it works without them
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
 
 catalog:
   "@better-auth/drizzle-adapter": ^1.7.14
@@ -20,6 +24,7 @@ catalog:
   "@nuxt/ui": ^4.12.0
   "@stylistic/eslint-plugin": ^5.10.0
   "@tanstack/vue-query": ^5.105.0
+  "@testcontainers/postgresql": ^12.2.1
   "@types/cors": ^2.8.19
   "@types/express": ^5.0.6
   "@types/node": ^24.0.0

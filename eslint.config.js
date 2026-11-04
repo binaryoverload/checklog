@@ -21,7 +21,7 @@ export default defineConfig(
       "import-x/extensions": ["error", "always", {
         ignorePackages: true,
         checkTypeImports: true,
-        pathGroupOverrides: [{ pattern: "@/**", action: "enforce" }],
+        pathGroupOverrides: [{ pattern: "@/**", action: "enforce" }, { pattern: "@test/**", action: "enforce" }],
       }],
     },
   },

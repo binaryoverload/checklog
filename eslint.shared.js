@@ -59,10 +59,11 @@ export default defineConfig(
       "import-x/no-named-default": "error",
       "import-x/order": ["error", {
         "groups": ["builtin", "external", "internal", ["parent", "sibling", "index"]],
-        // Workspace packages, the @ alias and Nuxt's ~ and # aliases count as internal
+        // Workspace packages, the @ and @test aliases and Nuxt's ~ and # aliases count as internal
         "pathGroups": [
           { pattern: "@checklog/**", group: "internal" },
           { pattern: "@/**", group: "internal" },
+          { pattern: "@test/**", group: "internal" },
           { pattern: "~/**", group: "internal" },
           { pattern: "#*", group: "internal" },
         ],

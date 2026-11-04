@@ -26,6 +26,14 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 - App source has no `../` imports: the API imports other folders as `@/` (its `src`, through `paths` in its `tsconfig.json`, which tsx, tsdown, Vitest and drizzle-kit all follow) and the web app uses Nuxt's `~/`. Files in the same folder use `./`. The shared package stays relative because the API type-checks its source with the API's own `paths`
 - Every `eslint-disable` comment needs a `-- reason` and must be closed (`@eslint-community/eslint-plugin-eslint-comments`)
 - Stylistic does not format `<template>` blocks, so `vue/*` layout rules live in the web app's ESLint config as a Nuxt-specific override
+- The API's own imports name the `.ts` file (`import-x/extensions`, reported but not autofixed, since the fix writes `@/db.ts` for a folder). The shared VS Code settings make auto-imports write `@/db/index.ts`
+
+## Tests
+
+- Each package's tests live in a `test` folder beside `src`, mirroring its layout (`src/core/permissions.ts` is tested in `test/core/permissions.test.ts`). Helpers live in `test/support`
+- API tests import source with `@/` and helpers with `@test/`. Shared package tests import `@checklog/shared`, so they test its public exports
+- The API has two Vitest projects. `unit` runs `*.test.ts` and the `*.test-d.ts` type tests with nothing running. `db` runs `*.db.test.ts` against Postgres 18 in Docker, started once per run by Testcontainers and migrated with the API's own runner. `pnpm test` runs both, so it needs Docker running; `vitest run --project unit` skips the database
+- Database tests run each test inside a transaction that's rolled back (`inRollback`), so they share one database without cleanup
 
 ## API and auth
 

@@ -3,8 +3,9 @@
   "compilerOptions": {
     "types": ["node"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@test/*": ["./test/*"]
     }
   },
-  "include": ["src", "*.config.ts"]
+  "include": ["src", "test", "*.config.ts"]
 }

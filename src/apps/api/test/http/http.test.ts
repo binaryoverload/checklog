@@ -6,10 +6,9 @@ import { z } from "zod"
 import { auth } from "@/core/auth.ts"
 import { logger } from "@/core/logger.ts"
 import { db } from "@/db/index.ts"
-
-import { errorHandler, notFound } from "./error-handling.ts"
-import { HttpError } from "./errors.ts"
-import { route } from "./route.ts"
+import { errorHandler, notFound } from "@/http/error-handling.ts"
+import { HttpError } from "@/http/errors.ts"
+import { route } from "@/http/route.ts"
 
 const signedIn = {
   user: { id: "user_test", email: "test@example.com", name: "Test User" },
