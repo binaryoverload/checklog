@@ -180,10 +180,14 @@ Membership, role, invitation, team and account changes happen inside Better Auth
 - **Database hooks:** `user.create.after` records `user.created`; `session.create.after` records sign-ins.
 - **Endpoint hooks:** `before` hooks on sign-in (blocking managed accounts of deleted organizations and deleted managed accounts, and limiting deleted personal accounts to their block screen), and on adding members, accepting invitations and creating organizations (an account only joins an organization of its own type, and a managed account only its own).
 
-**Atomicity** (decided: test, then reconcile). These hooks run after Better Auth's own write. Unless that write and the hook share a transaction, a crash in between leaves a change with no event. The first step is to turn on the Drizzle adapter's `transaction` option and test whether the hooks run inside the same transaction:
+**Atomicity** (decided: record after the commit). The Drizzle adapter's `transaction` option is on, so endpoints that write several rows, such as sign-up, do it in one transaction. Hooks don't get a share of it, though:
 
-- **If they do**, `recordAudit` uses that transaction and the guarantee holds.
-- **If they don't**, events are still recorded from the hooks, and a nightly reconciliation job compares current memberships, roles, invitations and groups with what the organization's log says they should be. It records any difference as a `system` event, so a missed change shows up in the log within a day, marked as found by reconciliation rather than recorded at the time.
+- `after` hooks, which the events above come from, run once Better Auth's transaction has committed. A write in a hook through Checklog's `db` is never part of that transaction.
+- `before` hooks run inside the transaction, but only writes through Better Auth's own adapter (`getCurrentAdapter`) join it, so only for Better Auth's tables. Not every endpoint runs in a transaction, either: creating an organization commits the organization before adding its creator as a member.
+
+So `recordAudit` runs in the `after` hooks, in its own write, with the actor from the hook's session. If the process stops between Better Auth's commit and the hook, the change is kept without an event. The window is small and the change itself is still in Better Auth's tables, so it's accepted as a known limit, with no reconciliation job. Postgres triggers would close the gap but don't know who made a change, and they'd put the audit logic in SQL migrations.
+
+Checklog's own endpoints don't have this gap: they write the change and its events in one transaction.
 
 ## Personal data
 
@@ -234,20 +238,19 @@ Tests (which agents may write, reviewed by a person) should cover:
 ## Suggested order of work
 
 1. The `audit_events` table and its trigger, and `recordAudit` with per-action payload schemas and scope rules
-2. Better Auth: turn on adapter transactions, test whether hooks share them, then wire up the hooks
+2. Better Auth: wire up the `after` hooks
 3. Recording organization, user and platform events for organization and account changes
 4. Soft delete: Better Auth `additionalFields` and `disableOrganizationDeletion`, the delete and restore endpoints, and the checks that hide deleted organizations
 5. Organization types: `account_type` and `managed_by_organization_id`, the managed-organization sign-up flow, the same-type membership hooks, and the sign-in block for deleted managed organizations
 6. The nightly context expiry and purge jobs, once pg-boss jobs exist
-7. Reconciliation, if step 2 showed it's needed
-8. Template, run and approval events as those features are built
-9. Operators and account deletion: see the [order of work](operators-and-account-deletion.md#order-of-work) in their plan
-10. Before the first production deployment: split the app and owner database roles, and add `MIGRATION_DATABASE_URL`
+7. Template, run and approval events as those features are built
+8. Operators and account deletion: see the [order of work](operators-and-account-deletion.md#order-of-work) in their plan
+9. Before the first production deployment: split the app and owner database roles, and add `MIGRATION_DATABASE_URL`
 
 ## Decided
 
 - **No hash chains:** a plain append-only table, as comparable products use; cryptographic tamper evidence is a future feature, not MVP or v1
-- **Better Auth atomicity:** test whether hooks share Better Auth's transaction; if not, record from hooks and reconcile nightly
+- **Better Auth atomicity:** hooks don't share Better Auth's transaction, so events are recorded in `after` hooks once it commits, accepting that a crash in between can lose an event; no reconciliation job
 - **IP addresses and user agents:** stored in `context` and erased after a deployment-wide period
 - **Retention:** audit events are kept for as long as their organization exists, and a user's own events as long as their account exists; `context` expires after a set period
 - **Deleted organizations:** soft-deleted, hidden at once, restorable by their owners during a deployment-wide grace period (default 90 days), then purged with their audit log and managed accounts; personal accounts and their events are kept

@@ -117,10 +117,10 @@ Following the [audit log plan](plans/audit-log.md):
 
 - [ ] `audit_events` table, with the append-only trigger (custom SQL in the migration); `user_id` as a plain column, an `impersonated_by` column, and the trigger's purge rule for users (person)
 - [ ] `recordAudit` with per-action payload schemas (person)
-- [ ] Better Auth: turn on adapter transactions and test whether hooks share them, then wire up the audit hooks (person). Tests can be written by an agent.
+- [x] Better Auth: turn on adapter transactions and test whether hooks share them (they don't; see the [atomicity decision](plans/audit-log.md#better-auth))
+- [ ] Better Auth: record audit events from the `after` hooks (person)
 - [ ] Record events across everything built so far: organization, run, user and platform events (person)
 - [ ] Context expiry job, and audit events in the purge job (person)
-- [ ] Reconciliation job, if the transaction test showed it's needed (person)
 - [ ] **Operators** (person unless marked), following the [operators plan](plans/operators-and-account-deletion.md):
   - [x] Access controller with `platform-admin` in `@checklog/shared`; `admin()` and `adminClient()`; schema migration
   - [ ] `before` hooks refusing `set-role`, `remove-user`, `create-user`, `update-user`, `set-user-password` and direct `impersonate-user`

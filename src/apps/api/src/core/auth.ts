@@ -18,6 +18,8 @@ export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
     usePlural: true,
+    // Endpoints that write several rows, such as sign-up, do it in one transaction
+    transaction: true,
   }),
   plugins: [
     admin({
