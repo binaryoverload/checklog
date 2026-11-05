@@ -43,6 +43,7 @@
     "supertest": "catalog:",
     "tsdown": "catalog:",
     "tsx": "catalog:",
+    "type-fest": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

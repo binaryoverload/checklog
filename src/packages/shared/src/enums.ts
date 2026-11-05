@@ -73,3 +73,7 @@ export type NotificationChannel = z.infer<typeof notificationChannelSchema>
 export const notificationDeliveryStatuses = ["pending", "sent", "failed"] as const
 export const notificationDeliveryStatusSchema = z.enum(notificationDeliveryStatuses)
 export type NotificationDeliveryStatus = z.infer<typeof notificationDeliveryStatusSchema>
+
+export const organizationTypes = ["personal", "managed"] as const
+export const organizationTypeSchema = z.enum(organizationTypes)
+export type OrganizationType = z.infer<typeof organizationTypeSchema>

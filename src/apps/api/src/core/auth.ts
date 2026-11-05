@@ -4,7 +4,7 @@ import { admin, organization } from "better-auth/plugins"
 
 import { db } from "@/db/index.ts"
 import { typeIdForModel } from "@/util/typeid.ts"
-import { platformAccessControl, platformRoles, platformAdminRoleName, orgRoles, orgAccessControl } from "@checklog/shared"
+import { platformAccessControl, platformRoles, platformAdminRoleName, orgRoles, orgAccessControl, organizationTypes } from "@checklog/shared"
 
 import { config } from "./config.ts"
 
@@ -39,7 +39,7 @@ export const auth = betterAuth({
         organization: {
           additionalFields: {
             accountType: {
-              type: ["personal", "managed"],
+              type: organizationTypes,
               required: true,
               input: false,
               defaultValue: "personal",

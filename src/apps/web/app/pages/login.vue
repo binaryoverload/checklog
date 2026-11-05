@@ -53,6 +53,7 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
     rememberMe: payload.data.remember,
   })
   if (error) {
+    // TODO: Do something with this error
     console.error(error)
     return
   }

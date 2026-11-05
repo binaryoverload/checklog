@@ -39,13 +39,32 @@ const schema = z.object({
 
 type Schema = z.output<typeof schema>
 
-function onSubmit(payload: FormSubmitEvent<Schema>) {
-  console.log("Submitted", payload)
+const auth = useAuth()
+
+const signUpSuccess = ref(false)
+
+async function onSubmit(payload: FormSubmitEvent<Schema>) {
+  const { error } = await auth.signUp.email({
+    name: payload.data.name,
+    email: payload.data.email,
+    password: payload.data.password,
+  })
+  if (error) {
+    // TODO: Do something with this error
+    console.error(error)
+    return
+  }
+
+  signUpSuccess.value = true
+  setTimeout(() => {
+    navigateTo("/login")
+  }, 5000)
 }
 </script>
 
 <template>
   <UAuthForm
+    v-if="!signUpSuccess"
     :fields="fields"
     :schema="schema"
     title="Create an account"
@@ -70,4 +89,18 @@ function onSubmit(payload: FormSubmitEvent<Schema>) {
       </ULink>.
     </template>
   </UAuthForm>
+  <div v-else class="text-center">
+    <UIcon
+      name="i-lucide-check-circle"
+      class="text-success size-8 mx-auto mb-4"
+    />
+    <p>Sign up successful! Redirecting to login page...</p>
+    <UButton
+      color="primary"
+      class="mt-4"
+      @click="navigateTo('/login')"
+    >
+      Go to Login
+    </UButton>
+  </div>
 </template>
