@@ -6,7 +6,7 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 
 - `src/apps/api`: Express, Drizzle, Better Auth, pg-boss
 - `src/apps/web`: Nuxt with Nuxt UI and TanStack Query
-- `src/packages/shared`: TypeScript types and validation schemas, shipped as source (no build step)
+- `src/packages/shared`: TypeScript types and validation schemas, shipped as source (no build step). Four entry points, imported by subpath with no root entry: `@checklog/shared/api` (request schemas and response types), `/domain` (the shared model: enums, field and notification schemas), `/auth` (access control) and `/utils`
 - All app and package code lives under the root `src/` folder
 - Root: shared ESLint config, `pnpm-workspace.yaml`, pnpm catalogs for shared dependency versions, `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, PR template with the AI-use checkbox
 
@@ -14,7 +14,7 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 
 - Apps depend on the shared package with `workspace:*`
 - `pnpm -r run build` builds in dependency order; `pnpm --filter <app>` targets one app
-- The API runs with tsx in dev and is bundled with tsdown for production, with `deps.alwaysBundle: ['@checklog/shared']` so the shared source is bundled in
+- The API runs with tsx in dev and is bundled with tsdown for production, with `deps.alwaysBundle: [/^@checklog\/shared(\/|$)/]` so the shared source and all its subpaths are bundled in
 - `pnpm deploy --filter api` produces the standalone folder for the API image
 - Turborepo is not used for now; add it later if build times justify caching
 
@@ -31,7 +31,7 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 ## Tests
 
 - Each package's tests live in a `test` folder beside `src`, mirroring its layout (`src/core/permissions.ts` is tested in `test/core/permissions.test.ts`). Helpers live in `test/support`
-- API tests import source with `@/` and helpers with `@test/`. Shared package tests import `@checklog/shared`, so they test its public exports
+- API tests import source with `@/` and helpers with `@test/`. Shared package tests import its entry points (`@checklog/shared/domain`), so they test its public exports
 - The API has two Vitest projects. `unit` runs `*.test.ts` and the `*.test-d.ts` type tests with nothing running. `db` runs `*.db.test.ts` against Postgres 18 in Docker, started once per run by Testcontainers and migrated with the API's own runner. `pnpm test` runs both, so it needs Docker running; `vitest run --project unit` skips the database
 - Database tests run each test inside a transaction that's rolled back (`inRollback`), so they share one database without cleanup
 
@@ -42,6 +42,8 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 - Mount the Better Auth handler before `express.json()`
 - One router per area under `/api` (templates, runs, approvals, schedules, notifications, members), all created up front
 - Route handlers use a typed `route()` helper that validates `params`, `query` and `body` with Zod schemas from `packages/shared` and passes the parsed values in; Express 5's `req.query` is read-only, so plain validation middleware can't hand handlers typed input
+- Responses are plain TypeScript types with a `Dto` suffix (`TemplateDto`) in `@checklog/shared/api`, one file per area with request schemas first. Drizzle row types keep plain names (`Template`) in the API's `util/types.ts`
+- Mappers in `src/mappers/`, one file per area, turn rows into response types: `to<Thing>Dto(row: <Thing>): <Thing>Dto`. They list every field explicitly, never `...row`, so a new column or `organizationId` can't leak into a response, and send dates as ISO strings
 - Every API error except Better Auth's (`/api/auth/*` keeps its own format) uses one shape: `{ "error": { "code": "not_found", "message": "Run not found", "details": [] } }`, with `details` holding the Zod issues on validation errors only. Unexpected errors are logged and return a generic `internal` 500
 - Use Better Auth's organization plugin for tenants, members, roles and invitations
 - Write sign-ins, role changes and invitations to the audit log via Better Auth hooks
