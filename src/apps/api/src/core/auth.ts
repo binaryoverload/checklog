@@ -39,7 +39,7 @@ export const auth = betterAuth({
         organization: {
           additionalFields: {
             accountType: {
-              type: organizationTypes,
+              type: [...organizationTypes],
               required: true,
               input: false,
               defaultValue: "personal",
