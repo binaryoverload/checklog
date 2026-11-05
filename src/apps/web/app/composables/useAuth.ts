@@ -25,13 +25,17 @@ export function useSessionQuery() {
   return query
 }
 
+export function organizationsQueryOptions(authClient: AuthClient) {
+  return queryOptions({
+    queryKey: ["organizations"],
+    queryFn: async () => unwrap(await authClient.organization.list()) ?? [],
+  })
+}
+
 // Organizations the signed-in user belongs to
 export function useOrganizationsQuery() {
   const { $authClient } = useNuxtApp()
-  const query = useQuery({
-    queryKey: ["organizations"],
-    queryFn: async () => unwrap(await $authClient.organization.list()) ?? [],
-  })
+  const query = useQuery(organizationsQueryOptions($authClient))
   onServerPrefetch(query.suspense)
   return query
 }
