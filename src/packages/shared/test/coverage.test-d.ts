@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, test } from "vitest"
 
-import type { FieldOptions, FieldType, FieldValue, NotificationPayload, NotificationType } from "@checklog/shared"
+import type { FieldOptions, FieldType, FieldValue, NotificationPayload, NotificationType } from "@checklog/shared/domain"
 
 // Each discriminated union must have exactly one variant per value of its enum:
 // a missing variant or a variant for a value that isn't in the enum both fail.

@@ -1,5 +1,5 @@
-import { apiErrorResponseSchema } from "@checklog/shared"
-import type { ApiErrorCode, ApiErrorDetail } from "@checklog/shared"
+import { apiErrorResponseSchema } from "@checklog/shared/api"
+import type { ApiErrorCode, ApiErrorDetail } from "@checklog/shared/api"
 
 // An error response from the API, in the shape every non-auth route uses
 export class ApiError extends Error {

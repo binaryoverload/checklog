@@ -40,7 +40,13 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 - [x] Session middleware: read the Better Auth session on every API request and expose the user and active organization to handlers (person)
 - [x] Development seed: `pnpm db:seed` creates sign-in accounts and an organization through Better Auth (agent)
 - [x] The permission function: one place that answers "can this user do this in this organization", from the member's role and `template_access`, in `core/permissions.ts` (person)
-- [ ] Shared Zod schemas in `packages/shared` for each area's request and response bodies, added as each area is built (person)
+- [ ] **Shared API contracts:** request schemas (Zod) and response types (plain TypeScript, `Dto` suffix) in the shared package's `api` entry point, filled by mappers in the API
+  - [x] Restructure `packages/shared` into the `api`, `domain`, `auth` and `utils` entry points: split `enums.ts` and the area files between `api/` and `domain/`, switch to subpath exports with no root entry, update every import and the tsdown `alwaysBundle` pattern (agent, behaviour-neutral refactor)
+  - [ ] Move the TypeID prefixes to `utils/typeid.ts`; the API's generators import them (agent, behaviour-neutral refactor)
+  - [ ] Row types for Checklog's tables in `util/types.ts`, with plain names like the existing `Organization`, and the `mappers/` convention, recorded in the implementation notes (agent)
+  - [ ] `typeIdSchema` in shared (person)
+  - [ ] `paginationQuerySchema`, `Paginated<T>` with `total`, and the API cursor and count helpers (person)
+  - [ ] Request schemas and response types per area, added as each area is built (person)
 
 ### Web app
 

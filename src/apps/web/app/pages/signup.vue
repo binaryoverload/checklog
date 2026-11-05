@@ -2,7 +2,7 @@
 import type { FormSubmitEvent } from "@nuxt/ui"
 import * as z from "zod"
 
-import { requiredString } from "@checklog/shared"
+import { requiredString } from "@checklog/shared/utils"
 
 definePageMeta({
   layout: "auth",

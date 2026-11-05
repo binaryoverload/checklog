@@ -1,4 +1,4 @@
-import { platformAdminRoleName } from "@checklog/shared"
+import { platformAdminRoleName } from "@checklog/shared/auth"
 
 // Better Auth stores several admin roles as one comma-separated string
 export function isPlatformAdmin(user: { role?: string | null } | null | undefined): boolean {

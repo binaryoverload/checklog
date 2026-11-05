@@ -2,9 +2,9 @@ import { sql } from "drizzle-orm"
 import { pgTable, text, integer, boolean, timestamp, unique, uniqueIndex, foreignKey, interval, index, jsonb } from "drizzle-orm/pg-core"
 import type { PgTableExtraConfigValue } from "drizzle-orm/pg-core"
 
-import { typeIdForTable } from "@/util/typeid.ts"
-import { approvalDecisionStatuses, approvalStatuses, assigneeTypes, fieldTypes, notificationChannels, notificationDeliveryStatuses, notificationSubjectTypes, notificationTypes, runStatuses, runStepStatuses, scheduleStatuses, templateAccessLevels, templateStatuses, templateStepKinds, templateVersionStatuses } from "@checklog/shared"
-import type { FieldOptions, FieldValue, NotificationPayload } from "@checklog/shared"
+import { approvalDecisionStatuses, approvalStatuses, assigneeTypes, fieldTypes, notificationChannels, notificationDeliveryStatuses, notificationSubjectTypes, notificationTypes, runStatuses, runStepStatuses, scheduleStatuses, templateAccessLevels, templateStatuses, templateStepKinds, templateVersionStatuses } from "@checklog/shared/domain"
+import type { FieldOptions, FieldValue, NotificationPayload } from "@checklog/shared/domain"
+import { typeIdForTable } from "@checklog/shared/utils"
 
 import { members, organizations, teams, users } from "./auth-schema.ts"
 

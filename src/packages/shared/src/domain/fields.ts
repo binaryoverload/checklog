@@ -1,6 +1,12 @@
 import z from "zod"
 
-import { dateTypeSchema } from "./enums"
+export const fieldTypes = ["text", "number", "date", "dropdown", "checkbox"] as const
+export const fieldTypeSchema = z.enum(fieldTypes)
+export type FieldType = z.infer<typeof fieldTypeSchema>
+
+export const dateTypes = ["date", "datetime", "time"] as const
+export const dateTypeSchema = z.enum(dateTypes)
+export type DateType = z.infer<typeof dateTypeSchema>
 
 export const fieldOptionsSchema = z.discriminatedUnion("type", [
   z.object({

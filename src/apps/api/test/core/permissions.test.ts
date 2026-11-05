@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest"
 
 import { assertCan, assertPlatformCan, can, platformCan } from "@/core/permissions.ts"
 import type { Member, User } from "@/util/types.ts"
-import { platformAdminRoleName } from "@checklog/shared"
+import { platformAdminRoleName } from "@checklog/shared/auth"
 
 function member(role: string): Member {
   return { id: "mem_test", organizationId: "org_test", userId: "user_test", role, createdAt: new Date() }

@@ -1,6 +1,7 @@
 // Prefixes are part of every stored ID, so never change one once rows exist.
 
 import { typeid } from "typeid-js"
+import z from "zod"
 
 // TypeID prefixes may only use lowercase a-z and underscores.
 const tableToPrefix = {
@@ -49,4 +50,8 @@ export function prefixForTable(tableName: keyof typeof tableToPrefix) {
 
 export function typeIdForTable(tableName: keyof typeof tableToPrefix) {
   return typeid(prefixForTable(tableName))
+}
+
+export function typeIdSchema(tableName: keyof typeof tableToPrefix) {
+  return z.string().startsWith(prefixForTable(tableName))
 }

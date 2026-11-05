@@ -4,8 +4,8 @@ import { auth } from "@/core/auth.ts"
 import { logger } from "@/core/logger.ts"
 import { members, organizations, users } from "@/db/auth-schema.ts"
 import { db, pool } from "@/db/index.ts"
-import type { orgRoles } from "@checklog/shared"
-import { platformAdminRoleName } from "@checklog/shared"
+import type { orgRoles } from "@checklog/shared/auth"
+import { platformAdminRoleName } from "@checklog/shared/auth"
 
 // Development sign-ins. Every seeded account shares this password.
 const password = "checklog"

@@ -6,8 +6,10 @@ import { db } from "@/db/index.ts"
 import { templateAccess, templates } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import type { Database, Member, PermissionContext, User } from "@/util/types.ts"
-import { highestTemplateAccessLevel, orgRoles, platformRoles, templateAccessIncludes, templateAccessLevels } from "@checklog/shared"
-import type { OrgStatementsCheckInput, PlatformStatementsCheckInput, TemplateAccessLevel } from "@checklog/shared"
+import { orgRoles, platformRoles } from "@checklog/shared/auth"
+import type { OrgStatementsCheckInput, PlatformStatementsCheckInput } from "@checklog/shared/auth"
+import { highestTemplateAccessLevel, templateAccessIncludes, templateAccessLevels } from "@checklog/shared/domain"
+import type { TemplateAccessLevel } from "@checklog/shared/domain"
 
 export function can(member: Member, permissions: OrgStatementsCheckInput): boolean {
   const roles = member.role.split(",").map(role => role.trim())

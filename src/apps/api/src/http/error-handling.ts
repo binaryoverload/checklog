@@ -1,7 +1,7 @@
 import type { ErrorRequestHandler, RequestHandler, Response } from "express"
 
 import { logger } from "@/core/logger.ts"
-import type { ApiErrorResponse } from "@checklog/shared"
+import type { ApiErrorResponse } from "@checklog/shared/api"
 
 import { HttpError } from "./errors.ts"
 

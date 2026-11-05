@@ -1,7 +1,7 @@
 import { createAuthClient } from "better-auth/client"
 import { adminClient, organizationClient } from "better-auth/client/plugins"
 
-import { orgAccessControl, orgRoles, platformAccessControl, platformRoles } from "@checklog/shared"
+import { orgAccessControl, orgRoles, platformAccessControl, platformRoles } from "@checklog/shared/auth"
 
 // One Better Auth client per request on the server, so each carries that visitor's cookie.
 // Session state lives in TanStack Query (see useSessionQuery), not in Better Auth's own stores.

@@ -5,8 +5,8 @@ import { assertTemplateAccessLevel, templateAccessLevel, visibleTemplatesWhere }
 import { organizations, teamMembers } from "@/db/auth-schema.ts"
 import { templates } from "@/db/schema.ts"
 import type { Database, PermissionContext } from "@/util/types.ts"
-import { templateAccessIncludes, templateAccessLevels } from "@checklog/shared"
-import type { TemplateAccessLevel } from "@checklog/shared"
+import { templateAccessIncludes, templateAccessLevels } from "@checklog/shared/domain"
+import type { TemplateAccessLevel } from "@checklog/shared/domain"
 import { addToGroup, createGroup, createMember, createOrganization, createTemplate, grant, inRollback } from "@test/support/database.ts"
 
 async function visibleTemplateIds(tx: Database, context: PermissionContext, needs?: TemplateAccessLevel): Promise<string[]> {

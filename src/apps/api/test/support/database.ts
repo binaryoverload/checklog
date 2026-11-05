@@ -3,9 +3,10 @@ import { TransactionRollbackError } from "drizzle-orm"
 import { members, organizations, teamMembers, teams, users } from "@/db/auth-schema.ts"
 import { db } from "@/db/index.ts"
 import { templateAccess, templates } from "@/db/schema.ts"
-import { typeIdForModel } from "@/util/typeid.ts"
 import type { Database, Member, Organization, PermissionContext } from "@/util/types.ts"
-import type { orgRoles, TemplateAccessLevel } from "@checklog/shared"
+import type { orgRoles } from "@checklog/shared/auth"
+import type { TemplateAccessLevel } from "@checklog/shared/domain"
+import { typeIdForModel } from "@checklog/shared/utils"
 
 type OrganizationRole = keyof typeof orgRoles
 

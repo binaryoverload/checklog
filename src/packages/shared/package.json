@@ -5,7 +5,7 @@
   "type": "module",
   "license": "SEE LICENSE IN ../../../LICENSE",
   "exports": {
-    ".": "./src/index.ts"
+    "./*": "./src/*/index.ts"
   },
   "scripts": {
     "lint": "eslint .",
@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "better-auth": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "typeid-js": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:",

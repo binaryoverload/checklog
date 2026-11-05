@@ -1,27 +1,5 @@
 import { createAccessControl } from "better-auth/plugins/access"
-import { defaultStatements as defaultAdminStatements } from "better-auth/plugins/admin/access"
-import { defaultStatements as defaultOrgStatements } from "better-auth/plugins/organization/access"
-
-export const platformAccessControl = createAccessControl(defaultAdminStatements)
-
-export type PlatformStatements = typeof platformAccessControl.statements
-export type PlatformStatementsCheckInput = {
-  [K in keyof PlatformStatements]?: PlatformStatements[K][number][]
-}
-
-const platformAdminRole = platformAccessControl.newRole({
-  user: ["list", "get", "ban", "impersonate"],
-  session: ["list", "revoke"],
-})
-
-const userRole = platformAccessControl.newRole({})
-
-export const platformAdminRoleName = "platform-admin"
-
-export const platformRoles = {
-  [platformAdminRoleName]: platformAdminRole,
-  user: userRole,
-}
+import { defaultStatements } from "better-auth/plugins/organization/access"
 
 const appStatements = {
   template: [
@@ -40,7 +18,7 @@ const appStatements = {
 } as const
 
 export const orgAccessControl = createAccessControl({
-  ...defaultOrgStatements,
+  ...defaultStatements,
   ...appStatements,
 })
 
@@ -50,12 +28,12 @@ export type OrgStatementsCheckInput = {
 }
 
 const orgOwnerRole = orgAccessControl.newRole({
-  ...defaultOrgStatements, // All better-auth permissions
+  ...defaultStatements, // All better-auth permissions
   ...appStatements, // All app permissions
 })
 
 const orgAdminRole = orgAccessControl.newRole({
-  ...defaultOrgStatements, // All better-auth permissions other than...
+  ...defaultStatements, // All better-auth permissions other than...
   organization: ["update"], // Org admins cannot delete the organization
   ...appStatements, // All app permissions
   managedAccount: [], // Only org owners can delete or restore managed accounts

@@ -1,4 +1,4 @@
-import type { ApiErrorCode, ApiErrorDetail } from "@checklog/shared"
+import type { ApiErrorCode, ApiErrorDetail } from "@checklog/shared/api"
 
 const statusByCode: Record<ApiErrorCode, number> = {
   bad_request: 400,

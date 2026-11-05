@@ -3,8 +3,9 @@ import { betterAuth } from "better-auth"
 import { admin, organization } from "better-auth/plugins"
 
 import { db } from "@/db/index.ts"
-import { typeIdForModel } from "@/util/typeid.ts"
-import { platformAccessControl, platformRoles, platformAdminRoleName, orgRoles, orgAccessControl, organizationTypes } from "@checklog/shared"
+import { platformAccessControl, platformRoles, platformAdminRoleName, orgRoles, orgAccessControl } from "@checklog/shared/auth"
+import { organizationTypes } from "@checklog/shared/domain"
+import { typeIdForModel } from "@checklog/shared/utils"
 
 import { config } from "./config.ts"
 

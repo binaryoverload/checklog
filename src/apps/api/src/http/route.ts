@@ -7,7 +7,7 @@ import { auth } from "@/core/auth.ts"
 import { members } from "@/db/auth-schema.ts"
 import { db } from "@/db/index.ts"
 import type { Member, Organization, Session } from "@/util/types.ts"
-import type { ApiErrorDetail } from "@checklog/shared"
+import type { ApiErrorDetail } from "@checklog/shared/api"
 
 import { HttpError } from "./errors.ts"
 

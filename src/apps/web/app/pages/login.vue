@@ -3,7 +3,7 @@ import type { FormSubmitEvent } from "@nuxt/ui"
 import { useQueryClient } from "@tanstack/vue-query"
 import * as z from "zod"
 
-import { requiredString } from "@checklog/shared"
+import { requiredString } from "@checklog/shared/utils"
 
 definePageMeta({
   layout: "auth",
