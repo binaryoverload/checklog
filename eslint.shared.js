@@ -77,6 +77,7 @@ export default defineConfig(
   {
     name: "checklog/no-parent-imports",
     files: ["src/**", "app/**"],
+    ignores: ["src/packages/**"],
     rules: {
       "no-restricted-imports": ["error", { patterns: [{ group: ["../*"], message: "Import from another folder with the @/ alias (~/ in the web app)." }] }],
     },

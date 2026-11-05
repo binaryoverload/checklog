@@ -14,8 +14,9 @@
   },
   "dependencies": {
     "better-auth": "catalog:",
+    "typeid-js": "catalog:",
     "zod": "catalog:",
-    "typeid-js": "catalog:"
+    "rrule": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:",

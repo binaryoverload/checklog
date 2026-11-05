@@ -245,6 +245,9 @@ catalogs:
     pg-boss:
       specifier: ^12.38.0
       version: 12.38.0
+    rrule:
+      specifier: ^2.8.1
+      version: 2.8.1
     supertest:
       specifier: ^7.3.1
       version: 7.3.1
@@ -340,6 +343,9 @@ importers:
       pg-boss:
         specifier: 'catalog:'
         version: 12.38.0(@opentelemetry/api@1.10.0)
+      rrule:
+        specifier: 'catalog:'
+        version: 2.8.1
       typeid-js:
         specifier: 'catalog:'
         version: 1.2.0
@@ -438,6 +444,9 @@ importers:
       better-auth:
         specifier: 'catalog:'
         version: 1.7.15(@opentelemetry/api@1.10.0)(drizzle-kit@0.31.11)(drizzle-orm@0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(pg@8.23.1))(pg@8.23.1)(vitest@5.1.0(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)))(vue@3.5.44(typescript@6.0.3))
+      rrule:
+        specifier: 'catalog:'
+        version: 2.8.1
       typeid-js:
         specifier: 'catalog:'
         version: 1.2.0
@@ -5839,6 +5848,9 @@ packages:
 
   rrule-temporal@2.2.8:
     resolution: {integrity: sha512-+wWUe0J02oMh1UWKIt1RTu2H0Cz+gP11O/iweK0MN2UP6JLGeepTUkbSBa90Hxq0W+ywSxM9IlJNouIUdMOwhg==}
+
+  rrule@2.8.1:
+    resolution: {integrity: sha512-hM3dHSBMeaJ0Ktp7W38BJZ7O1zOgaFEsn41PDk+yHoEtfLV+PoJt9E9xAlZiWgf/iqEqionN0ebHFZIDAp+iGw==}
 
   run-applescript@7.1.0:
     resolution: {integrity: sha512-DPe5pVFaAsinSaV6QjQ6gdiedWDcRCbUuiQfQa2wmWV7+xC9bGulGI8+TdRmoFkAPaBXk8CrAbnlY2ISniJ47Q==}
@@ -12677,6 +12689,10 @@ snapshots:
   rrule-temporal@2.2.8:
     dependencies:
       temporal-spec: 1.0.1
+
+  rrule@2.8.1:
+    dependencies:
+      tslib: 2.8.1
 
   run-applescript@7.1.0: {}
 

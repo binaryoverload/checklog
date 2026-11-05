@@ -27,6 +27,7 @@
     "nodemailer": "catalog:",
     "pg": "catalog:",
     "pg-boss": "catalog:",
+    "rrule": "catalog:",
     "typeid-js": "catalog:",
     "winston": "catalog:",
     "zod": "catalog:"
