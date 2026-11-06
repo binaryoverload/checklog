@@ -21,3 +21,5 @@ export const platformRoles = {
   [platformAdminRoleName]: platformAdminRole,
   user: userRole,
 }
+
+export type PlatformRole = keyof typeof platformRoles

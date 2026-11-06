@@ -4,18 +4,16 @@ import { auth } from "@/core/auth.ts"
 import { logger } from "@/core/logger.ts"
 import { members, organizations, users } from "@/db/auth-schema.ts"
 import { db, pool } from "@/db/index.ts"
-import type { orgRoles } from "@checklog/shared/auth"
+import type { OrgRole } from "@checklog/shared/auth"
 import { platformAdminRoleName } from "@checklog/shared/auth"
 
 // Development sign-ins. Every seeded account shares this password.
 const password = "checklog"
 
-type OrganizationRole = keyof typeof orgRoles
-
 const platformAdmin = { name: "Platform Admin", email: "platform-admin@checklog.co.uk", role: platformAdminRoleName }
 
 // One account per organization role, each a member of every seeded organization with that role
-const organizationUsers: { name: string, email: string, organizationRole: OrganizationRole }[] = [
+const organizationUsers: { name: string, email: string, organizationRole: OrgRole }[] = [
   { name: "Dev Owner", email: "owner@checklog.co.uk", organizationRole: "owner" },
   { name: "Dev Admin", email: "admin@checklog.co.uk", organizationRole: "admin" },
   { name: "Dev Editor", email: "editor@checklog.co.uk", organizationRole: "editor" },
@@ -61,7 +59,7 @@ async function findOrCreateOrganization({ name, slug }: { name: string, slug: st
 }
 
 // Adds a missing membership through Better Auth, and puts back a role that was changed since
-async function ensureMembership(organizationId: string, userId: string, role: OrganizationRole) {
+async function ensureMembership(organizationId: string, userId: string, role: OrgRole) {
   const membership = await db.query.members.findFirst({ where: and(eq(members.userId, userId), eq(members.organizationId, organizationId)) })
   if (!membership) {
     await auth.api.addMember({ body: { organizationId, userId, role } })

@@ -1,13 +1,44 @@
-// TODO (person): request schemas for the run routes, then the response types below
+import type { CreatedFields, UpdatedFields } from "./common.ts"
+import type { AssigneeType } from "../domain/assignees.ts"
+import type { FieldValue } from "../domain/fields.ts"
+import type { RunStatus, RunStepStatus } from "../domain/runs.ts"
 
-// TODO (person): the response type for a run
-export type RunDto = never
+// TODO (person): request schemas for the run routes
 
-// TODO (person): the response type for a run step
-export type RunStepDto = never
+export type RunDto = {
+  id: string
+  templateVersionId: string
+  scheduleId: string | null
+  name: string
+  status: RunStatus
+  completedAt: string | null
+} & CreatedFields & UpdatedFields
 
-// TODO (person): the response type for a run step's field value
-export type RunFieldValueDto = never
+export type RunStepDto = {
+  id: string
+  runId: string
+  templateStepId: string
+  status: RunStepStatus
+  assigneeType: AssigneeType | null
+  assigneeMemberId: string | null
+  assigneeTeamId: string | null
+  assigneeRole: string | null
+  dueAt: string | null
+  completedAt: string | null
+  completedBy: string | null
+  skipReason: string | null
+} & CreatedFields & UpdatedFields
 
-// TODO (person): the response type for a step note
-export type StepNoteDto = never
+export type RunFieldValueDto = {
+  id: string
+  runStepId: string
+  templateFieldId: string
+  value: FieldValue | null
+  updatedBy: string | null
+} & CreatedFields & UpdatedFields
+
+export type StepNoteDto = {
+  id: string
+  runStepId: string
+  body: string
+} & CreatedFields

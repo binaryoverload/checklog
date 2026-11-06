@@ -4,11 +4,9 @@ import { members, organizations, teamMembers, teams, users } from "@/db/auth-sch
 import { db } from "@/db/index.ts"
 import { templateAccess, templates } from "@/db/schema.ts"
 import type { Database, Member, Organization, PermissionContext } from "@/util/types.ts"
-import type { orgRoles } from "@checklog/shared/auth"
+import type { OrgRole } from "@checklog/shared/auth"
 import type { TemplateAccessLevel } from "@checklog/shared/domain"
 import { typeIdForModel } from "@checklog/shared/utils"
-
-type OrganizationRole = keyof typeof orgRoles
 
 // Runs a test body in a transaction that's always rolled back, so tests share one database without seeing each other's rows
 export async function inRollback(body: (tx: Database) => Promise<void>): Promise<void> {
@@ -28,7 +26,7 @@ export async function createOrganization(tx: Database, name = "Test organization
   return organization!
 }
 
-export async function createMember(tx: Database, organization: Organization, role: OrganizationRole | (string & {})): Promise<PermissionContext> {
+export async function createMember(tx: Database, organization: Organization, role: OrgRole | (string & {})): Promise<PermissionContext> {
   const userId = typeIdForModel("user").toString()
   await tx.insert(users).values({ id: userId, name: `Test ${role}`, email: `${userId}@example.com`, role: "user" })
 

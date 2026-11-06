@@ -54,3 +54,5 @@ export const orgRoles = {
   editor: orgEditorRole,
   viewer: orgViewerRole,
 }
+
+export type OrgRole = keyof typeof orgRoles
