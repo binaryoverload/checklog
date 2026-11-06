@@ -36,6 +36,13 @@
       "when": 1793818186118,
       "tag": "0004_viewer_role",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793997749220,
+      "tag": "0005_change_datetime_precision",
+      "breakpoints": true
     }
   ]
 }

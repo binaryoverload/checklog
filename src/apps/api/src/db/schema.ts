@@ -8,13 +8,15 @@ import { typeIdForTable } from "@checklog/shared/utils"
 
 import { members, organizations, teams, users } from "./auth-schema.ts"
 
+const timestampWithTimezone = (name: string) => timestamp(name, { withTimezone: true, precision: 3 })
+
 const createdFields = {
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestampWithTimezone("created_at").notNull().defaultNow(),
   createdBy: text("created_by").notNull(), // Deliberately not a foreign key to users
 }
 
 const updatedFields = {
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+  updatedAt: timestampWithTimezone("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
 }
 
 export const templates = pgTable("templates", {
@@ -45,7 +47,7 @@ export const templateVersions = pgTable("template_versions", {
   templateId: text("template_id").notNull(),
   version: integer("version").notNull(),
   status: text("status", { enum: templateVersionStatuses }).notNull(),
-  publishedAt: timestamp("published_at", { withTimezone: true }),
+  publishedAt: timestampWithTimezone("published_at"),
   publishedBy: text("published_by").references(() => users.id, { onDelete: "set null" }),
   ...createdFields,
   ...updatedFields,
@@ -142,7 +144,7 @@ export const schedules = pgTable("schedules", {
   status: text("status", { enum: scheduleStatuses }).notNull().default("active"),
   rrule: text("rrule").notNull(),
   timezone: text("timezone").notNull(),
-  nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+  nextRunAt: timestampWithTimezone("next_run_at"),
   runNamePattern: text("run_name_pattern").notNull(),
   ...createdFields,
   ...updatedFields,
@@ -163,7 +165,7 @@ export const runs = pgTable("runs", {
   scheduleId: text("schedule_id"),
   name: text("name").notNull(),
   status: text("status", { enum: runStatuses }).notNull().default("in_progress"),
-  completedAt: timestamp("completed_at", { withTimezone: true }),
+  completedAt: timestampWithTimezone("completed_at"),
   ...createdFields,
   ...updatedFields,
 }, t => [
@@ -195,8 +197,8 @@ export const runSteps = pgTable("run_steps", {
   assigneeMemberId: text("assignee_member_id").references(() => members.id, { onDelete: "set null" }),
   assigneeTeamId: text("assignee_team_id").references(() => teams.id, { onDelete: "set null" }),
   assigneeRole: text("assignee_role"),
-  dueAt: timestamp("due_at", { withTimezone: true }),
-  completedAt: timestamp("completed_at", { withTimezone: true }),
+  dueAt: timestampWithTimezone("due_at"),
+  completedAt: timestampWithTimezone("completed_at"),
   completedBy: text("completed_by"),
   skipReason: text("skip_reason"),
   ...createdFields,
@@ -301,7 +303,7 @@ export const notifications = pgTable("notifications", {
   subjectType: text("subject_type", { enum: notificationSubjectTypes }).notNull(),
   subjectId: text("subject_id").notNull(),
   dedupeKey: text("dedupe_key"),
-  readAt: timestamp("read_at", { withTimezone: true }),
+  readAt: timestampWithTimezone("read_at"),
   ...createdFields,
   ...updatedFields,
 }, t => [
@@ -318,9 +320,9 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
   recipient: text("recipient").notNull(),
   channel: text("channel", { enum: notificationChannels }).notNull(),
   status: text("status", { enum: notificationDeliveryStatuses }).notNull().default("pending"),
-  sentAt: timestamp("sent_at", { withTimezone: true }),
+  sentAt: timestampWithTimezone("sent_at"),
   attempts: integer("attempts").notNull().default(0),
-  lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+  lastAttemptAt: timestampWithTimezone("last_attempt_at"),
   lastError: text("last_error"),
   ...createdFields,
   ...updatedFields,
