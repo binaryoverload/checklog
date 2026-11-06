@@ -48,6 +48,17 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
   - [x] `paginationQuerySchema`, `Paginated<T>` with `total`, and the API cursor and count helpers (person)
   - [ ] Request schemas and response types per area, added as each area is built, replacing the `never` placeholders and filling the mapper skeletons in `src/mappers/` (person)
 
+### Time zones
+
+Following the [time zones plan](https://claude.ai/artifact/T4padi2zYYHZdKkYSLnxj7):
+
+- [ ] Add Luxon to the catalog and the API (and the web app for display) (agent)
+- [x] Migration: `runs.timezone` text, and `template_steps.due_offset` from `interval` to `text` (person)
+- [ ] `util/time.ts`: `addOffset`, `todayIn`, and rrule date conversion with `keepLocalTime` (person)
+- [ ] Tests for `util/time.ts` with the DST fixtures in the plan's Luxon table (agent, reviewed by a person)
+- [ ] `X-Timezone` header in `useApi()`, and its parsing and validation in `route()` (person)
+- [ ] Date and time formatting helper in the web app (person)
+
 ### Web app
 
 - [x] App shell: layout, navigation and organization switcher with Nuxt UI, Better Auth client, shared TanStack Query fetch helper with SSR hydration (agent)

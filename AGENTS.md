@@ -17,7 +17,7 @@ These rules apply to every AI coding agent working in this repository, and to th
 ## What agents may not do
 
 - **Write core logic.** Business logic, the data model and API behaviour are written by a person. This already covers auth, the audit log and migrations, so there are no extra no-go areas.
-- **Build UI screens.** Pages and the components that make up a feature's UI are written by a person. Agents may set up the app shell (layout, navigation, shared helpers and plugins) and other UI boilerplate.
+- **Build UI screens.** Pages and the components that make up a feature's UI are written by a person. Agents may set up the app shell: installing dependencies and modules, and scaffolding files (config, plugins, composables, layouts, type declarations) with a `TODO` where the logic goes. The logic inside them, such as request headers, formatting helpers, layout and navigation, is written by a person.
 - **Apply fixes to application code.** An agent explains the fix or shows a diff, and a person applies it.
 
 When a task would cross these lines, stop and say so. Leave a `TODO` marking where the person's code goes instead of writing it.
