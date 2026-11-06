@@ -43,6 +43,13 @@
       "when": 1793997749220,
       "tag": "0005_change_datetime_precision",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793998310950,
+      "tag": "0006_timezone_modifications",
+      "breakpoints": true
     }
   ]
 }

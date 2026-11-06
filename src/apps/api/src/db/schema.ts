@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm"
-import { pgTable, text, integer, boolean, timestamp, unique, uniqueIndex, foreignKey, interval, index, jsonb } from "drizzle-orm/pg-core"
+import { pgTable, text, integer, boolean, timestamp, unique, uniqueIndex, foreignKey, index, jsonb } from "drizzle-orm/pg-core"
 import type { PgTableExtraConfigValue } from "drizzle-orm/pg-core"
 
 import { approvalDecisionStatuses, approvalStatuses, assigneeTypes, fieldTypes, notificationChannels, notificationDeliveryStatuses, notificationSubjectTypes, notificationTypes, runStatuses, runStepStatuses, scheduleStatuses, templateAccessLevels, templateStatuses, templateStepKinds, templateVersionStatuses } from "@checklog/shared/domain"
@@ -78,7 +78,7 @@ export const templateSteps = pgTable("template_steps", {
   assigneeMemberId: text("assignee_member_id").references(() => members.id, { onDelete: "set null" }),
   assigneeTeamId: text("assignee_team_id").references(() => teams.id, { onDelete: "set null" }),
   assigneeRole: text("assignee_role"),
-  dueOffset: interval("due_offset"),
+  dueOffset: text("due_offset"),
   ...createdFields,
   ...updatedFields,
 }, t => [
@@ -164,6 +164,7 @@ export const runs = pgTable("runs", {
   templateVersionId: text("template_version_id").notNull(),
   scheduleId: text("schedule_id"),
   name: text("name").notNull(),
+  timezone: text("timezone").notNull(),
   status: text("status", { enum: runStatuses }).notNull().default("in_progress"),
   completedAt: timestampWithTimezone("completed_at"),
   ...createdFields,

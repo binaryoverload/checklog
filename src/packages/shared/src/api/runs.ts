@@ -10,6 +10,7 @@ export type RunDto = {
   templateVersionId: string
   scheduleId: string | null
   name: string
+  timezone: string
   status: RunStatus
   completedAt: string | null
 } & CreatedFields & UpdatedFields

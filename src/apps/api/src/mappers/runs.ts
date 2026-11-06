@@ -8,6 +8,7 @@ export function toRunDto(row: Run): RunDto {
     scheduleId: row.scheduleId,
     name: row.name,
     status: row.status,
+    timezone: row.timezone,
     completedAt: row.completedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     createdBy: row.createdBy,
