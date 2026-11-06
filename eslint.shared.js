@@ -28,8 +28,9 @@ export default defineConfig(
     rules: {
       // Type-only imports use `import type`, matching verbatimModuleSyntax
       "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "separate-type-imports" }],
-      // A warning, so unfinished code still lints
+      // Warnings, so unfinished code still lints
       "@typescript-eslint/no-unused-vars": "warn",
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
   {
