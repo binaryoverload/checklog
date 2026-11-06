@@ -52,6 +52,9 @@ export function typeIdForTable(tableName: keyof typeof tableToPrefix) {
   return typeid(prefixForTable(tableName))
 }
 
+const typeIdSuffix = "[0-7][0-9a-hjkmnp-tv-z]{25}"
+
 export function typeIdSchema(tableName: keyof typeof tableToPrefix) {
-  return z.string().startsWith(prefixForTable(tableName))
+  const prefix = prefixForTable(tableName)
+  return z.string().regex(new RegExp(`^${prefix}_${typeIdSuffix}$`), `Must be a ${prefix} ID`)
 }
