@@ -9,6 +9,6 @@ export type ScheduleDto = {
   status: ScheduleStatus
   recurrence: ScheduleRecurrence
   timezone: string
-  nextRunAt: Date | null
+  nextRunAt: string | null
   runNamePattern: string
 } & CreatedFields & UpdatedFields

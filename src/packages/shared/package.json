@@ -15,10 +15,10 @@
   "dependencies": {
     "better-auth": "catalog:",
     "typeid-js": "catalog:",
-    "zod": "catalog:",
-    "rrule": "catalog:"
+    "zod": "catalog:"
   },
   "devDependencies": {
+    "type-fest": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
