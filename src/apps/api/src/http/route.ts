@@ -24,6 +24,11 @@ type RouteOptions = {
    * @default "required"
    */
   organization?: "required" | "none"
+  /**
+   * Whether impersonation is allowed for this route.
+   * @default "allow"
+   */
+  impersonation?: "allow" | "refuse"
   params?: z.ZodType
   query?: z.ZodType
   body?: z.ZodType
@@ -71,6 +76,10 @@ export function route<S extends RouteOptions>(options: S, handler: RouteHandler<
     let activeOrganization: ActiveOrganization | null = null
     if (session && optionsWithDefaults.auth === "private" && optionsWithDefaults.organization === "required") {
       activeOrganization = await loadActiveOrganization(session)
+    }
+
+    if (optionsWithDefaults.impersonation === "refuse" && session?.session.impersonatedBy) {
+      throw new HttpError("forbidden", "Impersonation is not allowed for this route")
     }
 
     for (const location of ["params", "query", "body"] as const) {

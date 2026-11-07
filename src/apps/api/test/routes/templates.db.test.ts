@@ -1,68 +1,254 @@
 import { eq } from "drizzle-orm"
 import request from "supertest"
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest"
+import { describe, expect, test } from "vitest"
 
 import { createApp } from "@/app.ts"
-import { auth } from "@/core/auth.ts"
 import { db } from "@/db/index.ts"
-import { templates, templateVersions } from "@/db/schema.ts"
+import { schedules, templates, templateVersions } from "@/db/schema.ts"
 import { encodeCursor } from "@/util/pagination.ts"
-import type { Organization, PermissionContext } from "@/util/types.ts"
+import type { Organization, Template, TemplateVersion } from "@/util/types.ts"
+import type { TemplateDetails, TemplateVersionDto } from "@checklog/shared/api"
+import { templateAccessLevels } from "@checklog/shared/domain"
+import type { TemplateAccessLevel, TemplateStatus } from "@checklog/shared/domain"
 import { typeIdForTable } from "@checklog/shared/utils"
-import { addToGroup, createGroup, createMember, createOrganization, grant } from "@test/support/database.ts"
+import {
+  addToGroup,
+  createGroup,
+  createMember,
+  createOrganization,
+  grant,
+  insertSchedule,
+  insertTemplate,
+  insertTemplateVersion,
+} from "@test/support/database.ts"
+import { signedInMember, stubSessions } from "@test/support/session.ts"
 
 // Route handlers use the shared connection rather than a test transaction, so these tests commit their rows.
 // Each test creates its own organization, so they can't see each other's templates.
 
-let getSession: ReturnType<typeof vi.spyOn>
+stubSessions()
 
-beforeEach(() => {
-  getSession = vi.spyOn(auth.api, "getSession").mockResolvedValue(null as never)
-})
+const api = () => request(createApp())
 
-afterEach(() => {
-  vi.restoreAllMocks()
-})
-
-// Stubs only the session lookup; the membership is loaded from the database as in production
-function signInAs({ organization, member }: PermissionContext) {
-  getSession.mockResolvedValue({
-    user: { id: member.userId, email: `${member.userId}@example.com`, name: "Test user" },
-    session: { id: "sess_test", userId: member.userId, activeOrganizationId: organization.id },
-  } as never)
+function expectError(response: request.Response, status: number, code: string) {
+  expect(response.status).toBe(status)
+  expect(response.body.error.code).toBe(code)
 }
 
-async function signedInMember(role: string) {
-  const organization = await createOrganization(db)
-  const context = await createMember(db, organization, role)
-  signInAs(context)
-  return context
+async function insertTemplates(organization: Organization, names: string[], createdBy?: string) {
+  const rows: Template[] = []
+  for (const name of names) rows.push(await insertTemplate(db, organization, { name, createdBy }))
+  return rows
 }
 
-function createTemplate(body: unknown) {
-  return request(createApp()).post("/api/templates").send(body as object)
+async function storedTemplate(templateId: string) {
+  const [row] = await db.select().from(templates).where(eq(templates.id, templateId))
+  return row!
 }
 
 async function templatesIn(organizationId: string) {
   return db.select().from(templates).where(eq(templates.organizationId, organizationId))
 }
 
-function listTemplates(query: Record<string, string | number> = {}) {
-  return request(createApp()).get("/api/templates").query(query)
+async function scheduleStatusOf(scheduleId: string) {
+  const [row] = await db.select({ status: schedules.status }).from(schedules).where(eq(schedules.id, scheduleId))
+  return row!.status
 }
 
-async function insertTemplates(organization: Organization, names: string[], createdBy = "user_someone_else") {
-  const rows = await db.insert(templates)
-    .values(names.map(name => ({ organizationId: organization.id, name, createdBy })))
-    .returning()
-  return rows
+// The routes on one template, so the access and ID rules are checked the same way for each
+interface TemplateRoute {
+  name: string
+  send: (templateId: string) => request.Test
+  needs: TemplateAccessLevel
+  impersonation: "allow" | "refuse"
+  // The status the template needs for the request to succeed, and the one that makes it a conflict
+  status: TemplateStatus
+  conflictStatus?: TemplateStatus
 }
 
-function names(response: request.Response): string[] {
-  return response.body.items.map((item: { name: string }) => item.name)
-}
+const templateRoutes: TemplateRoute[] = [
+  {
+    name: "GET /api/templates/:templateId",
+    send: id => api().get(`/api/templates/${id}`),
+    needs: "view",
+    impersonation: "allow",
+    status: "active",
+  },
+  {
+    name: "PATCH /api/templates/:templateId",
+    send: id => api().patch(`/api/templates/${id}`).send({ name: "Renamed" }),
+    needs: "edit",
+    impersonation: "allow",
+    status: "active",
+  },
+  {
+    name: "POST /api/templates/:templateId/archive",
+    send: id => api().post(`/api/templates/${id}/archive`),
+    needs: "edit",
+    impersonation: "refuse",
+    status: "active",
+    conflictStatus: "archived",
+  },
+  {
+    name: "POST /api/templates/:templateId/restore",
+    send: id => api().post(`/api/templates/${id}/restore`),
+    needs: "edit",
+    impersonation: "refuse",
+    status: "archived",
+    conflictStatus: "active",
+  },
+]
+
+describe.each(templateRoutes)("$name access", (route) => {
+  const allowedLevels = templateAccessLevels.slice(templateAccessLevels.indexOf(route.needs))
+  const lowerLevels = templateAccessLevels.slice(0, templateAccessLevels.indexOf(route.needs))
+
+  function templateIn(organization: Organization, options: { createdBy?: string, status?: TemplateStatus } = {}) {
+    return insertTemplate(db, organization, { status: route.status, ...options })
+  }
+
+  async function expectUnchanged(template: Template) {
+    expect(await storedTemplate(template.id)).toEqual(template)
+  }
+
+  test.each(["owner", "admin"])("lets an %s make the request", async (role) => {
+    const { organization } = await signedInMember(role)
+    const template = await templateIn(organization)
+
+    expect((await route.send(template.id)).status).toBe(200)
+  })
+
+  test.each(["editor", "viewer"])("lets a member with the %s role who created the template make the request", async (role) => {
+    const { organization, member } = await signedInMember(role)
+    const template = await templateIn(organization, { createdBy: member.userId })
+
+    expect((await route.send(template.id)).status).toBe(200)
+  })
+
+  test.each(allowedLevels)("lets a member with %s access make the request", async (level) => {
+    const { organization, member } = await signedInMember("viewer")
+    const template = await templateIn(organization)
+    await grant(db, template.id, { organization, memberId: member.id }, level)
+
+    expect((await route.send(template.id)).status).toBe(200)
+  })
+
+  test(`lets a member whose group has ${route.needs} access make the request`, async () => {
+    const { organization, member } = await signedInMember("viewer")
+    const teamId = await createGroup(db, organization)
+    await addToGroup(db, teamId, member)
+    const template = await templateIn(organization)
+    await grant(db, template.id, { organization, teamId }, route.needs)
+
+    expect((await route.send(template.id)).status).toBe(200)
+  })
+
+  if (lowerLevels.length > 0) {
+    test.each(lowerLevels)("refuses a member with only %s access with forbidden and changes nothing", async (level) => {
+      const { organization, member } = await signedInMember("viewer")
+      const template = await templateIn(organization)
+      await grant(db, template.id, { organization, memberId: member.id }, level)
+
+      expectError(await route.send(template.id), 403, "forbidden")
+      await expectUnchanged(template)
+    })
+  }
+
+  test("refuses a template the member can't see with not_found and changes nothing", async () => {
+    const { organization } = await signedInMember("viewer")
+    const template = await templateIn(organization)
+
+    expectError(await route.send(template.id), 404, "not_found")
+    await expectUnchanged(template)
+  })
+
+  test("refuses a template granted only to someone else with not_found", async () => {
+    const { organization } = await signedInMember("viewer")
+    const { member: someoneElse } = await createMember(db, organization, "viewer")
+    const template = await templateIn(organization)
+    await grant(db, template.id, { organization, memberId: someoneElse.id }, "edit")
+
+    expectError(await route.send(template.id), 404, "not_found")
+  })
+
+  test("refuses another organization's template with not_found and changes nothing", async () => {
+    const other = await createOrganization(db)
+    const template = await templateIn(other)
+    await signedInMember("owner")
+
+    expectError(await route.send(template.id), 404, "not_found")
+    await expectUnchanged(template)
+  })
+
+  test("refuses an ID that doesn't exist with not_found", async () => {
+    await signedInMember("owner")
+
+    expectError(await route.send(typeIdForTable("templates").toString()), 404, "not_found")
+  })
+
+  test.each([
+    ["an ID that isn't a TypeID", "not-an-id"],
+    ["an ID for another table", typeIdForTable("runs").toString()],
+  ])("refuses %s with validation_failed", async (_description, templateId) => {
+    await signedInMember("owner")
+
+    expectError(await route.send(templateId), 400, "validation_failed")
+  })
+
+  test("refuses a signed-out request with unauthorized", async () => {
+    expectError(await route.send(typeIdForTable("templates").toString()), 401, "unauthorized")
+  })
+
+  if (route.impersonation === "refuse") {
+    test("refuses an impersonated session with forbidden and changes nothing", async () => {
+      const { organization } = await signedInMember("owner", { impersonatedBy: "user_operator" })
+      const template = await templateIn(organization)
+
+      expectError(await route.send(template.id), 403, "forbidden")
+      await expectUnchanged(template)
+    })
+  } else {
+    test("allows an impersonated session", async () => {
+      const { organization } = await signedInMember("owner", { impersonatedBy: "user_operator" })
+      const template = await templateIn(organization)
+
+      expect((await route.send(template.id)).status).toBe(200)
+    })
+  }
+
+  const conflictStatus = route.conflictStatus
+  if (conflictStatus) {
+    test(`refuses a member with edit access with conflict when the template is ${conflictStatus}`, async () => {
+      const { organization, member } = await signedInMember("viewer")
+      const template = await templateIn(organization, { status: conflictStatus })
+      await grant(db, template.id, { organization, memberId: member.id }, "edit")
+
+      expectError(await route.send(template.id), 409, "conflict")
+      await expectUnchanged(template)
+    })
+
+    test(`refuses a member with view access with forbidden, not conflict, when the template is ${conflictStatus}`, async () => {
+      const { organization, member } = await signedInMember("viewer")
+      const template = await templateIn(organization, { status: conflictStatus })
+      await grant(db, template.id, { organization, memberId: member.id }, "view")
+
+      expectError(await route.send(template.id), 403, "forbidden")
+    })
+
+    test(`refuses a template the member can't see with not_found, not conflict, when it's ${conflictStatus}`, async () => {
+      const { organization } = await signedInMember("viewer")
+      const template = await templateIn(organization, { status: conflictStatus })
+
+      expectError(await route.send(template.id), 404, "not_found")
+    })
+  }
+})
 
 describe("POST /api/templates", () => {
+  function createTemplate(body: unknown) {
+    return api().post("/api/templates").send(body as object)
+  }
+
   test("creates the template and responds with it", async () => {
     const { member } = await signedInMember("editor")
 
@@ -125,10 +311,7 @@ describe("POST /api/templates", () => {
   test("refuses a viewer with forbidden and creates nothing", async () => {
     const { organization } = await signedInMember("viewer")
 
-    const response = await createTemplate({ name: "Server checks" })
-
-    expect(response.status).toBe(403)
-    expect(response.body.error.code).toBe("forbidden")
+    expectError(await createTemplate({ name: "Server checks" }), 403, "forbidden")
     expect(await templatesIn(organization.id)).toEqual([])
   })
 
@@ -138,16 +321,14 @@ describe("POST /api/templates", () => {
 
     const response = await createTemplate({ name: "Server checks" })
 
-    expect(response.status).toBe(400)
-    expect(response.body.error.code).toBe("validation_failed")
+    expectError(response, 400, "validation_failed")
     expect(response.body.error.details).toEqual([{ location: "body", path: ["name"], message: expect.any(String) }])
     expect(await templatesIn(organization.id)).toHaveLength(1)
   })
 
   test("allows the name of an archived template", async () => {
     const { organization } = await signedInMember("editor")
-    const first = await createTemplate({ name: "Server checks" })
-    await db.update(templates).set({ status: "archived" }).where(eq(templates.id, first.body.id))
+    await insertTemplate(db, organization, { name: "Server checks", status: "archived" })
 
     const response = await createTemplate({ name: "Server checks" })
 
@@ -156,8 +337,8 @@ describe("POST /api/templates", () => {
   })
 
   test("allows a name used in another organization", async () => {
-    await signedInMember("editor")
-    await createTemplate({ name: "Server checks" })
+    const other = await createOrganization(db)
+    await insertTemplate(db, other, { name: "Server checks" })
     await signedInMember("editor")
 
     expect((await createTemplate({ name: "Server checks" })).status).toBe(200)
@@ -172,22 +353,40 @@ describe("POST /api/templates", () => {
   ])("refuses %s with validation_failed", async (_description, body) => {
     const { organization } = await signedInMember("editor")
 
-    const response = await createTemplate(body)
-
-    expect(response.status).toBe(400)
-    expect(response.body.error.code).toBe("validation_failed")
+    expectError(await createTemplate(body), 400, "validation_failed")
     expect(await templatesIn(organization.id)).toEqual([])
   })
 
   test("refuses a signed-out request with unauthorized", async () => {
-    const response = await createTemplate({ name: "Server checks" })
-
-    expect(response.status).toBe(401)
-    expect(response.body.error.code).toBe("unauthorized")
+    expectError(await createTemplate({ name: "Server checks" }), 401, "unauthorized")
   })
 })
 
 describe("GET /api/templates", () => {
+  function listTemplates(query: Record<string, string | number> = {}) {
+    return api().get("/api/templates").query(query)
+  }
+
+  function names(response: request.Response): string[] {
+    return response.body.items.map((item: { name: string }) => item.name)
+  }
+
+  async function pageThrough(query: Record<string, string | number>) {
+    const seen: string[] = []
+    const totals: number[] = []
+    let cursor: string | null = null
+    let pageCount = 0
+    do {
+      const response = await listTemplates(cursor ? { ...query, cursor } : query)
+      expect(response.status).toBe(200)
+      seen.push(...names(response))
+      totals.push(response.body.total)
+      cursor = response.body.nextCursor
+      pageCount++
+    } while (cursor !== null && pageCount < 10)
+    return { seen, totals, pageCount }
+  }
+
   test("lists the organization's templates by name", async () => {
     const { organization } = await signedInMember("admin")
     const [created] = await insertTemplates(organization, ["Server checks", "Backups", "Fire alarm"])
@@ -214,19 +413,10 @@ describe("GET /api/templates", () => {
     const { organization } = await signedInMember("admin")
     await insertTemplates(organization, ["E", "C", "A", "D", "B"])
 
-    const seen: string[] = []
-    let cursor: string | null = null
-    let pageCount = 0
-    do {
-      const response = await listTemplates(cursor ? { limit: 2, cursor } : { limit: 2 })
-      expect(response.status).toBe(200)
-      expect(response.body.total).toBe(5)
-      seen.push(...names(response))
-      cursor = response.body.nextCursor
-      pageCount++
-    } while (cursor !== null && pageCount < 10)
+    const { seen, totals, pageCount } = await pageThrough({ limit: 2 })
 
     expect(seen).toEqual(["A", "B", "C", "D", "E"])
+    expect(totals).toEqual([5, 5, 5])
     expect(pageCount).toBe(3)
   })
 
@@ -252,7 +442,7 @@ describe("GET /api/templates", () => {
     expect(response.body.total).toBe(1)
   })
 
-  test.each(["editor", "viewer"])("shows an %s only the templates they created or were granted", async (role) => {
+  test.each(["editor", "viewer"])("shows a member with the %s role only the templates they created or were granted", async (role) => {
     const { organization, member } = await signedInMember(role)
     const teamId = await createGroup(db, organization)
     await addToGroup(db, teamId, member)
@@ -284,10 +474,7 @@ describe("GET /api/templates", () => {
   ])("refuses %s with bad_request", async (_description, cursor) => {
     await signedInMember("admin")
 
-    const response = await listTemplates({ cursor })
-
-    expect(response.status).toBe(400)
-    expect(response.body.error.code).toBe("bad_request")
+    expectError(await listTemplates({ cursor }), 400, "bad_request")
   })
 
   test.each([
@@ -297,144 +484,261 @@ describe("GET /api/templates", () => {
   ])("refuses %s with validation_failed", async (_description, limit) => {
     await signedInMember("admin")
 
-    const response = await listTemplates({ limit })
-
-    expect(response.status).toBe(400)
-    expect(response.body.error.code).toBe("validation_failed")
+    expectError(await listTemplates({ limit }), 400, "validation_failed")
   })
 
   test("refuses a signed-out request with unauthorized", async () => {
-    const response = await listTemplates()
+    expectError(await listTemplates(), 401, "unauthorized")
+  })
 
-    expect(response.status).toBe(401)
-    expect(response.body.error.code).toBe("unauthorized")
+  describe("status filter", () => {
+    async function activeAndArchived(organization: Organization) {
+      await insertTemplates(organization, ["Server checks", "Backups"])
+      await insertTemplate(db, organization, { name: "Fire alarm", status: "archived" })
+    }
+
+    test("lists only active templates by default", async () => {
+      const { organization } = await signedInMember("admin")
+      await activeAndArchived(organization)
+
+      const response = await listTemplates()
+
+      expect(names(response)).toEqual(["Backups", "Server checks"])
+      expect(response.body.total).toBe(2)
+    })
+
+    test("lists only active templates with status=active", async () => {
+      const { organization } = await signedInMember("admin")
+      await activeAndArchived(organization)
+
+      const response = await listTemplates({ status: "active" })
+
+      expect(names(response)).toEqual(["Backups", "Server checks"])
+      expect(response.body.total).toBe(2)
+    })
+
+    test("lists only archived templates with status=archived", async () => {
+      const { organization } = await signedInMember("admin")
+      await activeAndArchived(organization)
+
+      const response = await listTemplates({ status: "archived" })
+
+      expect(response.status).toBe(200)
+      expect(names(response)).toEqual(["Fire alarm"])
+      expect(response.body.items[0].status).toBe("archived")
+      expect(response.body.total).toBe(1)
+    })
+
+    test("pages through archived templates with the cursor", async () => {
+      const { organization } = await signedInMember("admin")
+      for (const name of ["E", "C", "A", "D", "B"]) await insertTemplate(db, organization, { name, status: "archived" })
+      await insertTemplates(organization, ["Active"])
+
+      const { seen, totals } = await pageThrough({ status: "archived", limit: 2 })
+
+      expect(seen).toEqual(["A", "B", "C", "D", "E"])
+      expect(totals).toEqual([5, 5, 5])
+    })
+
+    test("still applies the member's access to archived templates", async () => {
+      const { organization, member } = await signedInMember("viewer")
+      await insertTemplate(db, organization, { name: "Mine", status: "archived", createdBy: member.userId })
+      await insertTemplate(db, organization, { name: "Hidden", status: "archived" })
+
+      const response = await listTemplates({ status: "archived" })
+
+      expect(names(response)).toEqual(["Mine"])
+      expect(response.body.total).toBe(1)
+    })
+
+    test("refuses an unknown status with validation_failed", async () => {
+      await signedInMember("admin")
+
+      expectError(await listTemplates({ status: "deleted" }), 400, "validation_failed")
+    })
   })
 })
 
 describe("GET /api/templates/:templateId", () => {
   function getTemplate(templateId: string) {
-    return request(createApp()).get(`/api/templates/${templateId}`)
+    return api().get(`/api/templates/${templateId}`)
   }
 
-  test("responds with the template", async () => {
-    const { organization } = await signedInMember("admin")
-    const [template] = await insertTemplates(organization, ["Server checks"])
+  async function makeCurrent(template: Template, version: TemplateVersion) {
+    const [row] = await db.update(templates).set({ currentVersionId: version.id }).where(eq(templates.id, template.id)).returning()
+    return row!
+  }
 
-    const response = await getTemplate(template!.id)
+  function versionDto(row: TemplateVersion): TemplateVersionDto {
+    return {
+      id: row.id,
+      templateId: row.templateId,
+      version: row.version,
+      status: row.status,
+      publishedAt: row.publishedAt?.toISOString() ?? null,
+      publishedBy: row.publishedBy,
+      createdAt: row.createdAt.toISOString(),
+      createdBy: row.createdBy,
+      updatedAt: row.updatedAt.toISOString(),
+    }
+  }
+
+  test("responds with the template, its current version and its draft", async () => {
+    const { organization } = await signedInMember("admin")
+    const inserted = await insertTemplate(db, organization, { name: "Server checks" })
+    const published = await insertTemplateVersion(db, inserted, 1, "published")
+    const draft = await insertTemplateVersion(db, inserted, 2, "draft")
+    const template = await makeCurrent(inserted, published)
+
+    const response = await getTemplate(template.id)
 
     expect(response.status).toBe(200)
     expect(response.body).toEqual({
-      id: template!.id,
+      id: template.id,
       name: "Server checks",
       description: null,
       status: "active",
-      currentVersionId: null,
-      createdAt: template!.createdAt.toISOString(),
-      createdBy: template!.createdBy,
-      updatedAt: template!.updatedAt.toISOString(),
-    })
+      currentVersionId: published.id,
+      createdAt: template.createdAt.toISOString(),
+      createdBy: template.createdBy,
+      updatedAt: template.updatedAt.toISOString(),
+      currentVersion: versionDto(published),
+      draftVersion: versionDto(draft),
+    } satisfies TemplateDetails)
   })
 
-  test("responds with an archived template", async () => {
-    const { organization } = await signedInMember("admin")
-    const [template] = await insertTemplates(organization, ["Server checks"])
-    await db.update(templates).set({ status: "archived" }).where(eq(templates.id, template!.id))
+  test("responds with a new template's version 1 draft and no current version", async () => {
+    await signedInMember("editor")
+    const created = await api().post("/api/templates").send({ name: "Server checks" })
 
-    const response = await getTemplate(template!.id)
+    const response = await getTemplate(created.body.id)
+
+    expect(response.status).toBe(200)
+    expect(response.body.currentVersion).toBeNull()
+    expect(response.body.draftVersion).toMatchObject({ templateId: created.body.id, version: 1, status: "draft", publishedAt: null })
+  })
+
+  test("responds with no draft when the template has none", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization)
+    const published = await insertTemplateVersion(db, template, 1, "published")
+    await makeCurrent(template, published)
+
+    const response = await getTemplate(template.id)
+
+    expect(response.body.currentVersion).toEqual(versionDto(published))
+    expect(response.body.draftVersion).toBeNull()
+  })
+
+  test("doesn't treat older published or archived versions as the draft", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization)
+    await insertTemplateVersion(db, template, 1, "archived")
+    await insertTemplateVersion(db, template, 2, "published")
+    const current = await insertTemplateVersion(db, template, 3, "published")
+    await makeCurrent(template, current)
+
+    const response = await getTemplate(template.id)
+
+    expect(response.body.currentVersion.id).toBe(current.id)
+    expect(response.body.draftVersion).toBeNull()
+  })
+
+  test("responds with an archived current version", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization)
+    const archived = await insertTemplateVersion(db, template, 1, "archived")
+    await makeCurrent(template, archived)
+
+    const response = await getTemplate(template.id)
+
+    expect(response.body.currentVersion).toEqual(versionDto(archived))
+  })
+
+  test("responds with another template's versions only for that template", async () => {
+    const { organization } = await signedInMember("admin")
+    const first = await insertTemplate(db, organization)
+    const second = await insertTemplate(db, organization)
+    const firstDraft = await insertTemplateVersion(db, first, 1, "draft")
+    await insertTemplateVersion(db, second, 1, "draft")
+
+    const response = await getTemplate(first.id)
+
+    expect(response.body.draftVersion.id).toBe(firstDraft.id)
+  })
+
+  test("responds with an archived template and its versions", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization, { status: "archived" })
+    const published = await insertTemplateVersion(db, template, 1, "published")
+    const draft = await insertTemplateVersion(db, template, 2, "draft")
+    await makeCurrent(template, published)
+
+    const response = await getTemplate(template.id)
 
     expect(response.status).toBe(200)
     expect(response.body.status).toBe("archived")
+    expect(response.body.currentVersion.id).toBe(published.id)
+    expect(response.body.draftVersion.id).toBe(draft.id)
   })
 
-  test.each(["editor", "viewer"])("lets an %s get a template they created", async (role) => {
-    const { organization, member } = await signedInMember(role)
-    const [template] = await insertTemplates(organization, ["Server checks"], member.userId)
+  test("doesn't send organization IDs", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization)
+    const published = await insertTemplateVersion(db, template, 1, "published")
+    await insertTemplateVersion(db, template, 2, "draft")
+    await makeCurrent(template, published)
 
-    expect((await getTemplate(template!.id)).status).toBe(200)
+    const response = await getTemplate(template.id)
+
+    expect(response.body).not.toHaveProperty("organizationId")
+    expect(response.body.currentVersion).not.toHaveProperty("organizationId")
+    expect(response.body.draftVersion).not.toHaveProperty("organizationId")
   })
 
-  test.each(["view", "run", "edit"] as const)("lets a viewer with %s access get the template", async (level) => {
+  test.each(["view", "run", "edit"] as const)("responds with the versions to a member with %s access", async (level) => {
     const { organization, member } = await signedInMember("viewer")
-    const [template] = await insertTemplates(organization, ["Server checks"])
-    await grant(db, template!.id, { organization, memberId: member.id }, level)
+    const template = await insertTemplate(db, organization)
+    const draft = await insertTemplateVersion(db, template, 1, "draft")
+    await grant(db, template.id, { organization, memberId: member.id }, level)
 
-    expect((await getTemplate(template!.id)).status).toBe(200)
+    const response = await getTemplate(template.id)
+
+    expect(response.body.id).toBe(template.id)
+    expect(response.body.draftVersion.id).toBe(draft.id)
   })
 
-  test("lets a viewer get a template granted to their group", async () => {
+  test("responds with the versions to a member whose group has access", async () => {
     const { organization, member } = await signedInMember("viewer")
     const teamId = await createGroup(db, organization)
     await addToGroup(db, teamId, member)
-    const [template] = await insertTemplates(organization, ["Server checks"])
-    await grant(db, template!.id, { organization, teamId }, "view")
+    const template = await insertTemplate(db, organization)
+    const draft = await insertTemplateVersion(db, template, 1, "draft")
+    await grant(db, template.id, { organization, teamId }, "view")
 
-    expect((await getTemplate(template!.id)).status).toBe(200)
+    const response = await getTemplate(template.id)
+
+    expect(response.body.draftVersion.id).toBe(draft.id)
   })
 
-  test("refuses a template the member can't see with not_found", async () => {
+  test("refuses a template the member can't see with not_found, even when it has versions", async () => {
     const { organization } = await signedInMember("viewer")
-    const [template] = await insertTemplates(organization, ["Server checks"])
+    const template = await insertTemplate(db, organization)
+    const published = await insertTemplateVersion(db, template, 1, "published")
+    await insertTemplateVersion(db, template, 2, "draft")
+    await makeCurrent(template, published)
 
-    const response = await getTemplate(template!.id)
-
-    expect(response.status).toBe(404)
-    expect(response.body.error.code).toBe("not_found")
-  })
-
-  test("refuses another organization's template with not_found", async () => {
-    const other = await createOrganization(db)
-    const [template] = await insertTemplates(other, ["Server checks"])
-    await signedInMember("owner")
-
-    const response = await getTemplate(template!.id)
-
-    expect(response.status).toBe(404)
-    expect(response.body.error.code).toBe("not_found")
-  })
-
-  test("refuses an ID that doesn't exist with not_found", async () => {
-    await signedInMember("owner")
-
-    const response = await getTemplate(typeIdForTable("templates").toString())
-
-    expect(response.status).toBe(404)
-    expect(response.body.error.code).toBe("not_found")
-  })
-
-  test.each([
-    ["an ID that isn't a TypeID", "not-an-id"],
-    ["an ID for another table", typeIdForTable("runs").toString()],
-  ])("refuses %s with validation_failed", async (_description, templateId) => {
-    await signedInMember("owner")
-
-    const response = await getTemplate(templateId)
-
-    expect(response.status).toBe(400)
-    expect(response.body.error.code).toBe("validation_failed")
-  })
-
-  test("refuses a signed-out request with unauthorized", async () => {
-    const response = await getTemplate(typeIdForTable("templates").toString())
-
-    expect(response.status).toBe(401)
-    expect(response.body.error.code).toBe("unauthorized")
+    expectError(await getTemplate(template.id), 404, "not_found")
   })
 })
 
 describe("PATCH /api/templates/:templateId", () => {
   function updateTemplate(templateId: string, body: unknown) {
-    return request(createApp()).patch(`/api/templates/${templateId}`).send(body as object)
+    return api().patch(`/api/templates/${templateId}`).send(body as object)
   }
 
-  async function storedTemplate(templateId: string) {
-    const [row] = await db.select().from(templates).where(eq(templates.id, templateId))
-    return row!
-  }
-
-  async function templateWithDescription(organization: Organization, createdBy?: string) {
-    const [template] = await insertTemplates(organization, ["Server checks"], createdBy)
-    const [withDescription] = await db.update(templates).set({ description: "Weekly" }).where(eq(templates.id, template!.id)).returning()
-    return withDescription!
+  async function templateWithDescription(organization: Organization) {
+    return insertTemplate(db, organization, { name: "Server checks", description: "Weekly" })
   }
 
   test("renames the template and responds with it", async () => {
@@ -504,102 +808,23 @@ describe("PATCH /api/templates/:templateId", () => {
     expect((await storedTemplate(other!.id)).name).toBe("Backups")
   })
 
-  test.each(["owner", "admin"])("lets an %s update any template", async (role) => {
-    const { organization } = await signedInMember(role)
-    const [template] = await insertTemplates(organization, ["Server checks"])
-
-    expect((await updateTemplate(template!.id, { name: "Database checks" })).status).toBe(200)
-  })
-
-  test.each(["editor", "viewer"])("lets an %s update a template they created", async (role) => {
-    const { organization, member } = await signedInMember(role)
-    const [template] = await insertTemplates(organization, ["Server checks"], member.userId)
-
-    expect((await updateTemplate(template!.id, { name: "Database checks" })).status).toBe(200)
-  })
-
-  test("lets a member with edit access update the template", async () => {
-    const { organization, member } = await signedInMember("viewer")
-    const [template] = await insertTemplates(organization, ["Server checks"])
-    await grant(db, template!.id, { organization, memberId: member.id }, "edit")
-
-    expect((await updateTemplate(template!.id, { name: "Database checks" })).status).toBe(200)
-  })
-
-  test("lets a member whose group has edit access update the template", async () => {
-    const { organization, member } = await signedInMember("viewer")
-    const teamId = await createGroup(db, organization)
-    await addToGroup(db, teamId, member)
-    const [template] = await insertTemplates(organization, ["Server checks"])
-    await grant(db, template!.id, { organization, teamId }, "edit")
-
-    expect((await updateTemplate(template!.id, { name: "Database checks" })).status).toBe(200)
-  })
-
-  test.each(["view", "run"] as const)("refuses a member with only %s access with not_found and changes nothing", async (level) => {
-    const { organization, member } = await signedInMember("viewer")
-    const [template] = await insertTemplates(organization, ["Server checks"])
-    await grant(db, template!.id, { organization, memberId: member.id }, level)
-
-    const response = await updateTemplate(template!.id, { name: "Database checks" })
-
-    expect(response.status).toBe(404)
-    expect(response.body.error.code).toBe("not_found")
-    expect((await storedTemplate(template!.id)).name).toBe("Server checks")
-  })
-
-  test("refuses a template the member can't see with not_found", async () => {
-    const { organization } = await signedInMember("editor")
-    const [template] = await insertTemplates(organization, ["Server checks"])
-
-    const response = await updateTemplate(template!.id, { name: "Database checks" })
-
-    expect(response.status).toBe(404)
-    expect(response.body.error.code).toBe("not_found")
-    expect((await storedTemplate(template!.id)).name).toBe("Server checks")
-  })
-
-  test("refuses another organization's template with not_found and changes nothing", async () => {
-    const other = await createOrganization(db)
-    const [template] = await insertTemplates(other, ["Server checks"])
-    await signedInMember("owner")
-
-    const response = await updateTemplate(template!.id, { name: "Database checks" })
-
-    expect(response.status).toBe(404)
-    expect(response.body.error.code).toBe("not_found")
-    expect((await storedTemplate(template!.id)).name).toBe("Server checks")
-  })
-
-  test("refuses an ID that doesn't exist with not_found", async () => {
-    await signedInMember("owner")
-
-    const response = await updateTemplate(typeIdForTable("templates").toString(), { name: "Database checks" })
-
-    expect(response.status).toBe(404)
-    expect(response.body.error.code).toBe("not_found")
-  })
-
   test("refuses another active template's name with validation_failed on the name", async () => {
     const { organization } = await signedInMember("admin")
     const [template] = await insertTemplates(organization, ["Server checks", "Backups"])
 
     const response = await updateTemplate(template!.id, { name: "Backups" })
 
-    expect(response.status).toBe(400)
-    expect(response.body.error.code).toBe("validation_failed")
+    expectError(response, 400, "validation_failed")
     expect(response.body.error.details).toEqual([{ location: "body", path: ["name"], message: expect.any(String) }])
     expect((await storedTemplate(template!.id)).name).toBe("Server checks")
   })
 
   test("allows the name of an archived template", async () => {
     const { organization } = await signedInMember("admin")
-    const [template, archived] = await insertTemplates(organization, ["Server checks", "Backups"])
-    await db.update(templates).set({ status: "archived" }).where(eq(templates.id, archived!.id))
+    const template = await insertTemplate(db, organization, { name: "Server checks" })
+    await insertTemplate(db, organization, { name: "Backups", status: "archived" })
 
-    const response = await updateTemplate(template!.id, { name: "Backups" })
-
-    expect(response.status).toBe(200)
+    expect((await updateTemplate(template.id, { name: "Backups" })).status).toBe(200)
   })
 
   test.each([
@@ -613,26 +838,151 @@ describe("PATCH /api/templates/:templateId", () => {
     const { organization } = await signedInMember("admin")
     const template = await templateWithDescription(organization)
 
-    const response = await updateTemplate(template.id, body)
-
-    expect(response.status).toBe(400)
-    expect(response.body.error.code).toBe("validation_failed")
+    expectError(await updateTemplate(template.id, body), 400, "validation_failed")
     expect(await storedTemplate(template.id)).toEqual(template)
   })
+})
 
-  test("refuses an ID that isn't a template TypeID with validation_failed", async () => {
-    await signedInMember("owner")
+describe("POST /api/templates/:templateId/archive", () => {
+  function archiveTemplate(templateId: string) {
+    return api().post(`/api/templates/${templateId}/archive`)
+  }
 
-    const response = await updateTemplate(typeIdForTable("runs").toString(), { name: "Database checks" })
+  test("archives the template and responds with it", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization, { name: "Server checks" })
 
-    expect(response.status).toBe(400)
-    expect(response.body.error.code).toBe("validation_failed")
+    const response = await archiveTemplate(template.id)
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({
+      id: template.id,
+      name: "Server checks",
+      description: null,
+      status: "archived",
+      currentVersionId: null,
+      createdAt: template.createdAt.toISOString(),
+      createdBy: template.createdBy,
+      updatedAt: expect.any(String),
+    })
+    expect((await storedTemplate(template.id)).status).toBe("archived")
   })
 
-  test("refuses a signed-out request with unauthorized", async () => {
-    const response = await updateTemplate(typeIdForTable("templates").toString(), { name: "Database checks" })
+  test("archives the template's active and paused schedules", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization)
+    const active = await insertSchedule(db, template, "active")
+    const paused = await insertSchedule(db, template, "paused")
 
-    expect(response.status).toBe(401)
-    expect(response.body.error.code).toBe("unauthorized")
+    await archiveTemplate(template.id)
+
+    expect(await scheduleStatusOf(active.id)).toBe("archived")
+    expect(await scheduleStatusOf(paused.id)).toBe("archived")
+  })
+
+  test("leaves already archived schedules unchanged", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization)
+    const archived = await insertSchedule(db, template, "archived")
+
+    await archiveTemplate(template.id)
+
+    const [row] = await db.select().from(schedules).where(eq(schedules.id, archived.id))
+    expect(row).toEqual(archived)
+  })
+
+  test("leaves other templates and their schedules alone", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization)
+    const other = await insertTemplate(db, organization)
+    const otherSchedule = await insertSchedule(db, other, "active")
+
+    await archiveTemplate(template.id)
+
+    expect((await storedTemplate(other.id)).status).toBe("active")
+    expect(await scheduleStatusOf(otherSchedule.id)).toBe("active")
+  })
+
+  test("leaves the schedules alone when the request is refused", async () => {
+    const { organization, member } = await signedInMember("viewer")
+    const template = await insertTemplate(db, organization)
+    const schedule = await insertSchedule(db, template, "active")
+    await grant(db, template.id, { organization, memberId: member.id }, "run")
+
+    expectError(await archiveTemplate(template.id), 403, "forbidden")
+    expect(await scheduleStatusOf(schedule.id)).toBe("active")
+  })
+
+  test("leaves another organization's schedules alone", async () => {
+    const other = await createOrganization(db)
+    const template = await insertTemplate(db, other)
+    const schedule = await insertSchedule(db, template, "active")
+    await signedInMember("owner")
+
+    expectError(await archiveTemplate(template.id), 404, "not_found")
+    expect(await scheduleStatusOf(schedule.id)).toBe("active")
+  })
+})
+
+describe("POST /api/templates/:templateId/restore", () => {
+  function restoreTemplate(templateId: string) {
+    return api().post(`/api/templates/${templateId}/restore`)
+  }
+
+  test("restores the template and responds with it", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization, { name: "Server checks", status: "archived" })
+
+    const response = await restoreTemplate(template.id)
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({
+      id: template.id,
+      name: "Server checks",
+      description: null,
+      status: "active",
+      currentVersionId: null,
+      createdAt: template.createdAt.toISOString(),
+      createdBy: template.createdBy,
+      updatedAt: expect.any(String),
+    })
+    expect((await storedTemplate(template.id)).status).toBe("active")
+  })
+
+  test("leaves the template's schedules archived", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization)
+    const schedule = await insertSchedule(db, template, "active")
+    await api().post(`/api/templates/${template.id}/archive`)
+
+    await restoreTemplate(template.id)
+
+    expect(await scheduleStatusOf(schedule.id)).toBe("archived")
+  })
+
+  test("refuses a name another active template now uses with conflict and changes nothing", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization, { name: "Server checks", status: "archived" })
+    await insertTemplate(db, organization, { name: "Server checks" })
+
+    expectError(await restoreTemplate(template.id), 409, "conflict")
+    expect((await storedTemplate(template.id)).status).toBe("archived")
+  })
+
+  test("allows a name only another archived template uses", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization, { name: "Server checks", status: "archived" })
+    await insertTemplate(db, organization, { name: "Server checks", status: "archived" })
+
+    expect((await restoreTemplate(template.id)).status).toBe(200)
+  })
+
+  test("allows a name an active template uses in another organization", async () => {
+    const other = await createOrganization(db)
+    await insertTemplate(db, other, { name: "Server checks" })
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization, { name: "Server checks", status: "archived" })
+
+    expect((await restoreTemplate(template.id)).status).toBe(200)
   })
 })

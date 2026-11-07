@@ -25,6 +25,11 @@ export type TemplateDto = {
   currentVersionId: string | null
 } & CreatedFields & UpdatedFields
 
+export type TemplateDetails = TemplateDto & {
+  currentVersion: TemplateVersionDto | null
+  draftVersion: TemplateVersionDto | null
+}
+
 export type TemplateVersionDto = {
   id: string
   templateId: string

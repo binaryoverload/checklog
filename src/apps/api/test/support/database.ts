@@ -2,10 +2,10 @@ import { TransactionRollbackError } from "drizzle-orm"
 
 import { members, organizations, teamMembers, teams, users } from "@/db/auth-schema.ts"
 import { db } from "@/db/index.ts"
-import { templateAccess, templates } from "@/db/schema.ts"
-import type { Database, Member, Organization, PermissionContext } from "@/util/types.ts"
+import { schedules, templateAccess, templates, templateVersions } from "@/db/schema.ts"
+import type { Database, Member, Organization, PermissionContext, Schedule, Template, TemplateVersion } from "@/util/types.ts"
 import type { OrgRole } from "@checklog/shared/auth"
-import type { TemplateAccessLevel } from "@checklog/shared/domain"
+import type { ScheduleStatus, TemplateAccessLevel, TemplateStatus, TemplateVersionStatus } from "@checklog/shared/domain"
 import { typeIdForModel } from "@checklog/shared/utils"
 
 // Runs a test body in a transaction that's always rolled back, so tests share one database without seeing each other's rows
@@ -51,12 +51,51 @@ export async function addToGroup(tx: Database, teamId: string, member: Member): 
   await tx.insert(teamMembers).values({ id: typeIdForModel("teamMember").toString(), teamId, userId: member.userId, createdAt: new Date() })
 }
 
-// Names are unique within an organization
+// Default names are numbered, since active names are unique within an organization
 let templateCount = 0
 
+export async function insertTemplate(
+  tx: Database,
+  organization: Organization,
+  options: { name?: string, description?: string | null, status?: TemplateStatus, createdBy?: string } = {},
+): Promise<Template> {
+  const [template] = await tx.insert(templates).values({
+    organizationId: organization.id,
+    name: options.name ?? `Test template ${++templateCount}`,
+    description: options.description ?? null,
+    status: options.status ?? "active",
+    createdBy: options.createdBy ?? "user_someone_else",
+  }).returning()
+  return template!
+}
+
 export async function createTemplate(tx: Database, organization: Organization, createdBy = "user_someone_else"): Promise<string> {
-  const [template] = await tx.insert(templates).values({ organizationId: organization.id, name: `Test template ${++templateCount}`, createdBy }).returning()
-  return template!.id
+  return (await insertTemplate(tx, organization, { createdBy })).id
+}
+
+export async function insertTemplateVersion(tx: Database, template: Template, version: number, status: TemplateVersionStatus): Promise<TemplateVersion> {
+  const [row] = await tx.insert(templateVersions).values({
+    organizationId: template.organizationId,
+    templateId: template.id,
+    version,
+    status,
+    publishedAt: status === "draft" ? null : new Date(),
+    createdBy: "user_someone_else",
+  }).returning()
+  return row!
+}
+
+export async function insertSchedule(tx: Database, template: Template, status: ScheduleStatus): Promise<Schedule> {
+  const [schedule] = await tx.insert(schedules).values({
+    organizationId: template.organizationId,
+    templateId: template.id,
+    status,
+    rrule: "FREQ=WEEKLY",
+    timezone: "Europe/London",
+    runNamePattern: "Weekly checks",
+    createdBy: "user_someone_else",
+  }).returning()
+  return schedule!
 }
 
 export async function grant(

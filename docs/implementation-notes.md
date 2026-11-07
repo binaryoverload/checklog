@@ -46,6 +46,8 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 - Mappers in `src/mappers/`, one file per area, turn rows into response types: `to<Thing>Dto(row: <Thing>): <Thing>Dto`. They list every field explicitly, never `...row`, so a new column or `organizationId` can't leak into a response, and send dates as ISO strings
 - Successful responses are 200, creates included; the body is the created or changed resource
 - Every API error except Better Auth's (`/api/auth/*` keeps its own format) uses one shape: `{ "error": { "code": "not_found", "message": "Run not found", "details": [] } }`, with `details` holding the Zod issues on validation errors only. Unexpected errors are logged and return a generic `internal` 500
+- Refused requests are checked in this order: `404 not_found` when the member can't see the resource at all (other organizations' and missing IDs included, so hidden and missing look the same), `403 forbidden` when they can see it but lack the access for the action, and `400` (`validation_failed`, `precondition_failed`) or `409 conflict` when they can act but the request is invalid or the resource is in the wrong state
+- Writes put the access they need in the `where` (`visibleTemplatesWhere`), so the usual case is one query; only when nothing matches does the route look up the member's level (`templateAccessLevel`) to pick the error
 - Use Better Auth's organization plugin for tenants, members, roles and invitations
 - Write sign-ins, role changes and invitations to the audit log via Better Auth hooks
 - SAML is community-maintained in Better Auth; OIDC covers most identity providers

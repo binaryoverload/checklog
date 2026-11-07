@@ -92,7 +92,7 @@ Access to an individual template comes from `template_access`: each level includ
 
 | Table | Key columns | Notes |
 | --- | --- | --- |
-| `schedules` | `template_id`, `status` (active, paused, archived), `rrule` (RFC 5545), `timezone`, `next_run_at`, `run_name_pattern` | Covers daily, weekly, monthly and custom. Always uses the template's current version when it fires. Only `active` schedules fire. Schedules are archived, never deleted, because runs keep a link to the schedule that started them (`ON DELETE RESTRICT`). Managing a template's schedules needs edit access to the template; there are no schedule role permissions. |
+| `schedules` | `template_id`, `status` (active, paused, archived), `rrule` (RFC 5545), `timezone`, `next_run_at`, `run_name_pattern` | Covers daily, weekly, monthly and custom. Always uses the template's current version when it fires. Only `active` schedules fire. Schedules are archived, never deleted, because runs keep a link to the schedule that started them (`ON DELETE RESTRICT`). Managing a template's schedules needs edit access to the template; there are no schedule role permissions. Archiving a template archives its active and paused schedules in the same transaction, and restoring the template leaves them archived (decided). |
 
 pg-boss does the firing: a recurring job finds schedules with `next_run_at <= now()`, starts runs and advances `next_run_at`. The `schedules` table stays the source of truth, so the UI can list and edit schedules without reading pg-boss internals.
 
