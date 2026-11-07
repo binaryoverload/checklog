@@ -50,14 +50,14 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 
 ### Time zones
 
-Following the [time zones plan](https://claude.ai/artifact/T4padi2zYYHZdKkYSLnxj7):
-
 - [ ] Add Luxon to the catalog and the API (and the web app for display) (agent)
 - [x] Migration: `runs.timezone` text, and `template_steps.due_offset` from `interval` to `text` (person)
 - [ ] `util/time.ts`: `addOffset`, `todayIn`, and rrule date conversion with `keepLocalTime` (person)
 - [ ] Tests for `util/time.ts` with the DST fixtures in the plan's Luxon table (agent, reviewed by a person)
 - [ ] `X-Timezone` header in `useApi()`, and its parsing and validation in `route()` (person)
 - [ ] Date and time formatting helper in the web app (person)
+- [ ] Validate zones with Luxon's `IANAZone.isValidZone` and store their canonical names, replacing the `Intl` check in `timezoneSchema` (person)
+- [ ] Move the schedule calculations onto Luxon (person)
 
 ### Web app
 
@@ -69,24 +69,29 @@ Following the [time zones plan](https://claude.ai/artifact/T4padi2zYYHZdKkYSLnxj
 
 ### Templates
 
-- [ ] API: create, list and archive templates (person)
-- [ ] API: edit the draft version's steps (add, reorder, edit, remove) with title, instructions, kind, halt, skippable, assignee and due offset (person)
-- [ ] API: edit a step's fields (text, date, dropdown, checkbox) with labels, keys, required and dropdown options (person)
-- [ ] API: publish the draft (freezes it, sets the current version, opens a new draft on next edit) and archive a version (person)
-- [ ] API: template access, granting groups and people view, run or edit (person)
-- [ ] UI: template list, template editor (steps and fields), publish, and access settings (person)
+One pull request per item:
+
+- [ ] API: create (with an empty version 1 draft), list, get, rename, archive and restore templates; a duplicate active name is `validation_failed` on `name` (person)
+- [ ] API: edit the draft's steps (add, reorder, edit, remove) through `ensureDraft`, which copies the current version into a new draft on the first edit; title, instructions, kind, halt, skippable, assignee and due offset, with the step rules from the plan (person)
+- [ ] API: edit a step's fields (add, reorder, edit, remove) with labels, keys, help text, required and options; approval steps can have fields (person)
+- [ ] API: `updatedAt` edit-conflict check on step and field `PATCH`es, refusing a stale edit with `conflict` (person)
+- [ ] `precondition_failed` error code, with details pointing at steps, for the publish and start checks (person)
+- [ ] API: publish the draft with the publish checks, discard a draft, list versions, get one version, and archive a version (person)
+- [ ] API: template access, granting groups and people view, run or edit; can land any time after templates (person)
+- [ ] UI: template list, template editor (steps and fields), publish, versions and access settings (person)
 
 ### Runs
 
-- [ ] API: start a run from a template's current version, creating its run steps with resolved assignees and due dates (person)
-- [ ] API: run start check that refuses a version with a missing assignee (`assignee_type` set but its column null) and says which steps to fix in a new version; also check assigned members and groups belong to the organization (person). See [Missing assignees](plans/db-structure.md#missing-assignees).
-- [ ] API: list runs (mine, my groups', all) and get one run with its steps (person)
-- [ ] Run step permission check in `core/permissions.ts`: who can complete, skip or approve a step, from its assignee (member, group or role) (person)
-- [ ] API: set field values and complete a step, enforcing required fields and halt steps (person)
+- [ ] API: `startRun` from a template's current version, creating its run steps with resolved assignees and due dates from `addOffset`; `runs.timezone` from the schedule, or from `X-Timezone` for an ad hoc run (person)
+- [ ] API: run start check, refused with `precondition_failed`: the template is active with a current version that isn't archived, no missing assignees (`assignee_type` set but its column null), and assigned members and groups still belong to the organization (person). See [Missing assignees](plans/db-structure.md#missing-assignees).
+- [ ] Run step permission check `canActOnStep` in `core/permissions.ts`: the step's assignee (member, group or role), or anyone with `run` on the template when the step is unassigned (person)
+- [ ] API: list runs (mine, my groups', all, plus status) and get one run with its steps, fields, values, notes and a computed `blocked`; anyone with `view` on the template or assigned a step sees the whole run (person)
+- [ ] Shared `validateFieldValue(options, value)` in `domain/fields.ts`, used by the API and the web app (person)
+- [ ] API: set field values by key and complete a step, enforcing required fields, halt steps and `allowFuture` (date fields against `todayIn` the user's zone) (person)
 - [ ] API: skip a skippable step with a reason (person)
 - [ ] API: add notes to a step (person)
-- [ ] API: reassign a step, cancel a run, and complete the run when every step is resolved (person)
-- [ ] UI: run list, run page with steps, fields, notes, skip and complete (person)
+- [ ] API: reassign a step, cancel a run, and complete the run when every step is resolved; completed and cancelled runs refuse step actions with `conflict` (person)
+- [ ] UI: run list with the start column, run page with steps, fields, notes, skip and complete; the start time in the run's zone, due dates with the run's zone alongside when it differs, and times rendered on the client only (person)
 
 ### Approvals
 
@@ -136,7 +141,7 @@ Following the [audit log plan](plans/audit-log.md):
 - [ ] `recordAudit` with per-action payload schemas (person)
 - [x] Better Auth: turn on adapter transactions and test whether hooks share them (they don't; see the [atomicity decision](plans/audit-log.md#better-auth))
 - [ ] Better Auth: record audit events from the `after` hooks (person)
-- [ ] Record events across everything built so far: organization, run, user and platform events (person)
+- [ ] Record events across everything built so far: organization, run, user and platform events; field value changes record the user's zone (person)
 - [ ] Context expiry job, and audit events in the purge job (person)
 - [ ] **Operators** (person unless marked), following the [operators plan](plans/operators-and-account-deletion.md):
   - [x] Access controller with `platform-admin` in `@checklog/shared`; `admin()` and `adminClient()`; schema migration

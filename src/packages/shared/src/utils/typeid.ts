@@ -58,3 +58,7 @@ export function typeIdSchema(tableName: keyof typeof tableToPrefix) {
   const prefix = prefixForTable(tableName)
   return z.string().regex(new RegExp(`^${prefix}_${typeIdSuffix}$`), `Must be a ${prefix} ID`)
 }
+
+export function typeIdParamsSchema(tableName: keyof typeof tableToPrefix) {
+  return z.object({ id: typeIdSchema(tableName) })
+}

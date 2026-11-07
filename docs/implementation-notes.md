@@ -44,6 +44,7 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 - Route handlers use a typed `route()` helper that validates `params`, `query` and `body` with Zod schemas from `packages/shared` and passes the parsed values in; Express 5's `req.query` is read-only, so plain validation middleware can't hand handlers typed input
 - Responses are plain TypeScript types with a `Dto` suffix (`TemplateDto`) in `@checklog/shared/api`, one file per area with request schemas first. Drizzle row types keep plain names (`Template`) in the API's `util/types.ts`
 - Mappers in `src/mappers/`, one file per area, turn rows into response types: `to<Thing>Dto(row: <Thing>): <Thing>Dto`. They list every field explicitly, never `...row`, so a new column or `organizationId` can't leak into a response, and send dates as ISO strings
+- Successful responses are 200, creates included; the body is the created or changed resource
 - Every API error except Better Auth's (`/api/auth/*` keeps its own format) uses one shape: `{ "error": { "code": "not_found", "message": "Run not found", "details": [] } }`, with `details` holding the Zod issues on validation errors only. Unexpected errors are logged and return a generic `internal` 500
 - Use Better Auth's organization plugin for tenants, members, roles and invitations
 - Write sign-ins, role changes and invitations to the audit log via Better Auth hooks

@@ -4,12 +4,9 @@ import type { CreatedFields, UpdatedFields } from "./common.ts"
 import type { AssigneeType } from "../domain/assignees.ts"
 import type { FieldOptions, FieldType } from "../domain/fields.ts"
 import type { TemplateAccessLevel, TemplateStatus, TemplateStepKind, TemplateVersionStatus } from "../domain/templates.ts"
-import { typeIdSchema } from "../utils/typeid.ts"
 import { requiredString } from "../utils/zod.ts"
 
 export const templateNameSchema = requiredString().max(200)
-
-export const templateParamsSchema = z.object({ templateId: typeIdSchema("templates") })
 
 export const createTemplateBodySchema = z.strictObject({
   name: templateNameSchema,
@@ -17,7 +14,7 @@ export const createTemplateBodySchema = z.strictObject({
 })
 export type CreateTemplateBody = z.infer<typeof createTemplateBodySchema>
 
-export const updateTemplateBodySchema = createTemplateBodySchema.partial()
+export const updateTemplateBodySchema = createTemplateBodySchema.partial().refine(d => Object.keys(d).length > 0, "At least one field must be provided")
 export type UpdateTemplateBody = z.infer<typeof updateTemplateBodySchema>
 
 export type TemplateDto = {
