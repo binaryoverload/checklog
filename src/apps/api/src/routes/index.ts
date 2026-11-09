@@ -1,5 +1,7 @@
 import { Router } from "express"
 
+import { templateDraftsRouter } from "@/routes/template-drafts.ts"
+
 import { approvalsRouter } from "./approvals.ts"
 import { membersRouter } from "./members.ts"
 import { notificationsRouter } from "./notifications.ts"
@@ -12,6 +14,7 @@ export function apiRouter() {
   const router = Router()
 
   router.use("/api/templates", templatesRouter)
+  router.use("/api/templates", templateDraftsRouter)
   router.use("/api/runs", runsRouter)
   router.use("/api/approvals", approvalsRouter)
   router.use("/api/schedules", schedulesRouter)
