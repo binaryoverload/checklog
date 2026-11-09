@@ -59,6 +59,14 @@ export function typeIdSchema(tableName: keyof typeof tableToPrefix) {
   return z.string().regex(new RegExp(`^${prefix}_${typeIdSuffix}$`), `Must be a ${prefix} ID`)
 }
 
-export function typeIdParamsSchema(tableName: keyof typeof tableToPrefix) {
+export function typeIdParamSchema(tableName: keyof typeof tableToPrefix) {
   return z.object({ id: typeIdSchema(tableName) })
+}
+
+export function typeIdParamsSchema<T extends string>(params: Record<T, keyof typeof tableToPrefix>) {
+  const schemaShape: Record<T, z.ZodType<string>> = {} as Record<T, z.ZodType<string>>
+  for (const key in params) {
+    schemaShape[key] = typeIdSchema(params[key])
+  }
+  return z.object(schemaShape)
 }

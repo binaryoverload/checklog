@@ -15,7 +15,7 @@ import type { SortDefinition } from "@/util/pagination.ts"
 import type { Template } from "@/util/types.ts"
 import { createTemplateBodySchema, paginationQuerySchema, updateTemplateBodySchema } from "@checklog/shared/api"
 import { templateStatusSchema } from "@checklog/shared/domain"
-import { typeIdParamsSchema } from "@checklog/shared/utils"
+import { typeIdParamSchema } from "@checklog/shared/utils"
 
 export const templatesRouter = Router()
 
@@ -73,12 +73,11 @@ templatesRouter.get("/", route({ query: paginationQuerySchema().and(z.object({ s
   res.status(200).json(toPage(rows, { limit: query.limit, total: counted!.total, sort: templateSort, map: toTemplateDto }))
 }))
 
-const currentVersion = alias(templateVersions, "current_version")
-const draft = alias(templateVersions, "draft")
-
-templatesRouter.get("/:id", route({ params: typeIdParamsSchema("templates") }, async ({ params, member, organization, res }) => {
+templatesRouter.get("/:id", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "view")
 
+  const currentVersion = alias(templateVersions, "current_version")
+  const draft = alias(templateVersions, "draft")
   const [row] = await db
     .select({ template: templates, currentVersion, draft })
     .from(templates)
@@ -95,7 +94,7 @@ templatesRouter.get("/:id", route({ params: typeIdParamsSchema("templates") }, a
   })
 }))
 
-templatesRouter.patch("/:id", route({ params: typeIdParamsSchema("templates"), body: updateTemplateBodySchema }, async ({ params, body, member, organization, res }) => {
+templatesRouter.patch("/:id", route({ params: typeIdParamSchema("templates"), body: updateTemplateBodySchema }, async ({ params, body, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "edit")
 
   try {
@@ -122,7 +121,7 @@ templatesRouter.patch("/:id", route({ params: typeIdParamsSchema("templates"), b
   }
 }))
 
-templatesRouter.post("/:id/archive", route({ params: typeIdParamsSchema("templates"), impersonation: "refuse" }, async ({ params, member, organization, res }) => {
+templatesRouter.post("/:id/archive", route({ params: typeIdParamSchema("templates"), impersonation: "refuse" }, async ({ params, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "edit")
 
   const archived = await db.transaction(async (tx) => {
@@ -151,7 +150,7 @@ templatesRouter.post("/:id/archive", route({ params: typeIdParamsSchema("templat
   res.json(toTemplateDto(archived))
 }))
 
-templatesRouter.post("/:id/restore", route({ params: typeIdParamsSchema("templates"), impersonation: "refuse" }, async ({ params, member, organization, res }) => {
+templatesRouter.post("/:id/restore", route({ params: typeIdParamSchema("templates"), impersonation: "refuse" }, async ({ params, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "edit")
 
   try {
