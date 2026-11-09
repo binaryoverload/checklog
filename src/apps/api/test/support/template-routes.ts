@@ -1,0 +1,187 @@
+import { eq } from "drizzle-orm"
+import request from "supertest"
+import { describe, expect, test } from "vitest"
+
+import { createApp } from "@/app.ts"
+import { db } from "@/db/index.ts"
+import { templates } from "@/db/schema.ts"
+import type { Organization, Template } from "@/util/types.ts"
+import { templateAccessLevels } from "@checklog/shared/domain"
+import type { TemplateAccessLevel, TemplateStatus } from "@checklog/shared/domain"
+import { typeIdForTable } from "@checklog/shared/utils"
+import { addToGroup, createGroup, createMember, createOrganization, grant, insertTemplate } from "@test/support/database.ts"
+import { signedInMember } from "@test/support/session.ts"
+
+export const api = () => request(createApp())
+
+export function expectError(response: request.Response, status: number, code: string) {
+  expect(response.status).toBe(status)
+  expect(response.body.error.code).toBe(code)
+}
+
+async function storedTemplate(templateId: string) {
+  const [row] = await db.select().from(templates).where(eq(templates.id, templateId))
+  return row!
+}
+
+// A route on one template, so the access and ID rules are checked the same way for each
+export interface TemplateRoute {
+  name: string
+  send: (templateId: string) => PromiseLike<request.Response>
+  needs: TemplateAccessLevel
+  impersonation: "allow" | "refuse"
+  // The status the template needs for the request to succeed, and the one that makes it a conflict
+  status: TemplateStatus
+  conflictStatus?: TemplateStatus
+  // The status a successful request returns, when it isn't 200
+  successStatus?: number
+}
+
+// Call from a file that calls stubSessions()
+export function describeTemplateAccess(routes: TemplateRoute[]): void {
+  describe.each(routes)("$name access", (route) => {
+    const successStatus = route.successStatus ?? 200
+    const allowedLevels = templateAccessLevels.slice(templateAccessLevels.indexOf(route.needs))
+    const lowerLevels = templateAccessLevels.slice(0, templateAccessLevels.indexOf(route.needs))
+
+    function templateIn(organization: Organization, options: { createdBy?: string, status?: TemplateStatus } = {}) {
+      return insertTemplate(db, organization, { status: route.status, ...options })
+    }
+
+    async function expectUnchanged(template: Template) {
+      expect(await storedTemplate(template.id)).toEqual(template)
+    }
+
+    test.each(["owner", "admin"])("lets an %s make the request", async (role) => {
+      const { organization } = await signedInMember(role)
+      const template = await templateIn(organization)
+
+      expect((await route.send(template.id)).status).toBe(successStatus)
+    })
+
+    test.each(["editor", "viewer"])("lets a member with the %s role who created the template make the request", async (role) => {
+      const { organization, member } = await signedInMember(role)
+      const template = await templateIn(organization, { createdBy: member.userId })
+
+      expect((await route.send(template.id)).status).toBe(successStatus)
+    })
+
+    test.each(allowedLevels)("lets a member with %s access make the request", async (level) => {
+      const { organization, member } = await signedInMember("viewer")
+      const template = await templateIn(organization)
+      await grant(db, template.id, { organization, memberId: member.id }, level)
+
+      expect((await route.send(template.id)).status).toBe(successStatus)
+    })
+
+    test(`lets a member whose group has ${route.needs} access make the request`, async () => {
+      const { organization, member } = await signedInMember("viewer")
+      const teamId = await createGroup(db, organization)
+      await addToGroup(db, teamId, member)
+      const template = await templateIn(organization)
+      await grant(db, template.id, { organization, teamId }, route.needs)
+
+      expect((await route.send(template.id)).status).toBe(successStatus)
+    })
+
+    if (lowerLevels.length > 0) {
+      test.each(lowerLevels)("refuses a member with only %s access with forbidden and changes nothing", async (level) => {
+        const { organization, member } = await signedInMember("viewer")
+        const template = await templateIn(organization)
+        await grant(db, template.id, { organization, memberId: member.id }, level)
+
+        expectError(await route.send(template.id), 403, "forbidden")
+        await expectUnchanged(template)
+      })
+    }
+
+    test("refuses a template the member can't see with not_found and changes nothing", async () => {
+      const { organization } = await signedInMember("viewer")
+      const template = await templateIn(organization)
+
+      expectError(await route.send(template.id), 404, "not_found")
+      await expectUnchanged(template)
+    })
+
+    test("refuses a template granted only to someone else with not_found", async () => {
+      const { organization } = await signedInMember("viewer")
+      const { member: someoneElse } = await createMember(db, organization, "viewer")
+      const template = await templateIn(organization)
+      await grant(db, template.id, { organization, memberId: someoneElse.id }, "edit")
+
+      expectError(await route.send(template.id), 404, "not_found")
+    })
+
+    test("refuses another organization's template with not_found and changes nothing", async () => {
+      const other = await createOrganization(db)
+      const template = await templateIn(other)
+      await signedInMember("owner")
+
+      expectError(await route.send(template.id), 404, "not_found")
+      await expectUnchanged(template)
+    })
+
+    test("refuses an ID that doesn't exist with not_found", async () => {
+      await signedInMember("owner")
+
+      expectError(await route.send(typeIdForTable("templates").toString()), 404, "not_found")
+    })
+
+    test.each([
+      ["an ID that isn't a TypeID", "not-an-id"],
+      ["an ID for another table", typeIdForTable("runs").toString()],
+    ])("refuses %s with validation_failed", async (_description, templateId) => {
+      await signedInMember("owner")
+
+      expectError(await route.send(templateId), 400, "validation_failed")
+    })
+
+    test("refuses a signed-out request with unauthorized", async () => {
+      expectError(await route.send(typeIdForTable("templates").toString()), 401, "unauthorized")
+    })
+
+    if (route.impersonation === "refuse") {
+      test("refuses an impersonated session with forbidden and changes nothing", async () => {
+        const { organization } = await signedInMember("owner", { impersonatedBy: "user_operator" })
+        const template = await templateIn(organization)
+
+        expectError(await route.send(template.id), 403, "forbidden")
+        await expectUnchanged(template)
+      })
+    } else {
+      test("allows an impersonated session", async () => {
+        const { organization } = await signedInMember("owner", { impersonatedBy: "user_operator" })
+        const template = await templateIn(organization)
+
+        expect((await route.send(template.id)).status).toBe(successStatus)
+      })
+    }
+
+    const conflictStatus = route.conflictStatus
+    if (conflictStatus) {
+      test(`refuses a member with edit access with conflict when the template is ${conflictStatus}`, async () => {
+        const { organization, member } = await signedInMember("viewer")
+        const template = await templateIn(organization, { status: conflictStatus })
+        await grant(db, template.id, { organization, memberId: member.id }, "edit")
+
+        expectError(await route.send(template.id), 409, "conflict")
+        await expectUnchanged(template)
+      })
+
+      test(`refuses a member with view access with forbidden, not conflict, when the template is ${conflictStatus}`, async () => {
+        const { organization, member } = await signedInMember("viewer")
+        const template = await templateIn(organization, { status: conflictStatus })
+        await grant(db, template.id, { organization, memberId: member.id }, "view")
+
+        expectError(await route.send(template.id), 403, "forbidden")
+      })
+
+      test(`refuses a template the member can't see with not_found, not conflict, when it's ${conflictStatus}`, async () => {
+        const { organization } = await signedInMember("viewer")
+        const template = await templateIn(organization, { status: conflictStatus })
+
+        expectError(await route.send(template.id), 404, "not_found")
+      })
+    }
+  })
+}
