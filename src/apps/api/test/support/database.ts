@@ -1,9 +1,9 @@
-import { TransactionRollbackError } from "drizzle-orm"
+import { eq, TransactionRollbackError } from "drizzle-orm"
 
 import { members, organizations, teamMembers, teams, users } from "@/db/auth-schema.ts"
 import { db } from "@/db/index.ts"
-import { schedules, templateAccess, templates, templateVersions } from "@/db/schema.ts"
-import type { Database, Member, Organization, Schedule, Template, TemplateVersion, Transaction, UserContext } from "@/util/types.ts"
+import { schedules, templateAccess, templateFields, templates, templateSteps, templateVersions } from "@/db/schema.ts"
+import type { Database, Member, Organization, Schedule, Template, TemplateField, TemplateStep, TemplateVersion, Transaction, UserContext } from "@/util/types.ts"
 import type { OrgRole } from "@checklog/shared/auth"
 import type { ScheduleStatus, TemplateAccessLevel, TemplateStatus, TemplateVersionStatus } from "@checklog/shared/domain"
 import { typeIdForModel } from "@checklog/shared/utils"
@@ -83,6 +83,51 @@ export async function insertTemplateVersion(tx: Database, template: Template, ve
     createdBy: "user_someone_else",
   }).returning()
   return row!
+}
+
+// Points the template at a version and returns the updated template
+export async function setCurrentVersion(tx: Database, template: Template, version: TemplateVersion): Promise<Template> {
+  const [row] = await tx.update(templates).set({ currentVersionId: version.id }).where(eq(templates.id, template.id)).returning()
+  return row!
+}
+
+export async function insertTemplateStep(
+  tx: Database,
+  version: TemplateVersion,
+  values: Partial<typeof templateSteps.$inferInsert> = {},
+): Promise<TemplateStep> {
+  const [step] = await tx.insert(templateSteps).values({
+    organizationId: version.organizationId,
+    templateVersionId: version.id,
+    position: 0,
+    title: "Test step",
+    createdBy: "user_someone_else",
+    ...values,
+  }).returning()
+  return step!
+}
+
+// Default keys are numbered, since keys are unique within a version
+let fieldCount = 0
+
+export async function insertTemplateField(
+  tx: Database,
+  step: TemplateStep,
+  values: Partial<typeof templateFields.$inferInsert> = {},
+): Promise<TemplateField> {
+  const [field] = await tx.insert(templateFields).values({
+    organizationId: step.organizationId,
+    templateVersionId: step.templateVersionId,
+    templateStepId: step.id,
+    position: 0,
+    key: `field_${++fieldCount}`,
+    label: "Test field",
+    type: "text",
+    options: { type: "text", multiLine: false },
+    createdBy: "user_someone_else",
+    ...values,
+  }).returning()
+  return field!
 }
 
 export async function insertSchedule(tx: Database, template: Template, status: ScheduleStatus): Promise<Schedule> {
