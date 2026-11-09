@@ -23,6 +23,7 @@
     "better-auth": "catalog:",
     "cors": "catalog:",
     "drizzle-orm": "catalog:",
+    "es-toolkit": "catalog:",
     "express": "catalog:",
     "nodemailer": "catalog:",
     "pg": "catalog:",
