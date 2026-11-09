@@ -2,7 +2,7 @@ import { afterEach, beforeEach, vi } from "vitest"
 
 import { auth } from "@/core/auth.ts"
 import { db } from "@/db/index.ts"
-import type { PermissionContext } from "@/util/types.ts"
+import type { UserContext } from "@/util/types.ts"
 import type { OrgRole } from "@checklog/shared/auth"
 import { createMember, createOrganization } from "@test/support/database.ts"
 
@@ -20,7 +20,7 @@ export function stubSessions(): void {
 }
 
 // Stubs only the session lookup; the membership is loaded from the database as in production
-export function signInAs({ organization, member }: PermissionContext, options: { impersonatedBy?: string } = {}): void {
+export function signInAs({ organization, member }: UserContext, options: { impersonatedBy?: string } = {}): void {
   getSession.mockResolvedValue({
     user: { id: member.userId, email: `${member.userId}@example.com`, name: "Test user" },
     session: { id: "sess_test", userId: member.userId, activeOrganizationId: organization.id, impersonatedBy: options.impersonatedBy },
@@ -28,7 +28,7 @@ export function signInAs({ organization, member }: PermissionContext, options: {
 }
 
 // A member of a new organization, signed in
-export async function signedInMember(role: OrgRole | (string & {}), options: { impersonatedBy?: string } = {}): Promise<PermissionContext> {
+export async function signedInMember(role: OrgRole | (string & {}), options: { impersonatedBy?: string } = {}): Promise<UserContext> {
   const organization = await createOrganization(db)
   const context = await createMember(db, organization, role)
   signInAs(context, options)

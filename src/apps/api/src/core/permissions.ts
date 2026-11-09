@@ -5,7 +5,7 @@ import { teamMembers, teams } from "@/db/auth-schema.ts"
 import { db } from "@/db/index.ts"
 import { templateAccess, templates } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
-import type { Database, Member, PermissionContext, User } from "@/util/types.ts"
+import type { Database, Member, UserContext, User } from "@/util/types.ts"
 import { orgRoles, platformRoles } from "@checklog/shared/auth"
 import type { OrgStatementsCheckInput, PlatformStatementsCheckInput } from "@checklog/shared/auth"
 import { highestTemplateAccessLevel, templateAccessIncludes, templateAccessLevels } from "@checklog/shared/domain"
@@ -48,7 +48,7 @@ export function assertPlatformCan(user: User, permissions: PlatformStatementsChe
 }
 
 // SQL builder to determine which template access grants apply to this member
-function grantAppliesTo({ organization, member }: PermissionContext): SQL {
+function grantAppliesTo({ organization, member }: UserContext): SQL {
   const memberTeamIds = db
     .select({ id: teamMembers.teamId })
     .from(teamMembers)
@@ -59,7 +59,7 @@ function grantAppliesTo({ organization, member }: PermissionContext): SQL {
 }
 
 // Condition for queries on templates: the ones this member can reach at the needed level
-export function visibleTemplatesWhere(context: PermissionContext, needs: TemplateAccessLevel = "view"): SQL {
+export function visibleTemplatesWhere(context: UserContext, needs: TemplateAccessLevel = "view"): SQL {
   if (context.organization.deletedAt) return sql`false`
 
   const isInOrg = eq(templates.organizationId, context.organization.id)
@@ -81,7 +81,7 @@ export function visibleTemplatesWhere(context: PermissionContext, needs: Templat
 
 export async function templateAccessLevel(
   tx: Database,
-  { organization, member }: PermissionContext,
+  { organization, member }: UserContext,
   templateId: string,
 ): Promise<TemplateAccessLevel | null> {
   // Backstop for callers that don't go through route(), which already refuses deleted organizations
@@ -107,7 +107,7 @@ export async function templateAccessLevel(
 
 export async function assertTemplateAccessLevel(
   tx: Database,
-  context: PermissionContext,
+  context: UserContext,
   templateId: string,
   requiredLevel: TemplateAccessLevel,
 ): Promise<void> {

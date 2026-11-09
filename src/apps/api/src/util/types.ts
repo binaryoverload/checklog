@@ -3,7 +3,8 @@ import type { organizations, members, teams, users, invitations } from "@/db/aut
 import type { db } from "@/db/index.ts"
 import type { approvalDecisions, approvalRequests, notificationDeliveries, notifications, runFieldValues, runs, runSteps, schedules, stepNotes, templateAccess, templateFields, templates, templateSteps, templateVersions } from "@/db/schema.ts"
 
-export type Database = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
+export type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+export type Database = typeof db | Transaction
 
 export type Session = typeof auth.$Infer.Session
 
@@ -13,7 +14,7 @@ export type User = typeof users.$inferSelect
 export type Team = typeof teams.$inferSelect
 export type Invitation = typeof invitations.$inferSelect
 
-export interface PermissionContext {
+export interface UserContext {
   organization: Organization
   member: Member
 }

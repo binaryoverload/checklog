@@ -3,13 +3,13 @@ import { TransactionRollbackError } from "drizzle-orm"
 import { members, organizations, teamMembers, teams, users } from "@/db/auth-schema.ts"
 import { db } from "@/db/index.ts"
 import { schedules, templateAccess, templates, templateVersions } from "@/db/schema.ts"
-import type { Database, Member, Organization, PermissionContext, Schedule, Template, TemplateVersion } from "@/util/types.ts"
+import type { Database, Member, Organization, Schedule, Template, TemplateVersion, Transaction, UserContext } from "@/util/types.ts"
 import type { OrgRole } from "@checklog/shared/auth"
 import type { ScheduleStatus, TemplateAccessLevel, TemplateStatus, TemplateVersionStatus } from "@checklog/shared/domain"
 import { typeIdForModel } from "@checklog/shared/utils"
 
 // Runs a test body in a transaction that's always rolled back, so tests share one database without seeing each other's rows
-export async function inRollback(body: (tx: Database) => Promise<void>): Promise<void> {
+export async function inRollback(body: (tx: Transaction) => Promise<void>): Promise<void> {
   try {
     await db.transaction(async (tx) => {
       await body(tx)
@@ -26,7 +26,7 @@ export async function createOrganization(tx: Database, name = "Test organization
   return organization!
 }
 
-export async function createMember(tx: Database, organization: Organization, role: OrgRole | (string & {})): Promise<PermissionContext> {
+export async function createMember(tx: Database, organization: Organization, role: OrgRole | (string & {})): Promise<UserContext> {
   const userId = typeIdForModel("user").toString()
   await tx.insert(users).values({ id: userId, name: `Test ${role}`, email: `${userId}@example.com`, role: "user" })
 

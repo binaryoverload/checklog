@@ -4,12 +4,12 @@ import { describe, expect, test } from "vitest"
 import { assertTemplateAccessLevel, templateAccessLevel, visibleTemplatesWhere } from "@/core/permissions.ts"
 import { organizations, teamMembers } from "@/db/auth-schema.ts"
 import { templates } from "@/db/schema.ts"
-import type { Database, PermissionContext } from "@/util/types.ts"
+import type { Database, UserContext } from "@/util/types.ts"
 import { templateAccessIncludes, templateAccessLevels } from "@checklog/shared/domain"
 import type { TemplateAccessLevel } from "@checklog/shared/domain"
 import { addToGroup, createGroup, createMember, createOrganization, createTemplate, grant, inRollback } from "@test/support/database.ts"
 
-async function visibleTemplateIds(tx: Database, context: PermissionContext, needs?: TemplateAccessLevel): Promise<string[]> {
+async function visibleTemplateIds(tx: Database, context: UserContext, needs?: TemplateAccessLevel): Promise<string[]> {
   const rows = await tx.select({ id: templates.id }).from(templates).where(visibleTemplatesWhere(context, needs))
   return rows.map(row => row.id).sort()
 }
