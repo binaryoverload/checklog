@@ -6,10 +6,10 @@ import z from "zod"
 
 import { assertTemplateAccessLevel, visibleTemplatesWhere } from "@/core/permissions.ts"
 import { db } from "@/db/index.ts"
-import { templates, templateSteps, templateVersions } from "@/db/schema.ts"
+import { templateFields, templates, templateSteps, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import { route } from "@/http/route.ts"
-import { toTemplateStepDto, toTemplateVersionDto } from "@/mappers/templates.ts"
+import { toTemplateStepDto, toTemplateVersionDto, toTemplateVersionWithStepsDto } from "@/mappers/templates.ts"
 import { assertAssigneeValid } from "@/services/assignees.ts"
 import { ensureDraft, requireDraft } from "@/services/templates.ts"
 import { templateStepCreateBodySchema, templateStepUpdateBodySchema } from "@checklog/shared/api"
@@ -29,21 +29,35 @@ templateDraftsRouter.get("/:id/draft", route({ params: typeIdParamSchema("templa
     .where(and(eq(templates.id, params.id), visible))
 
   if (!row) throw new HttpError("not_found", "Template not found")
+  if (!row.draft) {
+    res.json({ draftVersion: null })
+    return
+  }
+
+  const [steps, fields] = await Promise.all([
+    db.select().from(templateSteps).where(eq(templateSteps.templateVersionId, row.draft.id)),
+    db.select().from(templateFields).where(eq(templateFields.templateVersionId, row.draft.id)),
+  ])
 
   res.json({
-    draftVersion: row.draft ? toTemplateVersionDto(row.draft) : null,
+    draftVersion: toTemplateVersionWithStepsDto(row.draft, steps, fields),
   })
 }))
 
 templateDraftsRouter.post("/:id/draft", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
   await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
 
-  const draft = await db.transaction(async (tx) => {
-    return await ensureDraft(tx, { member, organization }, params.id)
+  const [draft, steps, fields] = await db.transaction(async (tx) => {
+    const draft = await ensureDraft(tx, { member, organization }, params.id)
+
+    const steps = await tx.select().from(templateSteps).where(eq(templateSteps.templateVersionId, draft.id))
+    const fields = await tx.select().from(templateFields).where(eq(templateFields.templateVersionId, draft.id))
+
+    return [draft, steps, fields]
   })
 
   res.json({
-    draftVersion: toTemplateVersionDto(draft),
+    draftVersion: toTemplateVersionWithStepsDto(draft, steps, fields),
   })
 }))
 

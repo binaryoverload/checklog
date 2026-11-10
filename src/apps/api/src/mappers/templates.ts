@@ -1,5 +1,7 @@
+import { sortBy } from "es-toolkit"
+
 import type { Template, TemplateAccess, TemplateField, TemplateStep, TemplateVersion } from "@/util/types.ts"
-import type { TemplateAccessDto, TemplateDto, TemplateFieldDto, TemplateStepDto, TemplateVersionDto } from "@checklog/shared/api"
+import type { TemplateAccessDto, TemplateDto, TemplateFieldDto, TemplateStepDto, TemplateStepWithFieldsDto, TemplateVersionDto, TemplateVersionWithStepsDto } from "@checklog/shared/api"
 import { flatToAssignee } from "@checklog/shared/domain"
 
 export function toTemplateDto(row: Template): TemplateDto {
@@ -26,6 +28,20 @@ export function toTemplateVersionDto(row: TemplateVersion): TemplateVersionDto {
     createdAt: row.createdAt.toISOString(),
     createdBy: row.createdBy,
     updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+export function toTemplateVersionWithStepsDto(version: TemplateVersion, steps: TemplateStep[], fields: TemplateField[]): TemplateVersionWithStepsDto {
+  return {
+    ...toTemplateVersionDto(version),
+    steps: sortBy(steps.map(step => toTemplateStepWithFieldsDto(step, fields.filter(field => field.templateStepId === step.id))), ["position"]),
+  }
+}
+
+export function toTemplateStepWithFieldsDto(step: TemplateStep, fields: TemplateField[]): TemplateStepWithFieldsDto {
+  return {
+    ...toTemplateStepDto(step),
+    fields: sortBy(fields.map(toTemplateFieldDto), ["position"]),
   }
 }
 

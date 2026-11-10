@@ -41,6 +41,10 @@ export type TemplateVersionDto = {
   publishedBy: string | null
 } & CreatedFields & UpdatedFields
 
+export type TemplateVersionWithStepsDto = TemplateVersionDto & {
+  steps: TemplateStepWithFieldsDto[]
+}
+
 const templateStepFields = z.strictObject({
   kind: templateStepKindSchema,
   title: requiredString().max(200),
@@ -84,6 +88,10 @@ export type TemplateStepDto = {
   assigneeMissing: boolean
   dueOffset: string | null
 } & CreatedFields & UpdatedFields
+
+export type TemplateStepWithFieldsDto = TemplateStepDto & {
+  fields: TemplateFieldDto[]
+}
 
 // TODO: The request schema for a template field
 export type TemplateFieldDto = {

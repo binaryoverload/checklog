@@ -73,7 +73,7 @@ One pull request per item:
 
 - [x] API: create (with an empty version 1 draft), list, get, rename, archive and restore templates; a duplicate active name is `validation_failed` on `name`, archiving archives the template's schedules, and archiving or restoring a template already in that state is `conflict` (person)
 - [x] API: edit the draft's steps (add, reorder, edit, remove) through `requireDraft`; title, instructions, kind, halt, skippable, assignee and due offset, with the step rules from the plan (person)
-- [ ] API: `GET /templates/:templateId/draft` returns the draft's steps and their fields, not only the version (person)
+- [x] API: `GET` and `POST /templates/:templateId/draft` return the draft with its steps and their fields (person)
 - [x] API: `POST /templates/:templateId/draft` starts editing through `ensureDraft`, which copies the current version into a new draft, and is the only route that creates one; edits to a template with no draft are `conflict`, so the editor's step IDs are always the draft's (person)
 - [ ] API: edit a step's fields (add, reorder, edit, remove) with labels, keys, help text, required and options; approval steps can have fields (person)
   - `POST /templates/:templateId/draft/steps/:stepId/fields` adds a field
