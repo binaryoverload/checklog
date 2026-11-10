@@ -1,9 +1,11 @@
 import type { ApiErrorCode, ApiErrorDetail } from "@checklog/shared/api"
+import type { PreconditionIssue } from "@checklog/shared/domain"
 
 const statusByCode: Record<ApiErrorCode, number> = {
   bad_request: 400,
   invalid_json: 400,
   validation_failed: 400,
+  precondition_failed: 400,
   unauthorized: 401,
   forbidden: 403,
   no_active_organization: 403,
@@ -21,7 +23,7 @@ export class HttpError extends Error {
   constructor(
     readonly code: ApiErrorCode,
     message: string,
-    readonly details?: ApiErrorDetail[],
+    readonly details?: (ApiErrorDetail | PreconditionIssue)[],
   ) {
     super(message)
     this.name = "HttpError"

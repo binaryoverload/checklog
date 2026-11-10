@@ -1,6 +1,8 @@
 import z from "zod"
 
-import type { Assignee } from "./assignees.ts"
+import type { Assignee, AssigneeType } from "./assignees.ts"
+import type { FieldOptions } from "./fields.ts"
+import type { PreconditionIssue } from "./preconditions.ts"
 
 export const templateStatuses = ["active", "archived"] as const
 export const templateStatusSchema = z.enum(templateStatuses)
@@ -33,5 +35,31 @@ export function templateStepRuleIssues(step: { kind: TemplateStepKind, isHalt: b
   if (step.kind === "approval" && step.assignee == null) issues.push({ path: ["assignee"], message: "Approval steps must have an assignee" })
   if (step.kind === "approval" && step.skippable) issues.push({ path: ["skippable"], message: "Approval steps cannot be skippable" })
   if (step.isHalt && step.skippable) issues.push({ path: ["skippable"], message: "Halt steps cannot be skippable" })
+  return issues
+}
+
+export function templateVersionPublishIssues(
+  versionId: string,
+  steps: { id: string, assigneeType: AssigneeType | null, assignee: Assignee | null }[],
+  fields: { id: string, templateStepId: string, options: FieldOptions }[],
+): PreconditionIssue[] {
+  const issues: PreconditionIssue[] = []
+
+  if (steps.length === 0) {
+    issues.push({ location: "resource", resourceType: "templateVersion", problem: "no_steps", versionId, message: "Template must have at least one step" })
+  }
+
+  for (const step of steps) {
+    if (step.assigneeType != null && step.assignee == null) {
+      issues.push({ location: "resource", resourceType: "templateStep", problem: "missing_assignee", stepId: step.id, fieldId: null, message: "Step has an invalid assignee" })
+    }
+  }
+
+  for (const field of fields) {
+    if (field.options.type === "dropdown" && (field.options.choices.length === 0)) {
+      issues.push({ location: "resource", resourceType: "templateStep", problem: "dropdown_without_choices", stepId: field.templateStepId, fieldId: field.id, message: "Dropdown field has no choices" })
+    }
+  }
+
   return issues
 }

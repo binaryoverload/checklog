@@ -1,5 +1,7 @@
 import z from "zod"
 
+import { preconditionIssueSchema } from "../domain/preconditions.ts"
+
 // The body of every API error response, except Better Auth's routes under /api/auth
 
 export const apiErrorCodes = [
@@ -12,6 +14,7 @@ export const apiErrorCodes = [
   "organization_deleted",
   "not_found",
   "conflict",
+  "precondition_failed",
   "payload_too_large",
   "internal",
 ] as const
@@ -30,7 +33,7 @@ export const apiErrorResponseSchema = z.object({
   error: z.object({
     code: apiErrorCodeSchema,
     message: z.string(),
-    details: z.array(apiErrorDetailSchema).optional(),
+    details: z.array(z.union([apiErrorDetailSchema, preconditionIssueSchema])).optional(),
   }),
 })
 export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>

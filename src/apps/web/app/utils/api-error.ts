@@ -1,5 +1,6 @@
 import { apiErrorResponseSchema } from "@checklog/shared/api"
 import type { ApiErrorCode, ApiErrorDetail } from "@checklog/shared/api"
+import type { PreconditionIssue } from "@checklog/shared/domain"
 
 // An error response from the API, in the shape every non-auth route uses
 export class ApiError extends Error {
@@ -7,7 +8,7 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: ApiErrorCode,
     message: string,
-    readonly details: ApiErrorDetail[] = [],
+    readonly details: (ApiErrorDetail | PreconditionIssue)[] = [],
   ) {
     super(message)
     this.name = "ApiError"

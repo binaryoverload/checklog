@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest"
 
-import { highestTemplateAccessLevel, templateAccessIncludes, templateStepRuleIssues } from "@checklog/shared/domain"
-import type { TemplateAccessLevel } from "@checklog/shared/domain"
+import { highestTemplateAccessLevel, templateAccessIncludes, templateStepRuleIssues, templateVersionPublishIssues } from "@checklog/shared/domain"
+import type { FieldOptions, PreconditionIssue, TemplateAccessLevel } from "@checklog/shared/domain"
 
 describe("templateAccessIncludes", () => {
   test.each<[TemplateAccessLevel, TemplateAccessLevel, boolean]>([
@@ -75,6 +75,60 @@ describe("templateStepRuleIssues", () => {
       { path: ["assignee"], message: "Approval steps must have an assignee" },
       { path: ["skippable"], message: "Approval steps cannot be skippable" },
       { path: ["skippable"], message: "Halt steps cannot be skippable" },
+    ])
+  })
+})
+
+type StepProblem = Extract<PreconditionIssue, { resourceType: "templateStep" }>["problem"]
+
+describe("templateVersionPublishIssues", () => {
+  const versionId = "tver_draft"
+  const unassigned = { id: "tstep_unassigned", assigneeType: null, assignee: null }
+  const assigned = { id: "tstep_assigned", assigneeType: "member", assignee: { type: "member", memberId: "member_1" } } as const
+  const missing = { id: "tstep_missing", assigneeType: "team", assignee: null } as const
+
+  const field = (id: string, templateStepId: string, options: FieldOptions) => ({ id, templateStepId, options })
+  const emptyDropdown: FieldOptions = { type: "dropdown", choices: [], multiple: false }
+  const dropdown: FieldOptions = { type: "dropdown", choices: [{ value: "ok", label: "OK" }], multiple: true }
+
+  const stepProblem = (problem: StepProblem, stepId: string, fieldId: string | null = null) =>
+    ({ location: "resource", resourceType: "templateStep", problem, stepId, fieldId, message: expect.any(String) })
+
+  test("allows assigned and unassigned steps with fields of every type", () => {
+    expect(templateVersionPublishIssues(versionId, [unassigned, assigned], [
+      field("tfield_text", unassigned.id, { type: "text", multiLine: false }),
+      field("tfield_number", unassigned.id, { type: "number" }),
+      field("tfield_date", assigned.id, { type: "date", dateType: "date", allowFuture: true }),
+      field("tfield_checkbox", assigned.id, { type: "checkbox" }),
+      field("tfield_dropdown", assigned.id, dropdown),
+    ])).toEqual([])
+  })
+
+  test("refuses a version with no steps, pointing at the version", () => {
+    expect(templateVersionPublishIssues(versionId, [], [])).toEqual([
+      { location: "resource", resourceType: "templateVersion", problem: "no_steps", versionId, message: expect.any(String) },
+    ])
+  })
+
+  test("refuses a step whose assignee type is set but whose assignee is gone", () => {
+    expect(templateVersionPublishIssues(versionId, [missing], [])).toEqual([stepProblem("missing_assignee", missing.id)])
+  })
+
+  test("refuses a dropdown with no choices, pointing at its step and field", () => {
+    expect(templateVersionPublishIssues(versionId, [unassigned], [field("tfield_empty", unassigned.id, emptyDropdown)])).toEqual([
+      stepProblem("dropdown_without_choices", unassigned.id, "tfield_empty"),
+    ])
+  })
+
+  test("reports every problem at once", () => {
+    expect(templateVersionPublishIssues(versionId, [missing, unassigned], [
+      field("tfield_first", unassigned.id, emptyDropdown),
+      field("tfield_second", missing.id, emptyDropdown),
+      field("tfield_fine", unassigned.id, dropdown),
+    ])).toEqual([
+      stepProblem("missing_assignee", missing.id),
+      stepProblem("dropdown_without_choices", unassigned.id, "tfield_first"),
+      stepProblem("dropdown_without_choices", missing.id, "tfield_second"),
     ])
   })
 })
