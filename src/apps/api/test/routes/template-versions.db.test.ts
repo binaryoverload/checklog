@@ -31,7 +31,7 @@ import {
   titlesOf,
   versionsOf,
 } from "@test/support/template-drafts.ts"
-import { api, describeTemplateAccess, expectError } from "@test/support/template-routes.ts"
+import { api, describeTemplateAccess, expectError, expectStatus } from "@test/support/template-routes.ts"
 import type { TemplateRoute } from "@test/support/template-routes.ts"
 
 // Route handlers use the shared connection rather than a test transaction, so these tests commit their rows.
@@ -132,7 +132,7 @@ describe("POST /api/templates/:templateId/draft/publish", () => {
 
     const response = await publish(template.id)
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toMatchObject({ id: draft.id, version: 2, status: "published", publishedBy: member.userId })
     expect(response.body).not.toHaveProperty("organizationId")
     const stored = (await storedVersion(draft.id))!
@@ -145,7 +145,7 @@ describe("POST /api/templates/:templateId/draft/publish", () => {
     const { organization } = await signedInMember("owner")
     const { template, published } = await publishedWithDraft(organization, ["Step"])
 
-    expect((await publish(template.id)).status).toBe(200)
+    expectStatus(await publish(template.id), 200)
 
     expect((await storedVersion(published.id))).toEqual(published)
     expect((await versionsOf(template)).map(version => version.status)).toEqual(["published", "published"])
@@ -155,7 +155,7 @@ describe("POST /api/templates/:templateId/draft/publish", () => {
     const { organization } = await signedInMember("owner")
     const { template, draft } = await draftWithSteps(organization, ["Step"])
 
-    expect((await publish(template.id)).status).toBe(200)
+    expectStatus(await publish(template.id), 200)
 
     expect((await storedTemplate(template.id)).currentVersionId).toBe(draft.id)
     expect((await storedVersion(draft.id))!.status).toBe("published")
@@ -166,7 +166,7 @@ describe("POST /api/templates/:templateId/draft/publish", () => {
     const { template, draft, steps: [first, second] } = await publishedWithDraft(organization, ["First", "Second"])
     const field = await insertTemplateField(db, first!)
 
-    expect((await publish(template.id)).status).toBe(200)
+    expectStatus(await publish(template.id), 200)
 
     expect((await stepsOf(draft)).map(step => step.id)).toEqual([first!.id, second!.id])
     expect(await storedField(field.id)).toMatchObject({ templateVersionId: draft.id, templateStepId: first!.id })
@@ -182,7 +182,7 @@ describe("POST /api/templates/:templateId/draft/publish", () => {
     await insertTemplateStep(db, draft, { position: 2, assigneeType: "team", assigneeTeamId: teamId })
     await insertTemplateStep(db, draft, { position: 3, assigneeType: "role", assigneeRole: "editor" })
 
-    expect((await publish(template.id)).status).toBe(200)
+    expectStatus(await publish(template.id), 200)
   })
 
   test("publishes a dropdown field with at least one choice", async () => {
@@ -190,7 +190,7 @@ describe("POST /api/templates/:templateId/draft/publish", () => {
     const { template, steps: [step] } = await draftWithSteps(organization, ["Step"])
     await insertTemplateField(db, step!, { type: "dropdown", options: { type: "dropdown", choices: [{ value: "ok", label: "OK" }], multiple: false } })
 
-    expect((await publish(template.id)).status).toBe(200)
+    expectStatus(await publish(template.id), 200)
   })
 
   test("refuses a template with no draft with conflict and changes nothing", async () => {
@@ -268,7 +268,7 @@ describe("DELETE /api/templates/:templateId/draft", () => {
 
     const response = await discard(template.id)
 
-    expect(response.status).toBe(204)
+    expectStatus(response, 204)
     expect(response.text).toBe("")
     expect((await versionsOf(template)).map(version => version.id)).toEqual([published.id])
     expect(await storedVersion(draft.id)).toBeUndefined()
@@ -280,7 +280,7 @@ describe("DELETE /api/templates/:templateId/draft", () => {
     const { organization } = await signedInMember("owner")
     const { template, published } = await publishedWithDraft(organization, ["Draft step"])
 
-    expect((await discard(template.id)).status).toBe(204)
+    expectStatus(await discard(template.id), 204)
 
     expect(await storedVersion(published.id)).toEqual(published)
     expect(await titlesOf(published)).toEqual(["Published"])
@@ -309,7 +309,7 @@ describe("DELETE /api/templates/:templateId/draft", () => {
     const { organization } = await signedInMember("owner")
     const { template } = await publishedWithDraft(organization)
 
-    expect((await discard(template.id)).status).toBe(204)
+    expectStatus(await discard(template.id), 204)
     expectError(await discard(template.id), 409, "conflict")
   })
 })
@@ -326,7 +326,7 @@ describe("GET /api/templates/:templateId/versions", () => {
 
     const response = await listVersions(template.id)
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     const body = response.body as TemplateVersionDto[]
     expect(body.map(version => [version.version, version.status])).toEqual([[3, "draft"], [2, "published"], [1, "archived"]])
   })
@@ -375,7 +375,7 @@ describe("GET /api/templates/:templateId/versions/:versionId", () => {
 
     const response = await getVersion(template.id, published.id)
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     const body = response.body as VersionWithSteps
     expect(body).toMatchObject({ id: published.id, version: 1, status: "published" })
     expect(body).not.toHaveProperty("organizationId")
@@ -461,7 +461,7 @@ describe("POST /api/templates/:templateId/versions/:versionId/archive", () => {
 
     const response = await archiveVersion(template.id, earlier.id)
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toMatchObject({ id: earlier.id, status: "archived" })
     expect(response.body).not.toHaveProperty("organizationId")
     expect((await storedVersion(earlier.id))!.status).toBe("archived")
@@ -472,7 +472,7 @@ describe("POST /api/templates/:templateId/versions/:versionId/archive", () => {
     const step = await insertTemplateStep(db, earlier)
     const field = await insertTemplateField(db, step)
 
-    expect((await archiveVersion(template.id, earlier.id)).status).toBe(200)
+    expectStatus(await archiveVersion(template.id, earlier.id), 200)
 
     expect((await stepsOf(earlier)).map(row => row.id)).toEqual([step.id])
     expect(await storedField(field.id)).toEqual(field)
@@ -481,7 +481,7 @@ describe("POST /api/templates/:templateId/versions/:versionId/archive", () => {
   test("leaves the other versions as they were", async () => {
     const { template, earlier, current } = await twoPublishedVersions()
 
-    expect((await archiveVersion(template.id, earlier.id)).status).toBe(200)
+    expectStatus(await archiveVersion(template.id, earlier.id), 200)
 
     expect(await storedVersion(current.id)).toEqual(current)
   })
@@ -489,7 +489,7 @@ describe("POST /api/templates/:templateId/versions/:versionId/archive", () => {
   test("archives the current version and leaves it current", async () => {
     const { template, current } = await twoPublishedVersions()
 
-    expect((await archiveVersion(template.id, current.id)).status).toBe(200)
+    expectStatus(await archiveVersion(template.id, current.id), 200)
 
     expect((await storedVersion(current.id))!.status).toBe("archived")
     expect((await storedTemplate(template.id)).currentVersionId).toBe(current.id)

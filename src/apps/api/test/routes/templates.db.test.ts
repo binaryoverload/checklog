@@ -18,7 +18,7 @@ import {
   insertTemplateVersion,
 } from "@test/support/database.ts"
 import { signedInMember, stubSessions } from "@test/support/session.ts"
-import { api, describeTemplateAccess, expectError } from "@test/support/template-routes.ts"
+import { api, describeTemplateAccess, expectError, expectStatus } from "@test/support/template-routes.ts"
 import type { TemplateRoute } from "@test/support/template-routes.ts"
 
 // Route handlers use the shared connection rather than a test transaction, so these tests commit their rows.
@@ -91,7 +91,7 @@ describe("POST /api/templates", () => {
 
     const response = await createTemplate({ name: "Server checks", description: "Weekly" })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toEqual({
       id: expect.stringMatching(/^tmpl_/),
       name: "Server checks",
@@ -142,7 +142,7 @@ describe("POST /api/templates", () => {
   test.each(["owner", "admin", "editor"])("lets an %s create templates", async (role) => {
     await signedInMember(role)
 
-    expect((await createTemplate({ name: "Server checks" })).status).toBe(200)
+    expectStatus(await createTemplate({ name: "Server checks" }), 200)
   })
 
   test("refuses a viewer with forbidden and creates nothing", async () => {
@@ -169,7 +169,7 @@ describe("POST /api/templates", () => {
 
     const response = await createTemplate({ name: "Server checks" })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(await templatesIn(organization.id)).toHaveLength(2)
   })
 
@@ -178,7 +178,7 @@ describe("POST /api/templates", () => {
     await insertTemplate(db, other, { name: "Server checks" })
     await signedInMember("editor")
 
-    expect((await createTemplate({ name: "Server checks" })).status).toBe(200)
+    expectStatus(await createTemplate({ name: "Server checks" }), 200)
   })
 
   test.each([
@@ -215,7 +215,7 @@ describe("GET /api/templates", () => {
     let pageCount = 0
     do {
       const response = await listTemplates(cursor ? { ...query, cursor } : query)
-      expect(response.status).toBe(200)
+      expectStatus(response, 200)
       seen.push(...names(response))
       totals.push(response.body.total)
       cursor = response.body.nextCursor
@@ -230,7 +230,7 @@ describe("GET /api/templates", () => {
 
     const response = await listTemplates()
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(names(response)).toEqual(["Backups", "Fire alarm", "Server checks"])
     expect(response.body.total).toBe(3)
     expect(response.body.nextCursor).toBeNull()
@@ -360,7 +360,7 @@ describe("GET /api/templates", () => {
 
       const response = await listTemplates({ status: "archived" })
 
-      expect(response.status).toBe(200)
+      expectStatus(response, 200)
       expect(names(response)).toEqual(["Fire alarm"])
       expect(response.body.items[0].status).toBe("archived")
       expect(response.body.total).toBe(1)
@@ -429,7 +429,7 @@ describe("GET /api/templates/:templateId", () => {
 
     const response = await getTemplate(template.id)
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toEqual({
       id: template.id,
       name: "Server checks",
@@ -450,7 +450,7 @@ describe("GET /api/templates/:templateId", () => {
 
     const response = await getTemplate(created.body.id)
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body.currentVersion).toBeNull()
     expect(response.body.draftVersion).toMatchObject({ templateId: created.body.id, version: 1, status: "draft", publishedAt: null })
   })
@@ -513,7 +513,7 @@ describe("GET /api/templates/:templateId", () => {
 
     const response = await getTemplate(template.id)
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body.status).toBe("archived")
     expect(response.body.currentVersion.id).toBe(published.id)
     expect(response.body.draftVersion.id).toBe(draft.id)
@@ -584,7 +584,7 @@ describe("PATCH /api/templates/:templateId", () => {
 
     const response = await updateTemplate(template.id, { name: "Database checks" })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toEqual({
       id: template.id,
       name: "Database checks",
@@ -605,7 +605,7 @@ describe("PATCH /api/templates/:templateId", () => {
 
     const response = await updateTemplate(template.id, { description: "Daily" })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(await storedTemplate(template.id)).toMatchObject({ name: "Server checks", description: "Daily" })
   })
 
@@ -615,7 +615,7 @@ describe("PATCH /api/templates/:templateId", () => {
 
     const response = await updateTemplate(template.id, { description: null })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body.description).toBeNull()
     expect(await storedTemplate(template.id)).toMatchObject({ name: "Server checks", description: null })
   })
@@ -633,7 +633,7 @@ describe("PATCH /api/templates/:templateId", () => {
     const { organization } = await signedInMember("admin")
     const template = await templateWithDescription(organization)
 
-    expect((await updateTemplate(template.id, { name: "Server checks" })).status).toBe(200)
+    expectStatus(await updateTemplate(template.id, { name: "Server checks" }), 200)
   })
 
   test("leaves other templates alone", async () => {
@@ -661,7 +661,7 @@ describe("PATCH /api/templates/:templateId", () => {
     const template = await insertTemplate(db, organization, { name: "Server checks" })
     await insertTemplate(db, organization, { name: "Backups", status: "archived" })
 
-    expect((await updateTemplate(template.id, { name: "Backups" })).status).toBe(200)
+    expectStatus(await updateTemplate(template.id, { name: "Backups" }), 200)
   })
 
   test.each([
@@ -691,7 +691,7 @@ describe("POST /api/templates/:templateId/archive", () => {
 
     const response = await archiveTemplate(template.id)
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toEqual({
       id: template.id,
       name: "Server checks",
@@ -772,7 +772,7 @@ describe("POST /api/templates/:templateId/restore", () => {
 
     const response = await restoreTemplate(template.id)
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toEqual({
       id: template.id,
       name: "Server checks",
@@ -810,7 +810,7 @@ describe("POST /api/templates/:templateId/restore", () => {
     const template = await insertTemplate(db, organization, { name: "Server checks", status: "archived" })
     await insertTemplate(db, organization, { name: "Server checks", status: "archived" })
 
-    expect((await restoreTemplate(template.id)).status).toBe(200)
+    expectStatus(await restoreTemplate(template.id), 200)
   })
 
   test("allows a name an active template uses in another organization", async () => {
@@ -819,6 +819,6 @@ describe("POST /api/templates/:templateId/restore", () => {
     const { organization } = await signedInMember("admin")
     const template = await insertTemplate(db, organization, { name: "Server checks", status: "archived" })
 
-    expect((await restoreTemplate(template.id)).status).toBe(200)
+    expectStatus(await restoreTemplate(template.id), 200)
   })
 })

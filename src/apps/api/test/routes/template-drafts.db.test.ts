@@ -17,7 +17,7 @@ import {
 } from "@test/support/database.ts"
 import { signedInMember, stubSessions } from "@test/support/session.ts"
 import { draftIn, draftStepIn, draftWithSteps, publishedWithDraft, publishedWithSteps, stepsOf, storedStep, titlesOf, versionsOf } from "@test/support/template-drafts.ts"
-import { api, describeTemplateAccess, expectError } from "@test/support/template-routes.ts"
+import { api, describeTemplateAccess, expectError, expectStatus } from "@test/support/template-routes.ts"
 import type { TemplateRoute } from "@test/support/template-routes.ts"
 
 // Route handlers use the shared connection rather than a test transaction, so these tests commit their rows.
@@ -107,7 +107,7 @@ describe("GET /api/templates/:templateId/draft", () => {
 
     const response = await getDraft(template.id)
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     const draftVersion = (response.body as { draftVersion: VersionWithSteps }).draftVersion
     expect(draftVersion).toMatchObject({ id: draft.id, version: 1, status: "draft" })
     expect(draftVersion.steps.map(step => step.title)).toEqual(["First", "Second"])
@@ -144,7 +144,7 @@ describe("GET /api/templates/:templateId/draft", () => {
 
     const response = await getDraft(template.id)
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toEqual({ draftVersion: null })
   })
 
@@ -162,7 +162,7 @@ describe("GET /api/templates/:templateId/draft", () => {
     const { organization } = await signedInMember("owner")
     const { template, published } = await publishedWithSteps(organization, ["Published"])
 
-    expect((await getDraft(template.id)).status).toBe(200)
+    expectStatus(await getDraft(template.id), 200)
 
     expect((await versionsOf(template)).map(version => version.id)).toEqual([published.id])
   })
@@ -176,7 +176,7 @@ describe("POST /api/templates/:templateId/draft", () => {
     const { template, published, steps: [first] } = await publishedWithSteps(organization, ["First", "Second"])
     await insertTemplateField(db, first!, { key: "reading" })
 
-    expect((await startEditing(template.id)).status).toBe(200)
+    expectStatus(await startEditing(template.id), 200)
 
     const versions = await versionsOf(template)
     expect(versions.map(version => [version.version, version.status])).toEqual([[1, "published"], [2, "draft"]])
@@ -216,7 +216,7 @@ describe("POST /api/templates/:templateId/draft", () => {
     const { organization } = await signedInMember("owner")
     const { template, draft } = await draftWithSteps(organization, ["Edited"])
 
-    expect((await startEditing(template.id)).status).toBe(200)
+    expectStatus(await startEditing(template.id), 200)
 
     expect((await versionsOf(template)).map(version => version.id)).toEqual([draft.id])
     expect(await titlesOf(draft)).toEqual(["Edited"])
@@ -226,8 +226,8 @@ describe("POST /api/templates/:templateId/draft", () => {
     const { organization } = await signedInMember("owner")
     const { template } = await publishedWithSteps(organization, ["First"])
 
-    expect((await startEditing(template.id)).status).toBe(200)
-    expect((await startEditing(template.id)).status).toBe(200)
+    expectStatus(await startEditing(template.id), 200)
+    expectStatus(await startEditing(template.id), 200)
 
     expect((await versionsOf(template)).map(version => version.status)).toEqual(["published", "draft"])
   })
@@ -242,7 +242,7 @@ describe("POST /api/templates/:templateId/draft/steps", () => {
 
     const response = await addStep(template.id, { title: "Third" })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     const body = response.body as TemplateStepDto
     expect(body).toMatchObject({ templateVersionId: draft.id, title: "Third", position: 2, createdBy: member.userId })
     expect(body).not.toHaveProperty("organizationId")
@@ -256,7 +256,7 @@ describe("POST /api/templates/:templateId/draft/steps", () => {
 
     const response = await addStep(template.id, { title: "Only" })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect((await stepsOf(draft)).map(step => step.position)).toEqual([0])
   })
 
@@ -268,7 +268,7 @@ describe("POST /api/templates/:templateId/draft/steps", () => {
     const { organization } = await signedInMember("owner")
     const { template, draft } = await draftWithSteps(organization, ["First", "Second", "Third"])
 
-    expect((await addStep(template.id, { title: "New", position })).status).toBe(200)
+    expectStatus(await addStep(template.id, { title: "New", position }), 200)
 
     const steps = await stepsOf(draft)
     expect(steps.map(step => step.title)).toEqual(titles)
@@ -304,7 +304,7 @@ describe("POST /api/templates/:templateId/draft/steps", () => {
       dueOffset: "P3D",
     })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(await storedStep((response.body as TemplateStepDto).id)).toMatchObject({
       title: "Sign off",
       instructions: "Check the readings",
@@ -406,7 +406,7 @@ describe("PATCH /api/templates/:templateId/draft/steps/:stepId", () => {
 
     const response = await editStep(template.id, step, { title: "Renamed" })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toMatchObject({ id: step.id, title: "Renamed", instructions: "Keep these", dueOffset: "P1D" })
     expect(response.body).not.toHaveProperty("organizationId")
     expect(await storedStep(step.id)).toMatchObject({ title: "Renamed", instructions: "Keep these", dueOffset: "P1D" })
@@ -466,7 +466,7 @@ describe("PATCH /api/templates/:templateId/draft/steps/:stepId", () => {
     const { template, draft } = await draftWithSteps(organization)
     const step = await insertTemplateStep(db, draft, { kind: "approval", isHalt: true, assigneeType: "member", assigneeMemberId: member.id })
 
-    expect((await editStep(template.id, step, { title: "Renamed" })).status).toBe(200)
+    expectStatus(await editStep(template.id, step, { title: "Renamed" }), 200)
 
     expect(await storedStep(step.id)).toMatchObject({ title: "Renamed", kind: "approval", isHalt: true, assigneeType: "member", assigneeMemberId: member.id })
   })
@@ -476,7 +476,7 @@ describe("PATCH /api/templates/:templateId/draft/steps/:stepId", () => {
     const { template, draft } = await draftWithSteps(organization)
     const step = await insertTemplateStep(db, draft, { assigneeType: "member", assigneeMemberId: member.id })
 
-    expect((await editStep(template.id, step, { kind: "approval" })).status).toBe(200)
+    expectStatus(await editStep(template.id, step, { kind: "approval" }), 200)
 
     expect((await storedStep(step.id))!.kind).toBe("approval")
   })
@@ -490,7 +490,7 @@ describe("PATCH /api/templates/:templateId/draft/steps/:stepId", () => {
 
     const response = await editStep(template.id, step, { title: "Renamed" })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toMatchObject({ assignee: null, assigneeMissing: true })
   })
 
@@ -503,7 +503,7 @@ describe("PATCH /api/templates/:templateId/draft/steps/:stepId", () => {
 
     const response = await editStep(template.id, step, { title: "Renamed" })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toMatchObject({ assignee: null, assigneeMissing: true })
   })
 
@@ -620,7 +620,7 @@ describe("PUT /api/templates/:templateId/draft/steps/order", () => {
     const { organization } = await signedInMember("owner")
     const { template, draft, steps: [first, second, third] } = await draftWithSteps(organization, ["First", "Second", "Third"])
 
-    expect((await reorder(template.id, [third!.id, first!.id, second!.id])).status).toBe(200)
+    expectStatus(await reorder(template.id, [third!.id, first!.id, second!.id]), 200)
 
     const steps = await stepsOf(draft)
     expect(steps.map(step => step.title)).toEqual(["Third", "First", "Second"])
@@ -659,7 +659,7 @@ describe("PUT /api/templates/:templateId/draft/steps/order", () => {
     const first = await insertTemplateStep(db, draft, { title: "First", position: 4 })
     const second = await insertTemplateStep(db, draft, { title: "Second", position: 9 })
 
-    expect((await reorder(template.id, [first.id, second.id])).status).toBe(200)
+    expectStatus(await reorder(template.id, [first.id, second.id]), 200)
 
     expect((await stepsOf(draft)).map(step => step.position)).toEqual([0, 1])
   })
@@ -668,7 +668,7 @@ describe("PUT /api/templates/:templateId/draft/steps/order", () => {
     const { organization } = await signedInMember("owner")
     const { template } = await draftWithSteps(organization)
 
-    expect((await reorder(template.id, [])).status).toBe(200)
+    expectStatus(await reorder(template.id, []), 200)
   })
 
   test("refuses a template with no draft with conflict and creates no draft", async () => {
@@ -729,7 +729,7 @@ describe("DELETE /api/templates/:templateId/draft/steps/:stepId", () => {
 
     const response = await deleteStep(template.id, second!.id)
 
-    expect(response.status).toBe(204)
+    expectStatus(response, 204)
     expect(response.text).toBe("")
 
     const steps = await stepsOf(draft)
@@ -741,7 +741,7 @@ describe("DELETE /api/templates/:templateId/draft/steps/:stepId", () => {
     const { organization } = await signedInMember("owner")
     const { template, steps: [first, second, third] } = await draftWithSteps(organization, ["First", "Second", "Third"])
 
-    expect((await deleteStep(template.id, first!.id)).status).toBe(204)
+    expectStatus(await deleteStep(template.id, first!.id), 204)
 
     expect((await storedStep(second!.id))!.updatedAt.getTime()).toBeGreaterThan(second!.updatedAt.getTime())
     expect((await storedStep(third!.id))!.updatedAt.getTime()).toBeGreaterThan(third!.updatedAt.getTime())
@@ -754,7 +754,7 @@ describe("DELETE /api/templates/:templateId/draft/steps/:stepId", () => {
     const first = await insertTemplateStep(db, draft, { title: "First", position: 0 })
     await insertTemplateStep(db, draft, { title: "Second", position: 1 })
 
-    expect((await deleteStep(template.id, first.id)).status).toBe(204)
+    expectStatus(await deleteStep(template.id, first.id), 204)
 
     const steps = await stepsOf(draft)
     expect(steps.map(step => step.title)).toEqual(["Second", "Third"])
@@ -767,7 +767,7 @@ describe("DELETE /api/templates/:templateId/draft/steps/:stepId", () => {
     const keptField = await insertTemplateField(db, kept!)
     await insertTemplateField(db, removed!)
 
-    expect((await deleteStep(template.id, removed!.id)).status).toBe(204)
+    expectStatus(await deleteStep(template.id, removed!.id), 204)
 
     const fields = await db.select().from(templateFields).where(eq(templateFields.templateVersionId, draft.id))
     expect(fields.map(field => field.id)).toEqual([keptField.id])
@@ -811,7 +811,7 @@ describe("DELETE /api/templates/:templateId/draft/steps/:stepId", () => {
     const { organization } = await signedInMember("owner")
     const { template, steps: [step] } = await draftWithSteps(organization, ["Step"])
 
-    expect((await deleteStep(template.id, step!.id)).status).toBe(204)
+    expectStatus(await deleteStep(template.id, step!.id), 204)
     expectError(await deleteStep(template.id, step!.id), 404, "not_found")
   })
 })

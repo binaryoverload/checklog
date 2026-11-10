@@ -14,8 +14,13 @@ import { signedInMember } from "@test/support/session.ts"
 
 export const api = () => request(createApp())
 
+// Checks the status, putting the response body in the failure message so it shows why the request got another status
+export function expectStatus(response: request.Response, status: number) {
+  expect(response.status, `Response body: ${JSON.stringify(response.body, null, 2)}`).toBe(status)
+}
+
 export function expectError(response: request.Response, status: number, code: string) {
-  expect(response.status).toBe(status)
+  expectStatus(response, status)
   expect(response.body.error.code).toBe(code)
 }
 
@@ -60,14 +65,14 @@ export function describeTemplateAccess(routes: TemplateRoute[]): void {
       const { organization } = await signedInMember(role)
       const template = await templateIn(organization)
 
-      expect((await route.send(template.id)).status).toBe(successStatus)
+      expectStatus(await route.send(template.id), successStatus)
     })
 
     test.each(["editor", "viewer"])("lets a member with the %s role who created the template make the request", async (role) => {
       const { organization, member } = await signedInMember(role)
       const template = await templateIn(organization, { createdBy: member.userId })
 
-      expect((await route.send(template.id)).status).toBe(successStatus)
+      expectStatus(await route.send(template.id), successStatus)
     })
 
     test.each(allowedLevels)("lets a member with %s access make the request", async (level) => {
@@ -75,7 +80,7 @@ export function describeTemplateAccess(routes: TemplateRoute[]): void {
       const template = await templateIn(organization)
       await grant(db, template.id, { organization, memberId: member.id }, level)
 
-      expect((await route.send(template.id)).status).toBe(successStatus)
+      expectStatus(await route.send(template.id), successStatus)
     })
 
     test(`lets a member whose group has ${route.needs} access make the request`, async () => {
@@ -85,7 +90,7 @@ export function describeTemplateAccess(routes: TemplateRoute[]): void {
       const template = await templateIn(organization)
       await grant(db, template.id, { organization, teamId }, route.needs)
 
-      expect((await route.send(template.id)).status).toBe(successStatus)
+      expectStatus(await route.send(template.id), successStatus)
     })
 
     if (lowerLevels.length > 0) {
@@ -157,7 +162,7 @@ export function describeTemplateAccess(routes: TemplateRoute[]): void {
         const { organization } = await signedInMember("owner", { impersonatedBy: "user_operator" })
         const template = await templateIn(organization)
 
-        expect((await route.send(template.id)).status).toBe(successStatus)
+        expectStatus(await route.send(template.id), successStatus)
       })
     }
 

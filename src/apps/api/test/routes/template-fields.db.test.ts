@@ -17,7 +17,7 @@ import {
   storedField,
   versionsOf,
 } from "@test/support/template-drafts.ts"
-import { api, describeTemplateAccess, expectError } from "@test/support/template-routes.ts"
+import { api, describeTemplateAccess, expectError, expectStatus } from "@test/support/template-routes.ts"
 import type { TemplateRoute } from "@test/support/template-routes.ts"
 
 // Route handlers use the shared connection rather than a test transaction, so these tests commit their rows.
@@ -96,7 +96,7 @@ describe("POST /api/templates/:templateId/draft/steps/:stepId/fields", () => {
 
     const response = await addField(template.id, step.id, { label: "Reading", key: "reading", options: textOptions })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     const body = response.body as TemplateFieldDto
     expect(body).toMatchObject({ templateVersionId: draft.id, templateStepId: step.id, label: "Reading", key: "reading", position: 1, type: "text" })
     expect(body).not.toHaveProperty("organizationId")
@@ -116,7 +116,7 @@ describe("POST /api/templates/:templateId/draft/steps/:stepId/fields", () => {
   test("adds the first field to a step at position 0", async () => {
     const { template, step } = await stepWithFields()
 
-    expect((await addField(template.id, step.id, { label: "Only", key: "only", options: textOptions })).status).toBe(200)
+    expectStatus(await addField(template.id, step.id, { label: "Only", key: "only", options: textOptions }), 200)
 
     expect((await fieldsOf(step)).map(field => field.position)).toEqual([0])
   })
@@ -145,7 +145,7 @@ describe("POST /api/templates/:templateId/draft/steps/:stepId/fields", () => {
 
     const response = await addField(template.id, step.id, { label: "Result", key: "result", helpText: "Pick one", required: false, options })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(await storedField((response.body as TemplateFieldDto).id)).toMatchObject({
       label: "Result",
       key: "result",
@@ -166,7 +166,7 @@ describe("POST /api/templates/:templateId/draft/steps/:stepId/fields", () => {
 
     const response = await addField(template.id, step.id, { label: "Field", key: "field", options })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toMatchObject({ type, options })
   })
 
@@ -175,7 +175,7 @@ describe("POST /api/templates/:templateId/draft/steps/:stepId/fields", () => {
     const { template, draft } = await draftWithSteps(organization)
     const step = await insertTemplateStep(db, draft, { kind: "approval", assigneeType: "member", assigneeMemberId: member.id })
 
-    expect((await addField(template.id, step.id, { label: "Comments", key: "comments", options: textOptions })).status).toBe(200)
+    expectStatus(await addField(template.id, step.id, { label: "Comments", key: "comments", options: textOptions }), 200)
 
     expect(await keysOf(step)).toEqual(["comments"])
   })
@@ -185,7 +185,7 @@ describe("POST /api/templates/:templateId/draft/steps/:stepId/fields", () => {
     const { template, published, steps: [step] } = await publishedWithDraft(organization, ["Step"])
     await insertTemplateField(db, await insertTemplateStep(db, published, { position: 1 }), { key: "reading" })
 
-    expect((await addField(template.id, step!.id, { label: "Reading", key: "reading", options: textOptions })).status).toBe(200)
+    expectStatus(await addField(template.id, step!.id, { label: "Reading", key: "reading", options: textOptions }), 200)
 
     expect(await keysOf(step!)).toEqual(["reading"])
   })
@@ -226,7 +226,7 @@ describe("POST /api/templates/:templateId/draft/steps/:stepId/fields", () => {
   test("accepts keys with lowercase letters, digits and underscores starting with a letter", async () => {
     const { template, step } = await stepWithFields()
 
-    expect((await addField(template.id, step.id, { label: "Reading", key: "reading_2b", options: textOptions })).status).toBe(200)
+    expectStatus(await addField(template.id, step.id, { label: "Reading", key: "reading_2b", options: textOptions }), 200)
   })
 
   test("refuses a template with no draft with conflict and creates no draft", async () => {
@@ -278,7 +278,7 @@ describe("PATCH /api/templates/:templateId/draft/fields/:fieldId", () => {
 
     const response = await editField(template.id, field, { label: "Renamed" })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toMatchObject({ id: field.id, label: "Renamed", key: "reading", helpText: "Keep this", required: false })
     expect(response.body).not.toHaveProperty("organizationId")
     expect(await storedField(field.id)).toMatchObject({ label: "Renamed", key: "reading", helpText: "Keep this", required: false, type: "text" })
@@ -287,7 +287,7 @@ describe("PATCH /api/templates/:templateId/draft/fields/:fieldId", () => {
   test("changes the key", async () => {
     const { template, fields: [field] } = await stepWithFields(["reading"])
 
-    expect((await editField(template.id, field!, { key: "temperature" })).status).toBe(200)
+    expectStatus(await editField(template.id, field!, { key: "temperature" }), 200)
 
     expect((await storedField(field!.id))!.key).toBe("temperature")
   })
@@ -295,7 +295,7 @@ describe("PATCH /api/templates/:templateId/draft/fields/:fieldId", () => {
   test("keeps the field's own key without a conflict", async () => {
     const { template, fields: [field] } = await stepWithFields(["reading"])
 
-    expect((await editField(template.id, field!, { key: "reading", label: "Renamed" })).status).toBe(200)
+    expectStatus(await editField(template.id, field!, { key: "reading", label: "Renamed" }), 200)
   })
 
   test("changes the type by changing the options", async () => {
@@ -420,7 +420,7 @@ describe("PUT /api/templates/:templateId/draft/steps/:stepId/fields/order", () =
   test("puts the step's fields in the given order", async () => {
     const { template, step, fields: [first, second, third] } = await stepWithFields(["first", "second", "third"])
 
-    expect((await reorder(template.id, step.id, [third!.id, first!.id, second!.id])).status).toBe(200)
+    expectStatus(await reorder(template.id, step.id, [third!.id, first!.id, second!.id]), 200)
 
     const fields = await fieldsOf(step)
     expect(fields.map(field => field.key)).toEqual(["third", "first", "second"])
@@ -456,7 +456,7 @@ describe("PUT /api/templates/:templateId/draft/steps/:stepId/fields/order", () =
     const otherStep = await insertTemplateStep(db, draft, { title: "Other", position: 1 })
     const otherField = await insertTemplateField(db, otherStep, { key: "other" })
 
-    expect((await reorder(template.id, step.id, [second!.id, first!.id])).status).toBe(200)
+    expectStatus(await reorder(template.id, step.id, [second!.id, first!.id]), 200)
 
     expect(await storedField(otherField.id)).toEqual(otherField)
   })
@@ -466,7 +466,7 @@ describe("PUT /api/templates/:templateId/draft/steps/:stepId/fields/order", () =
     const first = await insertTemplateField(db, step, { key: "first", position: 3 })
     const second = await insertTemplateField(db, step, { key: "second", position: 7 })
 
-    expect((await reorder(template.id, step.id, [first.id, second.id])).status).toBe(200)
+    expectStatus(await reorder(template.id, step.id, [first.id, second.id]), 200)
 
     expect((await fieldsOf(step)).map(field => field.position)).toEqual([0, 1])
   })
@@ -474,7 +474,7 @@ describe("PUT /api/templates/:templateId/draft/steps/:stepId/fields/order", () =
   test("accepts an empty list for a step with no fields", async () => {
     const { template, step } = await stepWithFields()
 
-    expect((await reorder(template.id, step.id, [])).status).toBe(200)
+    expectStatus(await reorder(template.id, step.id, []), 200)
   })
 
   test("refuses a list missing a field with validation_failed and changes nothing", async () => {
@@ -556,7 +556,7 @@ describe("DELETE /api/templates/:templateId/draft/fields/:fieldId", () => {
 
     const response = await deleteField(template.id, second!.id)
 
-    expect(response.status).toBe(204)
+    expectStatus(response, 204)
     expect(response.text).toBe("")
 
     const fields = await fieldsOf(step)
@@ -567,7 +567,7 @@ describe("DELETE /api/templates/:templateId/draft/fields/:fieldId", () => {
   test("moves the updatedAt of the fields it renumbers forward", async () => {
     const { template, fields: [first, second] } = await stepWithFields(["first", "second"])
 
-    expect((await deleteField(template.id, first!.id)).status).toBe(204)
+    expectStatus(await deleteField(template.id, first!.id), 204)
 
     expect((await storedField(second!.id))!.updatedAt.getTime()).toBeGreaterThan(second!.updatedAt.getTime())
   })
@@ -577,7 +577,7 @@ describe("DELETE /api/templates/:templateId/draft/fields/:fieldId", () => {
     const otherStep = await insertTemplateStep(db, draft, { title: "Other", position: 1 })
     const otherField = await insertTemplateField(db, otherStep, { key: "other", position: 1 })
 
-    expect((await deleteField(template.id, first!.id)).status).toBe(204)
+    expectStatus(await deleteField(template.id, first!.id), 204)
 
     expect(await storedField(otherField.id)).toEqual(otherField)
   })
@@ -585,7 +585,7 @@ describe("DELETE /api/templates/:templateId/draft/fields/:fieldId", () => {
   test("frees the key for another field", async () => {
     const { template, step, fields: [field] } = await stepWithFields(["reading"])
 
-    expect((await deleteField(template.id, field!.id)).status).toBe(204)
+    expectStatus(await deleteField(template.id, field!.id), 204)
 
     expect(await keysOf(step)).toEqual([])
     await expect(insertTemplateField(db, step, { key: "reading" })).resolves.toBeDefined()
@@ -628,7 +628,7 @@ describe("DELETE /api/templates/:templateId/draft/fields/:fieldId", () => {
   test("refuses a field that's already been deleted with not_found", async () => {
     const { template, fields: [field] } = await stepWithFields(["reading"])
 
-    expect((await deleteField(template.id, field!.id)).status).toBe(204)
+    expectStatus(await deleteField(template.id, field!.id), 204)
     expectError(await deleteField(template.id, field!.id), 404, "not_found")
   })
 
