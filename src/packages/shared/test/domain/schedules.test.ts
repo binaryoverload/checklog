@@ -17,13 +17,10 @@ describe("scheduleRecurrenceSchema", () => {
     expect(scheduleRecurrenceSchema.safeParse({ ...recurrence, count: 5, endDate: "2027-01-01" }).success).toBe(false)
   })
 
-  // Fails while the refine's path is ["count", "endDate"], which Zod reads as the nested path count.endDate
-  test.fails("reports both a count and an end date on a field that exists", () => {
+  test("reports both a count and an end date on endDate", () => {
     const result = scheduleRecurrenceSchema.safeParse({ ...recurrence, count: 5, endDate: "2027-01-01" })
-    const paths = result.error?.issues.map(issue => issue.path.join(".")) ?? []
 
-    expect(paths.length).toBeGreaterThan(0)
-    for (const path of paths) expect(["count", "endDate"]).toContain(path)
+    expect(result.error?.issues.map(issue => issue.path)).toEqual([["endDate"]])
   })
 
   test.each([

@@ -27,6 +27,6 @@ export const scheduleRecurrenceSchema = z.object({
     return false
   }
   return true
-}, { error: "Cannot have both count and endDate", path: ["count", "endDate"] })
+}, { error: "Cannot have both count and endDate", path: ["endDate"] })
 
 export type ScheduleRecurrence = z.infer<typeof scheduleRecurrenceSchema>
