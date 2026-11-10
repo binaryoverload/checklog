@@ -788,9 +788,8 @@ describe("POST /api/templates/:templateId/restore", () => {
 
   test("leaves the template's schedules archived", async () => {
     const { organization } = await signedInMember("admin")
-    const template = await insertTemplate(db, organization)
-    const schedule = await insertSchedule(db, template, "active")
-    await api().post(`/api/templates/${template.id}/archive`)
+    const template = await insertTemplate(db, organization, { status: "archived" })
+    const schedule = await insertSchedule(db, template, "archived")
 
     await restoreTemplate(template.id)
 
