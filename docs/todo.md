@@ -78,11 +78,11 @@ One pull request per item:
 - [ ] API: edit a step's fields (add, reorder, edit, remove) with labels, keys, help text, required and options; approval steps can have fields (person)
   - `POST /templates/:templateId/draft/steps/:stepId/fields` adds a field
   - `PUT /templates/:templateId/draft/steps/:stepId/fields/order` reorders the step's fields
-  - `PATCH /templates/:templateId/draft/steps/:stepId/fields/:fieldId` edits a field
-  - `DELETE /templates/:templateId/draft/steps/:stepId/fields/:fieldId` removes a field
+  - `PATCH /templates/:templateId/draft/fields/:fieldId` edits a field
+  - `DELETE /templates/:templateId/draft/fields/:fieldId` removes a field
 - [ ] API: `updatedAt` edit-conflict check on step and field `PATCH`es, refusing a stale edit with `conflict` (person)
   - `PATCH /templates/:templateId/draft/steps/:stepId`
-  - `PATCH /templates/:templateId/draft/steps/:stepId/fields/:fieldId`
+  - `PATCH /templates/:templateId/draft/fields/:fieldId`
 - [ ] `precondition_failed` error code, with details pointing at steps, for the publish and start checks (person)
 - [ ] API: publish the draft with the publish checks, discard a draft, list versions, get one version, and archive a version (person)
   - `POST /templates/:templateId/draft/publish` publishes the draft and makes it the current version
@@ -92,8 +92,7 @@ One pull request per item:
   - `POST /templates/:templateId/versions/:versionId/archive` archives a version
 - [ ] API: template access, granting groups and people view, run or edit; can land any time after templates (person)
   - `GET /templates/:templateId/access` lists the template's grants
-  - `POST /templates/:templateId/access` grants a member or group a level
-  - `PATCH /templates/:templateId/access/:accessId` changes a grant's level
+  - `PUT /templates/:templateId/access` grants a member or group a level, or changes the level of their existing grant
   - `DELETE /templates/:templateId/access/:accessId` revokes a grant
 - [ ] UI: template list, template editor (steps and fields), publish, versions and access settings (person)
 - [ ] Later: `search` on name in `GET /templates`, an optional `ilike` filter that escapes `%` and `_` (person)

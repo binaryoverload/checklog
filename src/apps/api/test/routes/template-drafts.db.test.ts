@@ -1,23 +1,22 @@
-import { asc, eq } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { describe, expect, test } from "vitest"
 
 import { members, teams } from "@/db/auth-schema.ts"
 import { db } from "@/db/index.ts"
-import { templateFields, templates, templateSteps, templateVersions } from "@/db/schema.ts"
-import type { Organization, Template, TemplateStep, TemplateVersion } from "@/util/types.ts"
-import type { TemplateStepDto } from "@checklog/shared/api"
+import { templateFields, templateSteps } from "@/db/schema.ts"
+import type { TemplateStep } from "@/util/types.ts"
+import type { TemplateFieldDto, TemplateStepDto, TemplateVersionDto } from "@checklog/shared/api"
 import { typeIdForTable } from "@checklog/shared/utils"
 import {
   createGroup,
   createMember,
   createOrganization,
-  insertTemplate,
   insertTemplateField,
   insertTemplateStep,
   insertTemplateVersion,
-  setCurrentVersion,
 } from "@test/support/database.ts"
 import { signedInMember, stubSessions } from "@test/support/session.ts"
+import { draftIn, draftStepIn, draftWithSteps, publishedWithDraft, publishedWithSteps, stepsOf, storedStep, titlesOf, versionsOf } from "@test/support/template-drafts.ts"
 import { api, describeTemplateAccess, expectError } from "@test/support/template-routes.ts"
 import type { TemplateRoute } from "@test/support/template-routes.ts"
 
@@ -26,54 +25,8 @@ import type { TemplateRoute } from "@test/support/template-routes.ts"
 
 stubSessions()
 
-// A template whose draft has steps with these titles, at positions 0 to n−1
-async function draftWithSteps(organization: Organization, titles: string[] = [], options: { createdBy?: string } = {}) {
-  const template = await insertTemplate(db, organization, options)
-  const draft = await insertTemplateVersion(db, template, 1, "draft")
-  const steps: TemplateStep[] = []
-  for (const [position, title] of titles.entries()) steps.push(await insertTemplateStep(db, draft, { title, position }))
-  return { template, draft, steps }
-}
-
-// A template with a published current version holding these steps, and no draft
-async function publishedWithSteps(organization: Organization, titles: string[]) {
-  const inserted = await insertTemplate(db, organization)
-  const published = await insertTemplateVersion(db, inserted, 1, "published")
-  const template = await setCurrentVersion(db, inserted, published)
-  const steps: TemplateStep[] = []
-  for (const [position, title] of titles.entries()) steps.push(await insertTemplateStep(db, published, { title, position }))
-  return { template, published, steps }
-}
-
-async function stepsOf(version: TemplateVersion) {
-  return db.select().from(templateSteps).where(eq(templateSteps.templateVersionId, version.id)).orderBy(asc(templateSteps.position))
-}
-
-async function titlesOf(version: TemplateVersion) {
-  return (await stepsOf(version)).map(step => step.title)
-}
-
-async function versionsOf(template: Template) {
-  return db.select().from(templateVersions).where(eq(templateVersions.templateId, template.id)).orderBy(asc(templateVersions.version))
-}
-
-async function storedStep(stepId: string) {
-  const [row] = await db.select().from(templateSteps).where(eq(templateSteps.id, stepId))
-  return row
-}
-
-// Gives the access tests a draft to edit, when the template exists
-async function draftIn(templateId: string) {
-  const [template] = await db.select().from(templates).where(eq(templates.id, templateId))
-  return template ? insertTemplateVersion(db, template, 1, "draft") : undefined
-}
-
-// Gives the access tests a step in the template's draft, or an unused step ID when the template doesn't exist
-async function draftStepIn(templateId: string) {
-  const draft = await draftIn(templateId)
-  if (!draft) return { id: typeIdForTable("templateSteps").toString(), updatedAt: new Date() }
-  return insertTemplateStep(db, draft)
-}
+// A version as GET and POST /draft return it, with its steps and their fields in position order
+type VersionWithSteps = TemplateVersionDto & { steps: (TemplateStepDto & { fields: TemplateFieldDto[] })[] }
 
 const draftRoutes: TemplateRoute[] = [
   {
@@ -140,6 +93,81 @@ const draftRoutes: TemplateRoute[] = [
 
 describeTemplateAccess(draftRoutes)
 
+describe("GET /api/templates/:templateId/draft", () => {
+  const getDraft = (templateId: string) => api().get(`/api/templates/${templateId}/draft`)
+
+  test("returns the draft with its steps and their fields in position order", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, draft } = await draftWithSteps(organization)
+    const second = await insertTemplateStep(db, draft, { title: "Second", position: 1 })
+    const first = await insertTemplateStep(db, draft, { title: "First", position: 0 })
+    await insertTemplateField(db, first, { key: "later", position: 1 })
+    await insertTemplateField(db, first, { key: "earlier", position: 0 })
+    await insertTemplateField(db, second, { key: "other" })
+
+    const response = await getDraft(template.id)
+
+    expect(response.status).toBe(200)
+    const draftVersion = (response.body as { draftVersion: VersionWithSteps }).draftVersion
+    expect(draftVersion).toMatchObject({ id: draft.id, version: 1, status: "draft" })
+    expect(draftVersion.steps.map(step => step.title)).toEqual(["First", "Second"])
+    expect(draftVersion.steps.map(step => step.fields.map(field => field.key))).toEqual([["earlier", "later"], ["other"]])
+  })
+
+  test("returns steps and fields as DTOs, without the organization", async () => {
+    const { organization, member } = await signedInMember("owner")
+    const { template, steps: [step] } = await draftWithSteps(organization, ["Step"])
+    await db.update(templateSteps).set({ assigneeType: "member", assigneeMemberId: member.id }).where(eq(templateSteps.id, step!.id))
+    await insertTemplateField(db, step!, { key: "reading", type: "number", options: { type: "number", unit: "°C" } })
+
+    const draftVersion = ((await getDraft(template.id)).body as { draftVersion: VersionWithSteps }).draftVersion
+
+    expect(draftVersion).not.toHaveProperty("organizationId")
+    expect(draftVersion.steps[0]).toMatchObject({ assignee: { type: "member", memberId: member.id }, assigneeMissing: false })
+    expect(draftVersion.steps[0]).not.toHaveProperty("organizationId")
+    expect(draftVersion.steps[0]!.fields[0]).toMatchObject({ key: "reading", type: "number", options: { type: "number", unit: "°C" } })
+    expect(draftVersion.steps[0]!.fields[0]).not.toHaveProperty("organizationId")
+  })
+
+  test("returns an empty draft with no steps", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template } = await draftWithSteps(organization)
+
+    const response = await getDraft(template.id)
+
+    expect((response.body as { draftVersion: VersionWithSteps }).draftVersion.steps).toEqual([])
+  })
+
+  test("returns null when the template has no draft, without the published version's steps", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template } = await publishedWithSteps(organization, ["Published"])
+
+    const response = await getDraft(template.id)
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({ draftVersion: null })
+  })
+
+  test("returns only the draft's steps when there's also a published version", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, draft } = await publishedWithDraft(organization, ["Draft step"])
+
+    const draftVersion = ((await getDraft(template.id)).body as { draftVersion: VersionWithSteps }).draftVersion
+
+    expect(draftVersion.id).toBe(draft.id)
+    expect(draftVersion.steps.map(step => step.title)).toEqual(["Draft step"])
+  })
+
+  test("creates no draft", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, published } = await publishedWithSteps(organization, ["Published"])
+
+    expect((await getDraft(template.id)).status).toBe(200)
+
+    expect((await versionsOf(template)).map(version => version.id)).toEqual([published.id])
+  })
+})
+
 describe("POST /api/templates/:templateId/draft", () => {
   const startEditing = (templateId: string) => api().post(`/api/templates/${templateId}/draft`)
 
@@ -156,6 +184,32 @@ describe("POST /api/templates/:templateId/draft", () => {
     const draftFields = await db.select().from(templateFields).where(eq(templateFields.templateVersionId, versions[1]!.id))
     expect(draftFields.map(field => field.key)).toEqual(["reading"])
     expect(await titlesOf(published)).toEqual(["First", "Second"])
+  })
+
+  test("returns the new draft with the copied steps and fields", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, published, steps: [first] } = await publishedWithSteps(organization, ["First", "Second"])
+    await insertTemplateField(db, first!, { key: "reading" })
+
+    const response = await startEditing(template.id)
+
+    const draftVersion = (response.body as { draftVersion: VersionWithSteps }).draftVersion
+    expect(draftVersion).toMatchObject({ version: 2, status: "draft" })
+    expect(draftVersion.id).not.toBe(published.id)
+    expect(draftVersion.steps.map(step => step.title)).toEqual(["First", "Second"])
+    expect(draftVersion.steps.every(step => step.templateVersionId === draftVersion.id)).toBe(true)
+    expect(draftVersion.steps.map(step => step.fields.map(field => field.key))).toEqual([["reading"], []])
+    expect(draftVersion.steps[0]!.fields[0]!.templateStepId).toBe(draftVersion.steps[0]!.id)
+  })
+
+  test("returns an existing draft with its steps", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, draft } = await draftWithSteps(organization, ["Edited"])
+
+    const draftVersion = ((await startEditing(template.id)).body as { draftVersion: VersionWithSteps }).draftVersion
+
+    expect(draftVersion.id).toBe(draft.id)
+    expect(draftVersion.steps.map(step => step.title)).toEqual(["Edited"])
   })
 
   test("keeps an existing draft and its steps, without making another", async () => {

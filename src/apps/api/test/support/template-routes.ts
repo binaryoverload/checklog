@@ -35,6 +35,8 @@ export interface TemplateRoute {
   conflictStatus?: TemplateStatus
   // The status a successful request returns, when it isn't 200
   successStatus?: number
+  // Sets up rows the request needs on a new template, before the template is compared for changes
+  prepare?: (template: Template) => Promise<Template | void>
 }
 
 // Call from a file that calls stubSessions()
@@ -45,8 +47,9 @@ export function describeTemplateAccess(routes: TemplateRoute[]): void {
     const allowedLevels = templateAccessLevels.slice(templateAccessLevels.indexOf(route.needs))
     const lowerLevels = templateAccessLevels.slice(0, templateAccessLevels.indexOf(route.needs))
 
-    function templateIn(organization: Organization, options: { createdBy?: string, status?: TemplateStatus } = {}) {
-      return insertTemplate(db, organization, { status: route.status, ...options })
+    async function templateIn(organization: Organization, options: { createdBy?: string, status?: TemplateStatus } = {}) {
+      const template = await insertTemplate(db, organization, { status: route.status, ...options })
+      return (await route.prepare?.(template)) ?? template
     }
 
     async function expectUnchanged(template: Template) {
