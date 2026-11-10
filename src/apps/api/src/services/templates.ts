@@ -3,32 +3,44 @@ import { omit } from "es-toolkit"
 
 import { templateFields, templates, templateSteps, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
-import type { TemplateVersion, Transaction, UserContext } from "@/util/types.ts"
+import type { Template, TemplateVersion, Transaction, UserContext } from "@/util/types.ts"
 import { typeIdForTable } from "@checklog/shared/utils"
 
-export async function ensureDraft(tx: Transaction, userContext: UserContext, templateId: string): Promise<TemplateVersion> {
-  const fromOrg = eq(templates.organizationId, userContext.organization.id)
-
+async function lockTemplate(tx: Transaction, userContext: UserContext, templateId: string) {
   const [template] = await tx
-    .select({ id: templates.id, status: templates.status, currentVersionId: templates.currentVersionId })
+    .select()
     .from(templates)
-    .where(and(eq(templates.id, templateId), fromOrg))
+    .where(and(eq(templates.id, templateId), eq(templates.organizationId, userContext.organization.id)))
     .for("update")
-
   if (!template) throw new HttpError("not_found", "Template not found")
   if (template.status === "archived") throw new HttpError("conflict", "Template is archived")
+  return template
+}
 
-  const draft = await tx.query.templateVersions.findFirst({
-    where: (v, { and, eq }) => and(eq(v.templateId, templateId), eq(v.status, "draft")),
-  })
-  // If we already have a draft, use that
-  if (draft) return draft
+export async function ensureDraft(tx: Transaction, userContext: UserContext, templateId: string) {
+  const template = await lockTemplate(tx, userContext, templateId)
+  return await findDraft(tx, templateId) ?? await createDraft(tx, userContext, template)
+}
 
+export async function requireDraft(tx: Transaction, userContext: UserContext, templateId: string) {
+  await lockTemplate(tx, userContext, templateId)
+  const draft = await findDraft(tx, templateId)
+  if (!draft) throw new HttpError("conflict", "The template has no draft; start editing it first")
+  return draft
+}
+
+async function findDraft(tx: Transaction, templateId: string) {
+  return await tx.select().from(templateVersions)
+    .where(and(eq(templateVersions.templateId, templateId), eq(templateVersions.status, "draft")))
+    .then(rows => rows[0] ?? null)
+}
+
+async function createDraft(tx: Transaction, userContext: UserContext, template: Template): Promise<TemplateVersion> {
   // Find the current published version of the template
   const [latestVersion] = await tx
     .select({ version: max(templateVersions.version) })
     .from(templateVersions)
-    .where(eq(templateVersions.templateId, templateId))
+    .where(eq(templateVersions.templateId, template.id))
 
   const nextVersion = (latestVersion?.version ?? 0) + 1
 
@@ -45,7 +57,7 @@ export async function ensureDraft(tx: Transaction, userContext: UserContext, tem
     .values({
       organizationId: userContext.organization.id,
       createdBy: userContext.member.userId,
-      templateId,
+      templateId: template.id,
       version: nextVersion,
       status: "draft",
     })

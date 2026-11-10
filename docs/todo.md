@@ -74,7 +74,7 @@ One pull request per item:
 - [x] API: create (with an empty version 1 draft), list, get, rename, archive and restore templates; a duplicate active name is `validation_failed` on `name`, archiving archives the template's schedules, and archiving or restoring a template already in that state is `conflict` (person)
 - [x] API: edit the draft's steps (add, reorder, edit, remove) through `ensureDraft`, which copies the current version into a new draft on the first edit; title, instructions, kind, halt, skippable, assignee and due offset, with the step rules from the plan (person)
 - [ ] API: `GET /templates/:templateId/draft` returns the draft's steps and their fields, not only the version (person)
-- [ ] API: a first edit with no draft is addressed by the current version's step IDs, which `ensureDraft` replaces when it copies them, so `PATCH` and `DELETE` on a step need to map the old ID to its copy (person)
+- [x] API: `POST /templates/:templateId/draft` starts editing and is the only route that creates a draft; edits to a template with no draft are `conflict`, so the editor's step IDs are always the draft's (person)
 - [ ] API: edit a step's fields (add, reorder, edit, remove) with labels, keys, help text, required and options; approval steps can have fields (person)
 - [ ] API: `updatedAt` edit-conflict check on step and field `PATCH`es, refusing a stale edit with `conflict` (person)
 - [ ] `precondition_failed` error code, with details pointing at steps, for the publish and start checks (person)

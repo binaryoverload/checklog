@@ -11,7 +11,7 @@ import { HttpError } from "@/http/errors.ts"
 import { route } from "@/http/route.ts"
 import { toTemplateStepDto, toTemplateVersionDto } from "@/mappers/templates.ts"
 import { assertAssigneeValid } from "@/services/assignees.ts"
-import { ensureDraft } from "@/services/templates.ts"
+import { ensureDraft, requireDraft } from "@/services/templates.ts"
 import { templateStepCreateBodySchema, templateStepUpdateBodySchema } from "@checklog/shared/api"
 import { assigneeToFlat, flatToAssignee, templateStepRuleIssues } from "@checklog/shared/domain"
 import { diffArrays, typeIdParamSchema, typeIdParamsSchema, typeIdSchema } from "@checklog/shared/utils"
@@ -35,12 +35,24 @@ templateDraftsRouter.get("/:id/draft", route({ params: typeIdParamSchema("templa
   })
 }))
 
+templateDraftsRouter.post("/:id/draft", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
+  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+
+  const draft = await db.transaction(async (tx) => {
+    return await ensureDraft(tx, { member, organization }, params.id)
+  })
+
+  res.json({
+    draftVersion: toTemplateVersionDto(draft),
+  })
+}))
+
 templateDraftsRouter.post("/:id/draft/steps", route({ params: typeIdParamSchema("templates"), body: templateStepCreateBodySchema }, async ({ params, body, member, organization, res }) => {
   await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
   await assertAssigneeValid(db, body.assignee, organization.id)
 
   const step = await db.transaction(async (tx) => {
-    const draft = await ensureDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.id)
 
     const nextPosition = await tx.select({ maxPosition: sql<number>`max(${templateSteps.position})` })
       .from(templateSteps)
@@ -83,7 +95,7 @@ templateDraftsRouter.put("/:id/draft/steps/order", route({
   await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
 
   const steps = await db.transaction(async (tx) => {
-    const draft = await ensureDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.id)
     const steps = await tx.select().from(templateSteps).where(eq(templateSteps.templateVersionId, draft.id))
 
     const { onlyInArr1, onlyInArr2 } = diffArrays(body.stepIds, steps.map(step => step.id))
@@ -113,7 +125,7 @@ templateDraftsRouter.patch("/:id/draft/steps/:stepId", route({
   await assertAssigneeValid(db, body.assignee, organization.id)
 
   const step = await db.transaction(async (tx) => {
-    const draft = await ensureDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.id)
 
     const [existingStep] = await tx.select().from(templateSteps).where(and(eq(templateSteps.templateVersionId, draft.id), eq(templateSteps.id, params.stepId)))
     if (!existingStep) {
@@ -157,7 +169,7 @@ templateDraftsRouter.delete("/:id/draft/steps/:stepId", route({ params: typeIdPa
   await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
 
   await db.transaction(async (tx) => {
-    const draft = await ensureDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.id)
 
     const [deleted] = await tx.delete(templateSteps)
       .where(and(eq(templateSteps.templateVersionId, draft.id), eq(templateSteps.id, params.stepId)))

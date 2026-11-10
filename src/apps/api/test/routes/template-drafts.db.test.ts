@@ -62,11 +62,16 @@ async function storedStep(stepId: string) {
   return row
 }
 
+// Gives the access tests a draft to edit, when the template exists
+async function draftIn(templateId: string) {
+  const [template] = await db.select().from(templates).where(eq(templates.id, templateId))
+  return template ? insertTemplateVersion(db, template, 1, "draft") : undefined
+}
+
 // Gives the access tests a step in the template's draft, or an unused step ID when the template doesn't exist
 async function draftStepIn(templateId: string) {
-  const [template] = await db.select().from(templates).where(eq(templates.id, templateId))
-  if (!template) return { id: typeIdForTable("templateSteps").toString(), updatedAt: new Date() }
-  const draft = await insertTemplateVersion(db, template, 1, "draft")
+  const draft = await draftIn(templateId)
+  if (!draft) return { id: typeIdForTable("templateSteps").toString(), updatedAt: new Date() }
   return insertTemplateStep(db, draft)
 }
 
@@ -79,8 +84,19 @@ const draftRoutes: TemplateRoute[] = [
     status: "active",
   },
   {
+    name: "POST /api/templates/:templateId/draft",
+    send: id => api().post(`/api/templates/${id}/draft`),
+    needs: "edit",
+    impersonation: "allow",
+    status: "active",
+    conflictStatus: "archived",
+  },
+  {
     name: "POST /api/templates/:templateId/draft/steps",
-    send: id => api().post(`/api/templates/${id}/draft/steps`).send({ title: "New step" }),
+    send: async (id) => {
+      await draftIn(id)
+      return api().post(`/api/templates/${id}/draft/steps`).send({ title: "New step" })
+    },
     needs: "edit",
     impersonation: "allow",
     status: "active",
@@ -123,6 +139,45 @@ const draftRoutes: TemplateRoute[] = [
 ]
 
 describeTemplateAccess(draftRoutes)
+
+describe("POST /api/templates/:templateId/draft", () => {
+  const startEditing = (templateId: string) => api().post(`/api/templates/${templateId}/draft`)
+
+  test("copies the current version's steps and fields into a new draft and leaves the current version as it was", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, published, steps: [first] } = await publishedWithSteps(organization, ["First", "Second"])
+    await insertTemplateField(db, first!, { key: "reading" })
+
+    expect((await startEditing(template.id)).status).toBe(200)
+
+    const versions = await versionsOf(template)
+    expect(versions.map(version => [version.version, version.status])).toEqual([[1, "published"], [2, "draft"]])
+    expect(await titlesOf(versions[1]!)).toEqual(["First", "Second"])
+    const draftFields = await db.select().from(templateFields).where(eq(templateFields.templateVersionId, versions[1]!.id))
+    expect(draftFields.map(field => field.key)).toEqual(["reading"])
+    expect(await titlesOf(published)).toEqual(["First", "Second"])
+  })
+
+  test("keeps an existing draft and its steps, without making another", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, draft } = await draftWithSteps(organization, ["Edited"])
+
+    expect((await startEditing(template.id)).status).toBe(200)
+
+    expect((await versionsOf(template)).map(version => version.id)).toEqual([draft.id])
+    expect(await titlesOf(draft)).toEqual(["Edited"])
+  })
+
+  test("makes one draft when it's called twice", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template } = await publishedWithSteps(organization, ["First"])
+
+    expect((await startEditing(template.id)).status).toBe(200)
+    expect((await startEditing(template.id)).status).toBe(200)
+
+    expect((await versionsOf(template)).map(version => version.status)).toEqual(["published", "draft"])
+  })
+})
 
 describe("POST /api/templates/:templateId/draft/steps", () => {
   const addStep = (templateId: string, body: object) => api().post(`/api/templates/${templateId}/draft/steps`).send(body)
@@ -238,15 +293,12 @@ describe("POST /api/templates/:templateId/draft/steps", () => {
     expect(response.body.dueOffset).toBe("PT36H")
   })
 
-  test("copies the current version into a new draft when there's no draft, then adds the step to it", async () => {
+  test("refuses a template with no draft with conflict and creates no draft", async () => {
     const { organization } = await signedInMember("owner")
     const { template, published } = await publishedWithSteps(organization, ["First", "Second"])
 
-    expect((await addStep(template.id, { title: "Third" })).status).toBe(200)
-
-    const versions = await versionsOf(template)
-    expect(versions.map(version => [version.version, version.status])).toEqual([[1, "published"], [2, "draft"]])
-    expect(await titlesOf(versions[1]!)).toEqual(["First", "Second", "Third"])
+    expectError(await addStep(template.id, { title: "Third" }), 409, "conflict")
+    expect((await versionsOf(template)).map(version => version.id)).toEqual([published.id])
     expect(await titlesOf(published)).toEqual(["First", "Second"])
   })
 
@@ -286,15 +338,6 @@ describe("POST /api/templates/:templateId/draft/steps", () => {
 
     expectError(await addStep(template.id, { title: "Step", assignee: { type: "team", teamId } }), 400, "validation_failed")
     expect(await stepsOf(draft)).toEqual([])
-  })
-
-  test("leaves no new draft behind when a first edit is refused", async () => {
-    const { organization } = await signedInMember("owner")
-    const { member: outsider } = await createMember(db, await createOrganization(db), "editor")
-    const { template } = await publishedWithSteps(organization, ["First"])
-
-    expectError(await addStep(template.id, { title: "Step", assignee: { type: "member", memberId: outsider.id } }), 400, "validation_failed")
-    expect((await versionsOf(template)).map(version => version.status)).toEqual(["published"])
   })
 })
 
@@ -474,6 +517,15 @@ describe("PATCH /api/templates/:templateId/draft/steps/:stepId", () => {
     expect(await storedStep(step!.id)).toEqual(step)
   })
 
+  test("refuses a template with no draft with conflict and creates no draft", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, published, steps: [publishedStep] } = await publishedWithSteps(organization, ["Published"])
+
+    expectError(await editStep(template.id, publishedStep!, { title: "Changed" }), 409, "conflict")
+    expect((await versionsOf(template)).map(version => version.id)).toEqual([published.id])
+    expect(await storedStep(publishedStep!.id)).toEqual(publishedStep)
+  })
+
   test("refuses a step from the published version with not_found and changes nothing", async () => {
     const { organization } = await signedInMember("owner")
     const { template, steps: [publishedStep] } = await publishedWithSteps(organization, ["Published"])
@@ -563,6 +615,15 @@ describe("PUT /api/templates/:templateId/draft/steps/order", () => {
     const { template } = await draftWithSteps(organization)
 
     expect((await reorder(template.id, [])).status).toBe(200)
+  })
+
+  test("refuses a template with no draft with conflict and creates no draft", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, published, steps: [first, second] } = await publishedWithSteps(organization, ["First", "Second"])
+
+    expectError(await reorder(template.id, [second!.id, first!.id]), 409, "conflict")
+    expect((await versionsOf(template)).map(version => version.id)).toEqual([published.id])
+    expect(await titlesOf(published)).toEqual(["First", "Second"])
   })
 
   test("refuses a list missing a step with validation_failed and changes nothing", async () => {
@@ -656,6 +717,15 @@ describe("DELETE /api/templates/:templateId/draft/steps/:stepId", () => {
 
     const fields = await db.select().from(templateFields).where(eq(templateFields.templateVersionId, draft.id))
     expect(fields.map(field => field.id)).toEqual([keptField.id])
+  })
+
+  test("refuses a template with no draft with conflict and deletes nothing", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, published, steps: [publishedStep] } = await publishedWithSteps(organization, ["Published"])
+
+    expectError(await deleteStep(template.id, publishedStep!.id), 409, "conflict")
+    expect((await versionsOf(template)).map(version => version.id)).toEqual([published.id])
+    expect(await titlesOf(published)).toEqual(["Published"])
   })
 
   test("refuses a step from the published version with not_found and deletes nothing", async () => {
