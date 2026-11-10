@@ -1,6 +1,7 @@
 import { asc, eq } from "drizzle-orm"
 import { describe, expect, test } from "vitest"
 
+import { members, teams } from "@/db/auth-schema.ts"
 import { db } from "@/db/index.ts"
 import { templateFields, templates, templateSteps, templateVersions } from "@/db/schema.ts"
 import type { Organization, Template, TemplateStep, TemplateVersion } from "@/util/types.ts"
@@ -176,10 +177,7 @@ describe("POST /api/templates/:templateId/draft/steps", () => {
       instructions: null,
       isHalt: false,
       skippable: false,
-      assigneeType: null,
-      assigneeMemberId: null,
-      assigneeTeamId: null,
-      assigneeRole: null,
+      assignee: null,
       dueOffset: null,
     })
   })
@@ -219,7 +217,7 @@ describe("POST /api/templates/:templateId/draft/steps", () => {
 
     const response = await addStep(template.id, { title: "Grouped", assignee: { type: "team", teamId } })
 
-    expect(response.body).toMatchObject({ assigneeType: "team", assigneeTeamId: teamId, assigneeMemberId: null, assigneeRole: null })
+    expect(response.body).toMatchObject({ assignee: { type: "team", teamId: teamId } })
   })
 
   test("assigns a role", async () => {
@@ -228,7 +226,7 @@ describe("POST /api/templates/:templateId/draft/steps", () => {
 
     const response = await addStep(template.id, { title: "By role", assignee: { type: "role", role: "editor" } })
 
-    expect(response.body).toMatchObject({ assigneeType: "role", assigneeRole: "editor", assigneeMemberId: null, assigneeTeamId: null })
+    expect(response.body).toMatchObject({ assignee: { type: "role", role: "editor" } })
   })
 
   test("keeps the due offset exactly as entered", async () => {
@@ -351,7 +349,8 @@ describe("PATCH /api/templates/:templateId/draft/steps/:stepId", () => {
 
     const response = await editStep(template.id, step, { assignee: { type: "role", role: "editor" } })
 
-    expect(response.body).toMatchObject({ assigneeType: "role", assigneeRole: "editor", assigneeMemberId: null, assigneeTeamId: null })
+    expect(response.body).toMatchObject({ assignee: { type: "role", role: "editor" } })
+    expect(await storedStep(step.id)).toMatchObject({ assigneeType: "role", assigneeRole: "editor", assigneeMemberId: null, assigneeTeamId: null })
   })
 
   test("clears the assignee and due offset when they're set to null", async () => {
@@ -361,7 +360,83 @@ describe("PATCH /api/templates/:templateId/draft/steps/:stepId", () => {
 
     const response = await editStep(template.id, step, { assignee: null, dueOffset: null })
 
-    expect(response.body).toMatchObject({ assigneeType: null, assigneeMemberId: null, dueOffset: null })
+    expect(response.body).toMatchObject({ assignee: null, dueOffset: null })
+    expect(await storedStep(step.id)).toMatchObject({ assigneeType: null, assigneeMemberId: null, assigneeTeamId: null, assigneeRole: null, dueOffset: null })
+  })
+
+  test("leaves the settings it isn't given as they were", async () => {
+    const { organization, member } = await signedInMember("owner")
+    const { template, draft } = await draftWithSteps(organization)
+    const step = await insertTemplateStep(db, draft, { kind: "approval", isHalt: true, assigneeType: "member", assigneeMemberId: member.id })
+
+    expect((await editStep(template.id, step, { title: "Renamed" })).status).toBe(200)
+
+    expect(await storedStep(step.id)).toMatchObject({ title: "Renamed", kind: "approval", isHalt: true, assigneeType: "member", assigneeMemberId: member.id })
+  })
+
+  test("makes a step an approval step when it already has an assignee", async () => {
+    const { organization, member } = await signedInMember("owner")
+    const { template, draft } = await draftWithSteps(organization)
+    const step = await insertTemplateStep(db, draft, { assigneeType: "member", assigneeMemberId: member.id })
+
+    expect((await editStep(template.id, step, { kind: "approval" })).status).toBe(200)
+
+    expect((await storedStep(step.id))!.kind).toBe("approval")
+  })
+
+  test("returns no assignee, marked missing, when the assigned member has been removed", async () => {
+    const { organization } = await signedInMember("owner")
+    const { member: removed } = await createMember(db, organization, "editor")
+    const { template, draft } = await draftWithSteps(organization)
+    const step = await insertTemplateStep(db, draft, { assigneeType: "member", assigneeMemberId: removed.id })
+    await db.delete(members).where(eq(members.id, removed.id))
+
+    const response = await editStep(template.id, step, { title: "Renamed" })
+
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({ assignee: null, assigneeMissing: true })
+  })
+
+  test("returns no assignee, marked missing, when the assigned group has been removed", async () => {
+    const { organization } = await signedInMember("owner")
+    const teamId = await createGroup(db, organization)
+    const { template, draft } = await draftWithSteps(organization)
+    const step = await insertTemplateStep(db, draft, { assigneeType: "team", assigneeTeamId: teamId })
+    await db.delete(teams).where(eq(teams.id, teamId))
+
+    const response = await editStep(template.id, step, { title: "Renamed" })
+
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({ assignee: null, assigneeMissing: true })
+  })
+
+  test("doesn't mark an assigned or unassigned step as missing its assignee", async () => {
+    const { organization, member } = await signedInMember("owner")
+    const { template, draft } = await draftWithSteps(organization)
+    const assigned = await insertTemplateStep(db, draft, { assigneeType: "member", assigneeMemberId: member.id })
+    const unassigned = await insertTemplateStep(db, draft, { position: 1 })
+
+    expect((await editStep(template.id, assigned, { title: "Renamed" })).body).toMatchObject({ assigneeMissing: false })
+    expect((await editStep(template.id, unassigned, { title: "Renamed" })).body).toMatchObject({ assignee: null, assigneeMissing: false })
+  })
+
+  test("refuses making a step whose assigned member has been removed an approval step with validation_failed", async () => {
+    const { organization } = await signedInMember("owner")
+    const { member: removed } = await createMember(db, organization, "editor")
+    const { template, draft } = await draftWithSteps(organization)
+    const step = await insertTemplateStep(db, draft, { assigneeType: "member", assigneeMemberId: removed.id })
+    await db.delete(members).where(eq(members.id, removed.id))
+
+    expectError(await editStep(template.id, step, { kind: "approval" }), 400, "validation_failed")
+    expect((await storedStep(step.id))!.kind).toBe("task")
+  })
+
+  test("refuses an edit with only updatedAt with validation_failed", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, steps: [step] } = await draftWithSteps(organization, ["Step"])
+
+    expectError(await editStep(template.id, step!, {}), 400, "validation_failed")
+    expect(await storedStep(step!.id)).toEqual(step)
   })
 
   test.each([
@@ -457,6 +532,21 @@ describe("PUT /api/templates/:templateId/draft/steps/order", () => {
     expect(body[0]).not.toHaveProperty("organizationId")
   })
 
+  test("moves each step's updatedAt forward and returns the new value", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, steps } = await draftWithSteps(organization, ["First", "Second"])
+    const [first, second] = steps as [TemplateStep, TemplateStep]
+
+    const response = await reorder(template.id, [second.id, first.id])
+
+    for (const step of [first, second]) {
+      const stored = (await storedStep(step.id))!
+      const returned = (response.body as TemplateStepDto[]).find(dto => dto.id === step.id)!
+      expect(stored.updatedAt.getTime()).toBeGreaterThan(step.updatedAt.getTime())
+      expect(returned.updatedAt).toBe(stored.updatedAt.toISOString())
+    }
+  })
+
   test("rewrites positions with gaps to 0 to n−1", async () => {
     const { organization } = await signedInMember("owner")
     const { template, draft } = await draftWithSteps(organization)
@@ -529,6 +619,30 @@ describe("DELETE /api/templates/:templateId/draft/steps/:stepId", () => {
 
     const steps = await stepsOf(draft)
     expect(steps.map(step => step.title)).toEqual(["First", "Third"])
+    expect(steps.map(step => step.position)).toEqual([0, 1])
+  })
+
+  test("moves the updatedAt of the steps it renumbers forward", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, steps: [first, second, third] } = await draftWithSteps(organization, ["First", "Second", "Third"])
+
+    expect((await deleteStep(template.id, first!.id)).status).toBe(204)
+
+    expect((await storedStep(second!.id))!.updatedAt.getTime()).toBeGreaterThan(second!.updatedAt.getTime())
+    expect((await storedStep(third!.id))!.updatedAt.getTime()).toBeGreaterThan(third!.updatedAt.getTime())
+  })
+
+  test("keeps the other steps in their order when they were added out of order", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, draft } = await draftWithSteps(organization)
+    await insertTemplateStep(db, draft, { title: "Third", position: 2 })
+    const first = await insertTemplateStep(db, draft, { title: "First", position: 0 })
+    await insertTemplateStep(db, draft, { title: "Second", position: 1 })
+
+    expect((await deleteStep(template.id, first.id)).status).toBe(204)
+
+    const steps = await stepsOf(draft)
+    expect(steps.map(step => step.title)).toEqual(["Second", "Third"])
     expect(steps.map(step => step.position)).toEqual([0, 1])
   })
 

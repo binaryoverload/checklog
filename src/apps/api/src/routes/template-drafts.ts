@@ -1,16 +1,19 @@
-import { and, eq, sql } from "drizzle-orm"
+import { and, eq, sql, gt, gte } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
-import { sortBy, uniq, xor } from "es-toolkit"
+import { sortBy, uniq } from "es-toolkit"
 import { Router } from "express"
 import z from "zod"
 
-import { assertTemplateAccessLevel, templateAccessLevel, visibleTemplatesWhere } from "@/core/permissions.ts"
+import { assertTemplateAccessLevel, visibleTemplatesWhere } from "@/core/permissions.ts"
 import { db } from "@/db/index.ts"
 import { templates, templateSteps, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import { route } from "@/http/route.ts"
 import { toTemplateStepDto, toTemplateVersionDto } from "@/mappers/templates.ts"
+import { assertAssigneeValid } from "@/services/assignees.ts"
 import { ensureDraft } from "@/services/templates.ts"
+import { templateStepCreateBodySchema, templateStepUpdateBodySchema } from "@checklog/shared/api"
+import { assigneeToFlat, flatToAssignee, templateStepRuleIssues } from "@checklog/shared/domain"
 import { diffArrays, typeIdParamSchema, typeIdParamsSchema, typeIdSchema } from "@checklog/shared/utils"
 
 export const templateDraftsRouter = Router()
@@ -32,8 +35,43 @@ templateDraftsRouter.get("/:id/draft", route({ params: typeIdParamSchema("templa
   })
 }))
 
-templateDraftsRouter.post("/:id/draft/steps", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
-  throw new Error("Not implemented")
+templateDraftsRouter.post("/:id/draft/steps", route({ params: typeIdParamSchema("templates"), body: templateStepCreateBodySchema }, async ({ params, body, member, organization, res }) => {
+  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+  await assertAssigneeValid(db, body.assignee, organization.id)
+
+  const step = await db.transaction(async (tx) => {
+    const draft = await ensureDraft(tx, { member, organization }, params.id)
+
+    const nextPosition = await tx.select({ maxPosition: sql<number>`max(${templateSteps.position})` })
+      .from(templateSteps)
+      .where(eq(templateSteps.templateVersionId, draft.id))
+      .then(([row]) => (row?.maxPosition ?? -1) + 1)
+
+    const { assignee, position: requestedPosition, ...fields } = body
+
+    const position = Math.min(requestedPosition ?? nextPosition, nextPosition)
+
+    if (requestedPosition !== undefined && position < nextPosition) {
+      await tx.update(templateSteps)
+        .set({ position: sql`${templateSteps.position} + 1` })
+        .where(and(eq(templateSteps.templateVersionId, draft.id), gte(templateSteps.position, requestedPosition)))
+    }
+
+    const [step] = await tx.insert(templateSteps)
+      .values({
+        ...fields,
+        organizationId: organization.id,
+        templateVersionId: draft.id,
+        position,
+        createdBy: member.userId,
+        ...assigneeToFlat(assignee ?? null),
+      }).returning()
+    if (!step) throw new HttpError("internal", "Failed to create template step")
+
+    return step
+  })
+
+  res.json(toTemplateStepDto(step))
 }))
 
 templateDraftsRouter.put("/:id/draft/steps/order", route({
@@ -67,8 +105,52 @@ templateDraftsRouter.put("/:id/draft/steps/order", route({
   res.json(sortBy(steps, ["position"]).map(toTemplateStepDto))
 }))
 
-templateDraftsRouter.patch("/:id/draft/steps/:stepId", route({ params: typeIdParamsSchema({ id: "templates", stepId: "templateSteps" }) }, async ({ params, member, organization, res }) => {
-  throw new Error("Not implemented")
+templateDraftsRouter.patch("/:id/draft/steps/:stepId", route({
+  params: typeIdParamsSchema({ id: "templates", stepId: "templateSteps" }),
+  body: templateStepUpdateBodySchema,
+}, async ({ params, body, member, organization, res }) => {
+  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+  await assertAssigneeValid(db, body.assignee, organization.id)
+
+  const step = await db.transaction(async (tx) => {
+    const draft = await ensureDraft(tx, { member, organization }, params.id)
+
+    const [existingStep] = await tx.select().from(templateSteps).where(and(eq(templateSteps.templateVersionId, draft.id), eq(templateSteps.id, params.stepId)))
+    if (!existingStep) {
+      throw new HttpError("not_found", "Step not found")
+    }
+
+    const { updatedAt, assignee, ...updateData } = body
+
+    if (new Date(updatedAt).getTime() !== existingStep.updatedAt.getTime()) {
+      throw new HttpError("conflict", "Step has been modified since last retrieved")
+    }
+
+    const merged = {
+      kind: updateData.kind ?? existingStep.kind,
+      isHalt: updateData.isHalt ?? existingStep.isHalt,
+      skippable: updateData.skippable ?? existingStep.skippable,
+      assignee: assignee !== undefined ? assignee : flatToAssignee(existingStep),
+    }
+
+    const issues = templateStepRuleIssues(merged)
+    if (issues.length > 0) {
+      throw new HttpError("validation_failed", "The request is invalid", issues.map(issue => ({ location: "body", ...issue })))
+    }
+
+    const [step] = await tx.update(templateSteps)
+      .set({
+        ...updateData,
+        ...(assignee !== undefined ? assigneeToFlat(assignee) : {}),
+      })
+      .where(and(eq(templateSteps.templateVersionId, draft.id), eq(templateSteps.id, params.stepId)))
+      .returning()
+    if (!step) throw new HttpError("internal", "Failed to update step")
+
+    return step
+  })
+
+  res.json(toTemplateStepDto(step))
 }))
 
 templateDraftsRouter.delete("/:id/draft/steps/:stepId", route({ params: typeIdParamsSchema({ id: "templates", stepId: "templateSteps" }) }, async ({ params, member, organization, res }) => {
@@ -77,10 +159,14 @@ templateDraftsRouter.delete("/:id/draft/steps/:stepId", route({ params: typeIdPa
   await db.transaction(async (tx) => {
     const draft = await ensureDraft(tx, { member, organization }, params.id)
 
-    // TODO: Close the gap in positions
+    const [deleted] = await tx.delete(templateSteps)
+      .where(and(eq(templateSteps.templateVersionId, draft.id), eq(templateSteps.id, params.stepId)))
+      .returning({ position: templateSteps.position })
+    if (!deleted) throw new HttpError("not_found", "Step not found")
 
-    const deletedIds = await tx.delete(templateSteps).where(and(eq(templateSteps.templateVersionId, draft.id), eq(templateSteps.id, params.stepId))).returning({ id: templateSteps.id })
-    if (deletedIds.length === 0) throw new HttpError("not_found", "Step not found")
+    await tx.update(templateSteps)
+      .set({ position: sql`${templateSteps.position} - 1` })
+      .where(and(eq(templateSteps.templateVersionId, draft.id), gt(templateSteps.position, deleted.position)))
   })
 
   res.status(204).send()
