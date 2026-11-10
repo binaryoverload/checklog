@@ -121,6 +121,7 @@ One pull request per item:
 ### Checking it works
 
 - [ ] API tests for each area against a real Postgres (Testcontainers; see [Tests](implementation-notes.md#tests)), starting with the permission functions (agent, reviewed by a person)
+- [x] Unit tests for the shared package's domain rules, assignee mapping, field options, schedule recurrence and TypeID schemas (agent, reviewed by a person)
 - [ ] One end-to-end test of the whole loop: sign up, create a template, publish, start a run, complete it (agent, reviewed by a person)
 
 ## Then: accounts and organizations
