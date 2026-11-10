@@ -39,7 +39,8 @@ export interface TemplateRoute {
 
 // Call from a file that calls stubSessions()
 export function describeTemplateAccess(routes: TemplateRoute[]): void {
-  describe.each(routes)("$name access", (route) => {
+  // A loop rather than describe.each, which shortens long route names in the title so -t filters can miss them
+  for (const route of routes) describe(`${route.name} access`, () => {
     const successStatus = route.successStatus ?? 200
     const allowedLevels = templateAccessLevels.slice(templateAccessLevels.indexOf(route.needs))
     const lowerLevels = templateAccessLevels.slice(0, templateAccessLevels.indexOf(route.needs))
