@@ -1,21 +1,21 @@
-import { and, asc, count, eq, inArray } from "drizzle-orm"
+import { and, asc, count, eq, inArray, desc } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { Router } from "express"
 import z from "zod"
 
 import { assertCan, templateAccessLevel, visibleTemplatesWhere } from "@/core/permissions.ts"
 import { db } from "@/db/index.ts"
-import { schedules, templates, templateVersions } from "@/db/schema.ts"
+import { schedules, templateFields, templates, templateSteps, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import { route } from "@/http/route.ts"
-import { toTemplateDto, toTemplateVersionDto } from "@/mappers/templates.ts"
+import { toTemplateDto, toTemplateVersionDto, toTemplateVersionWithStepsDto } from "@/mappers/templates.ts"
 import { isUniqueViolation } from "@/util/db.ts"
 import { cursorCondition, orderFor, toPage } from "@/util/pagination.ts"
 import type { SortDefinition } from "@/util/pagination.ts"
 import type { Template } from "@/util/types.ts"
 import { createTemplateBodySchema, paginationQuerySchema, updateTemplateBodySchema } from "@checklog/shared/api"
 import { templateStatusSchema } from "@checklog/shared/domain"
-import { typeIdParamSchema } from "@checklog/shared/utils"
+import { typeIdParamSchema, typeIdParamsSchema } from "@checklog/shared/utils"
 
 export const templatesRouter = Router()
 
@@ -92,6 +92,38 @@ templatesRouter.get("/:id", route({ params: typeIdParamSchema("templates") }, as
     currentVersion: row.currentVersion ? toTemplateVersionDto(row.currentVersion) : null,
     draftVersion: row.draft ? toTemplateVersionDto(row.draft) : null,
   })
+}))
+
+templatesRouter.get("/:id/versions", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
+  const visible = visibleTemplatesWhere({ member, organization }, "view")
+
+  const template = await db.select().from(templates)
+    .where(and(eq(templates.id, params.id), visible))
+    .then(([row]) => row)
+
+  if (!template) throw new HttpError("not_found", "Template not found")
+
+  const versions = await db.select().from(templateVersions)
+    .where(eq(templateVersions.templateId, template.id))
+    .orderBy(desc(templateVersions.version))
+
+  res.json(versions.map(toTemplateVersionDto))
+}))
+
+templatesRouter.get("/:id/versions/:versionId", route({ params: typeIdParamsSchema({ id: "templates", versionId: "templateVersions" }) }, async ({ params, member, organization, res }) => {
+  const visible = visibleTemplatesWhere({ member, organization }, "view")
+
+  const [row] = await db.select({ version: templateVersions }).from(templateVersions)
+    .innerJoin(templates, eq(templates.id, templateVersions.templateId))
+    .where(and(eq(templates.id, params.id), eq(templateVersions.id, params.versionId), visible))
+  if (!row) throw new HttpError("not_found", "Template version not found")
+
+  const [steps, fields] = await Promise.all([
+    db.select().from(templateSteps).where(eq(templateSteps.templateVersionId, row.version.id)),
+    db.select().from(templateFields).where(eq(templateFields.templateVersionId, row.version.id)),
+  ])
+
+  res.json(toTemplateVersionWithStepsDto(row.version, steps, fields))
 }))
 
 templatesRouter.patch("/:id", route({ params: typeIdParamSchema("templates"), body: updateTemplateBodySchema }, async ({ params, body, member, organization, res }) => {
