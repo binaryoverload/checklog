@@ -3,12 +3,13 @@ import { alias } from "drizzle-orm/pg-core"
 import { Router } from "express"
 import z from "zod"
 
-import { assertCan, templateAccessLevel, visibleTemplatesWhere } from "@/core/permissions.ts"
+import { assertCan, assertTemplateAccessLevel, templateAccessLevel, visibleTemplatesWhere } from "@/core/permissions.ts"
 import { db } from "@/db/index.ts"
 import { schedules, templateFields, templates, templateSteps, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import { route } from "@/http/route.ts"
 import { toTemplateDto, toTemplateVersionDto, toTemplateVersionWithStepsDto } from "@/mappers/templates.ts"
+import { lockTemplate } from "@/services/templates.ts"
 import { isUniqueViolation } from "@/util/db.ts"
 import { cursorCondition, orderFor, toPage } from "@/util/pagination.ts"
 import type { SortDefinition } from "@/util/pagination.ts"
@@ -124,6 +125,29 @@ templatesRouter.get("/:id/versions/:versionId", route({ params: typeIdParamsSche
   ])
 
   res.json(toTemplateVersionWithStepsDto(row.version, steps, fields))
+}))
+
+templatesRouter.post("/:id/versions/:versionId/archive", route({ params: typeIdParamsSchema({ id: "templates", versionId: "templateVersions" }), impersonation: "refuse" }, async ({ params, member, organization, res }) => {
+  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+
+  const archived = await db.transaction(async (tx) => {
+    await lockTemplate(tx, { member, organization }, params.id)
+
+    const [version] = await tx.select().from(templateVersions)
+      .where(and(eq(templateVersions.templateId, params.id), eq(templateVersions.id, params.versionId)))
+    if (!version) throw new HttpError("not_found", "Template version not found")
+    if (version.status === "archived") throw new HttpError("conflict", "The version is already archived")
+    if (version.status === "draft") throw new HttpError("conflict", "A draft can't be archived; discard it instead")
+
+    const [archived] = await tx.update(templateVersions)
+      .set({ status: "archived" })
+      .where(eq(templateVersions.id, version.id))
+      .returning()
+    if (!archived) throw new HttpError("internal", "Failed to archive the version")
+    return archived
+  })
+
+  res.json(toTemplateVersionDto(archived))
 }))
 
 templatesRouter.patch("/:id", route({ params: typeIdParamSchema("templates"), body: updateTemplateBodySchema }, async ({ params, body, member, organization, res }) => {

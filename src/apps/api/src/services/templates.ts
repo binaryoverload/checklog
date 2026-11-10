@@ -6,7 +6,7 @@ import { HttpError } from "@/http/errors.ts"
 import type { Template, TemplateVersion, Transaction, UserContext } from "@/util/types.ts"
 import { typeIdForTable } from "@checklog/shared/utils"
 
-async function lockTemplate(tx: Transaction, userContext: UserContext, templateId: string) {
+export async function lockTemplate(tx: Transaction, userContext: UserContext, templateId: string) {
   const [template] = await tx
     .select()
     .from(templates)

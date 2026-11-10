@@ -83,8 +83,8 @@ One pull request per item:
 - [ ] API: `updatedAt` edit-conflict check on step and field `PATCH`es, refusing a stale edit with `conflict` (person)
   - `PATCH /templates/:templateId/draft/steps/:stepId`
   - `PATCH /templates/:templateId/draft/fields/:fieldId`
-- [ ] `precondition_failed` error code, with details pointing at steps, for the publish and start checks (person)
-- [ ] API: publish the draft with the publish checks, discard a draft, list versions, get one version, and archive a version (person)
+- [x] `precondition_failed` error code, with details pointing at steps, for the publish and start checks (person)
+- [x] API: publish the draft with the publish checks, discard a draft, list versions, get one version, and archive a version (person)
   - `POST /templates/:templateId/draft/publish` publishes the draft and makes it the current version
   - `DELETE /templates/:templateId/draft` discards the draft
   - `GET /templates/:templateId/versions` lists versions
