@@ -8,7 +8,7 @@ import type { TemplateAccessDto } from "@checklog/shared/api"
 import { typeIdForModel, typeIdForTable } from "@checklog/shared/utils"
 import { createGroup, createMember, createOrganization, grant, insertTemplate } from "@test/support/database.ts"
 import { signedInMember, stubSessions } from "@test/support/session.ts"
-import { api, describeTemplateAccess, expectError } from "@test/support/template-routes.ts"
+import { api, describeTemplateAccess, expectError, expectStatus } from "@test/support/template-routes.ts"
 import type { TemplateRoute } from "@test/support/template-routes.ts"
 
 // Route handlers use the shared connection rather than a test transaction, so these tests commit their rows.
@@ -61,7 +61,7 @@ const accessRoutes: TemplateRoute[] = [
   },
   {
     name: "PUT /api/templates/:templateId/access",
-    send: async id => api().put(`/api/templates/${id}/access`).send({ team: await groupFor(id), level: "view" }),
+    send: async id => api().put(`/api/templates/${id}/access`).send({ teamId: await groupFor(id), level: "view" }),
     needs: "edit",
     impersonation: "refuse",
     status: "active",
@@ -91,7 +91,7 @@ describe("GET /api/templates/:templateId/access", () => {
 
     const response = await listGrants(template.id)
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     const body = response.body as GrantWithName[]
     expect(body).toHaveLength(2)
     expect(body.find(row => row.id === memberGrant)).toMatchObject({ templateId: template.id, memberId: member.id, teamId: null, level: "run", name: "Test viewer" })
@@ -128,23 +128,22 @@ describe("PUT /api/templates/:templateId/access", () => {
     const { member } = await createMember(db, organization, "viewer")
     const template = await insertTemplate(db, organization)
 
-    const response = await putGrant(template.id, { member: member.id, level: "run" })
+    const response = await putGrant(template.id, { memberId: member.id, level: "run" })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     const body = response.body as TemplateAccessDto
     expect(body).toMatchObject({ templateId: template.id, memberId: member.id, teamId: null, level: "run", createdBy: signedIn.userId })
     expect(body).not.toHaveProperty("organizationId")
     expect(await storedGrant(body.id)).toMatchObject({ organizationId: organization.id, templateId: template.id, memberId: member.id, teamId: null, level: "run" })
   })
-
   test("grants a group a level", async () => {
     const { organization } = await signedInMember("owner")
     const teamId = await createGroup(db, organization)
     const template = await insertTemplate(db, organization)
 
-    const response = await putGrant(template.id, { team: teamId, level: "edit" })
+    const response = await putGrant(template.id, { teamId, level: "edit" })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(await grantsOn(template.id)).toMatchObject([{ memberId: null, teamId, level: "edit" }])
   })
 
@@ -154,9 +153,9 @@ describe("PUT /api/templates/:templateId/access", () => {
     const template = await insertTemplate(db, organization)
     const existing = await insertGrant(template.id, organization.id, { memberId: member.id }, "view")
 
-    const response = await putGrant(template.id, { member: member.id, level: "edit" })
+    const response = await putGrant(template.id, { memberId: member.id, level: "edit" })
 
-    expect(response.status).toBe(200)
+    expectStatus(response, 200)
     expect(response.body).toMatchObject({ id: existing, level: "edit" })
     expect(await grantsOn(template.id)).toMatchObject([{ id: existing, memberId: member.id, level: "edit" }])
   })
@@ -167,7 +166,7 @@ describe("PUT /api/templates/:templateId/access", () => {
     const template = await insertTemplate(db, organization)
     const existing = await insertGrant(template.id, organization.id, { teamId }, "edit")
 
-    expect((await putGrant(template.id, { team: teamId, level: "view" })).status).toBe(200)
+    expectStatus(await putGrant(template.id, { teamId, level: "view" }), 200)
 
     expect(await grantsOn(template.id)).toMatchObject([{ id: existing, teamId, level: "view" }])
   })
@@ -179,7 +178,7 @@ describe("PUT /api/templates/:templateId/access", () => {
     const other = await insertTemplate(db, organization)
     const otherGrant = await insertGrant(other.id, organization.id, { memberId: member.id }, "view")
 
-    expect((await putGrant(template.id, { member: member.id, level: "edit" })).status).toBe(200)
+    expectStatus(await putGrant(template.id, { memberId: member.id, level: "edit" }), 200)
 
     expect(await storedGrant(otherGrant)).toMatchObject({ level: "view" })
   })
@@ -191,7 +190,7 @@ describe("PUT /api/templates/:templateId/access", () => {
     const template = await insertTemplate(db, organization)
     await grant(db, template.id, { organization, teamId }, "view")
 
-    expect((await putGrant(template.id, { member: member.id, level: "edit" })).status).toBe(200)
+    expectStatus(await putGrant(template.id, { memberId: member.id, level: "edit" }), 200)
 
     const grants = await grantsOn(template.id)
     expect(grants).toHaveLength(2)
@@ -199,11 +198,12 @@ describe("PUT /api/templates/:templateId/access", () => {
   })
 
   test.each([
-    ["both a member and a group", (memberId: string, teamId: string) => ({ member: memberId, team: teamId, level: "view" })],
+    ["both a member and a group", (memberId: string, teamId: string) => ({ memberId, teamId, level: "view" })],
     ["neither a member nor a group", () => ({ level: "view" })],
-    ["no level", (memberId: string) => ({ member: memberId })],
-    ["an unknown level", (memberId: string) => ({ member: memberId, level: "manage" })],
-    ["memberId instead of member", (memberId: string) => ({ memberId, level: "view" })],
+    ["no level", (memberId: string) => ({ memberId })],
+    ["an unknown level", (memberId: string) => ({ memberId, level: "manage" })],
+    ["member instead of memberId", (memberId: string) => ({ member: memberId, level: "view" })],
+    ["a null member ID and no group", () => ({ memberId: null, level: "view" })],
   ])("refuses %s with validation_failed and grants nothing", async (_description, body) => {
     const { organization } = await signedInMember("owner")
     const { member } = await createMember(db, organization, "viewer")
@@ -219,7 +219,7 @@ describe("PUT /api/templates/:templateId/access", () => {
     const { member: outsider } = await createMember(db, await createOrganization(db), "viewer")
     const template = await insertTemplate(db, organization)
 
-    expectError(await putGrant(template.id, { member: outsider.id, level: "view" }), 400, "validation_failed")
+    expectError(await putGrant(template.id, { memberId: outsider.id, level: "view" }), 400, "validation_failed")
     expect(await grantsOn(template.id)).toEqual([])
   })
 
@@ -228,7 +228,7 @@ describe("PUT /api/templates/:templateId/access", () => {
     const teamId = await createGroup(db, await createOrganization(db))
     const template = await insertTemplate(db, organization)
 
-    expectError(await putGrant(template.id, { team: teamId, level: "view" }), 400, "validation_failed")
+    expectError(await putGrant(template.id, { teamId, level: "view" }), 400, "validation_failed")
     expect(await grantsOn(template.id)).toEqual([])
   })
 
@@ -236,7 +236,15 @@ describe("PUT /api/templates/:templateId/access", () => {
     const { organization } = await signedInMember("owner")
     const template = await insertTemplate(db, organization)
 
-    expectError(await putGrant(template.id, { member: typeIdForModel("member").toString(), level: "view" }), 400, "validation_failed")
+    expectError(await putGrant(template.id, { memberId: typeIdForModel("member").toString(), level: "view" }), 400, "validation_failed")
+    expect(await grantsOn(template.id)).toEqual([])
+  })
+
+  test("refuses a group ID that doesn't exist with validation_failed", async () => {
+    const { organization } = await signedInMember("owner")
+    const template = await insertTemplate(db, organization)
+
+    expectError(await putGrant(template.id, { teamId: typeIdForModel("team").toString(), level: "view" }), 400, "validation_failed")
     expect(await grantsOn(template.id)).toEqual([])
   })
 })
@@ -254,7 +262,7 @@ describe("DELETE /api/templates/:templateId/access/:accessId", () => {
 
     const response = await revoke(template.id, revoked)
 
-    expect(response.status).toBe(204)
+    expectStatus(response, 204)
     expect(response.text).toBe("")
     expect((await grantsOn(template.id)).map(row => row.id)).toEqual([kept])
   })
@@ -283,7 +291,7 @@ describe("DELETE /api/templates/:templateId/access/:accessId", () => {
     const template = await insertTemplate(db, organization)
     const accessId = await insertGrant(template.id, organization.id, { memberId: member.id }, "view")
 
-    expect((await revoke(template.id, accessId)).status).toBe(204)
+    expectStatus(await revoke(template.id, accessId), 204)
     expectError(await revoke(template.id, accessId), 404, "not_found")
   })
 

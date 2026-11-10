@@ -1,7 +1,7 @@
 import { sortBy } from "es-toolkit"
 
 import type { Template, TemplateAccess, TemplateField, TemplateStep, TemplateVersion } from "@/util/types.ts"
-import type { TemplateAccessDto, TemplateDto, TemplateFieldDto, TemplateStepDto, TemplateStepWithFieldsDto, TemplateVersionDto, TemplateVersionWithStepsDto } from "@checklog/shared/api"
+import type { TemplateAccessDto, TemplateAccessWithNameDto, TemplateDto, TemplateFieldDto, TemplateStepDto, TemplateStepWithFieldsDto, TemplateVersionDto, TemplateVersionWithStepsDto } from "@checklog/shared/api"
 import { flatToAssignee } from "@checklog/shared/domain"
 
 export function toTemplateDto(row: Template): TemplateDto {
@@ -95,5 +95,12 @@ export function toTemplateAccessDto(row: TemplateAccess): TemplateAccessDto {
     createdAt: row.createdAt.toISOString(),
     createdBy: row.createdBy,
     updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+export function toTemplateAccessWithNameDto(row: TemplateAccess, name: string): TemplateAccessWithNameDto {
+  return {
+    ...toTemplateAccessDto(row),
+    name,
   }
 }

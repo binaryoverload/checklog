@@ -4,7 +4,7 @@ import type { CreatedFields, UpdatedFields } from "./common.ts"
 import { assigneeSchema } from "../domain/assignees.ts"
 import type { Assignee } from "../domain/assignees.ts"
 import type { FieldOptions, FieldType } from "../domain/fields.ts"
-import { templateStepKindSchema, templateStepRuleIssues } from "../domain/templates.ts"
+import { templateAccessLevelSchema, templateStepKindSchema, templateStepRuleIssues } from "../domain/templates.ts"
 import type { TemplateAccessLevel, TemplateStatus, TemplateStepKind, TemplateVersionStatus } from "../domain/templates.ts"
 import { requiredString } from "../utils/zod.ts"
 
@@ -107,7 +107,11 @@ export type TemplateFieldDto = {
   options: FieldOptions
 } & CreatedFields & UpdatedFields
 
-// TODO: The request schema for a template access grant
+export const templateAccessUpsertBodySchema = z.union([
+  z.strictObject({ memberId: z.string(), level: templateAccessLevelSchema }),
+  z.strictObject({ teamId: z.string(), level: templateAccessLevelSchema }),
+])
+
 export type TemplateAccessDto = {
   id: string
   templateId: string
@@ -115,3 +119,5 @@ export type TemplateAccessDto = {
   teamId: string | null
   level: TemplateAccessLevel
 } & CreatedFields & UpdatedFields
+
+export type TemplateAccessWithNameDto = TemplateAccessDto & { name: string }

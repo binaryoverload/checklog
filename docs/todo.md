@@ -90,7 +90,7 @@ One pull request per item:
   - `GET /templates/:templateId/versions` lists versions
   - `GET /templates/:templateId/versions/:versionId` returns one version with its steps and fields
   - `POST /templates/:templateId/versions/:versionId/archive` archives a version
-- [ ] API: template access, granting groups and people view, run or edit; can land any time after templates (person)
+- [x] API: template access, granting groups and people view, run or edit; can land any time after templates (person)
   - `GET /templates/:templateId/access` lists the template's grants
   - `PUT /templates/:templateId/access` grants a member or group a level, or changes the level of their existing grant
   - `DELETE /templates/:templateId/access/:accessId` revokes a grant
