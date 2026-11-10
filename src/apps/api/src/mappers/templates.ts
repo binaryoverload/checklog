@@ -1,5 +1,6 @@
 import type { Template, TemplateAccess, TemplateField, TemplateStep, TemplateVersion } from "@/util/types.ts"
 import type { TemplateAccessDto, TemplateDto, TemplateFieldDto, TemplateStepDto, TemplateVersionDto } from "@checklog/shared/api"
+import { flatToAssignee } from "@checklog/shared/domain"
 
 export function toTemplateDto(row: Template): TemplateDto {
   return {
@@ -29,6 +30,8 @@ export function toTemplateVersionDto(row: TemplateVersion): TemplateVersionDto {
 }
 
 export function toTemplateStepDto(row: TemplateStep): TemplateStepDto {
+  const assignee = flatToAssignee(row)
+
   return {
     id: row.id,
     templateVersionId: row.templateVersionId,
@@ -38,10 +41,9 @@ export function toTemplateStepDto(row: TemplateStep): TemplateStepDto {
     instructions: row.instructions,
     isHalt: row.isHalt,
     skippable: row.skippable,
-    assigneeType: row.assigneeType,
-    assigneeMemberId: row.assigneeMemberId,
-    assigneeTeamId: row.assigneeTeamId,
-    assigneeRole: row.assigneeRole,
+    assignee,
+    // If the assignee type is set but the ID is null, the assignee target has been removed
+    assigneeMissing: row.assigneeType != null && assignee == null,
     dueOffset: row.dueOffset,
     createdAt: row.createdAt.toISOString(),
     createdBy: row.createdBy,

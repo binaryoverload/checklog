@@ -1,5 +1,7 @@
 import z from "zod"
 
+import type { Assignee } from "./assignees.ts"
+
 export const templateStatuses = ["active", "archived"] as const
 export const templateStatusSchema = z.enum(templateStatuses)
 export type TemplateStatus = z.infer<typeof templateStatusSchema>
@@ -24,4 +26,12 @@ export function templateAccessIncludes(has: TemplateAccessLevel, needs: Template
 export function highestTemplateAccessLevel(levels: TemplateAccessLevel[]): TemplateAccessLevel | null {
   if (levels.length === 0) return null
   return levels.reduce((highest, level) => (templateAccessIncludes(highest, level) ? highest : level))
+}
+
+export function templateStepRuleIssues(step: { kind: TemplateStepKind, isHalt: boolean, skippable: boolean, assignee?: Assignee | null }) {
+  const issues: { path: string[], message: string }[] = []
+  if (step.kind === "approval" && step.assignee == null) issues.push({ path: ["assignee"], message: "Approval steps must have an assignee" })
+  if (step.kind === "approval" && step.skippable) issues.push({ path: ["skippable"], message: "Approval steps cannot be skippable" })
+  if (step.isHalt && step.skippable) issues.push({ path: ["skippable"], message: "Halt steps cannot be skippable" })
+  return issues
 }

@@ -1,8 +1,10 @@
 import z from "zod"
 
 import type { CreatedFields, UpdatedFields } from "./common.ts"
-import type { AssigneeType } from "../domain/assignees.ts"
+import { assigneeSchema } from "../domain/assignees.ts"
+import type { Assignee } from "../domain/assignees.ts"
 import type { FieldOptions, FieldType } from "../domain/fields.ts"
+import { templateStepKindSchema, templateStepRuleIssues } from "../domain/templates.ts"
 import type { TemplateAccessLevel, TemplateStatus, TemplateStepKind, TemplateVersionStatus } from "../domain/templates.ts"
 import { requiredString } from "../utils/zod.ts"
 
@@ -39,7 +41,36 @@ export type TemplateVersionDto = {
   publishedBy: string | null
 } & CreatedFields & UpdatedFields
 
-// TODO: The request schemas for template step
+const templateStepFields = z.strictObject({
+  kind: templateStepKindSchema,
+  title: requiredString().max(200),
+  position: z.number().int().min(0).optional(),
+  instructions: z.string().max(2000).nullable().optional(),
+  isHalt: z.boolean(),
+  skippable: z.boolean(),
+  assignee: assigneeSchema.nullable().optional(),
+  dueOffset: z.iso.duration().nullable().optional(),
+})
+
+export const templateStepCreateBodySchema = templateStepFields.extend({
+  kind: templateStepKindSchema.default("task"),
+  isHalt: z.boolean().default(false),
+  skippable: z.boolean().default(false),
+}).superRefine((step, ctx) => {
+  for (const issue of templateStepRuleIssues(step)) {
+    ctx.addIssue({ code: "custom", path: issue.path, message: issue.message })
+  }
+})
+
+export type TemplateStepCreateBody = z.infer<typeof templateStepCreateBodySchema>
+
+export const templateStepUpdateBodySchema = templateStepFields
+  .omit({ position: true })
+  .partial()
+  .extend({ updatedAt: z.iso.datetime() })
+  .refine(d => Object.keys(d).some(key => key !== "updatedAt"), "At least one field must be provided")
+export type TemplateStepUpdateBody = z.infer<typeof templateStepUpdateBodySchema>
+
 export type TemplateStepDto = {
   id: string
   templateVersionId: string
@@ -49,10 +80,8 @@ export type TemplateStepDto = {
   instructions: string | null
   isHalt: boolean
   skippable: boolean
-  assigneeType: AssigneeType | null
-  assigneeMemberId: string | null
-  assigneeTeamId: string | null
-  assigneeRole: string | null
+  assignee: Assignee | null
+  assigneeMissing: boolean
   dueOffset: string | null
 } & CreatedFields & UpdatedFields
 
