@@ -16,7 +16,7 @@ const createdFields = {
 }
 
 const updatedFields = {
-  updatedAt: timestampWithTimezone("updated_at").notNull().defaultNow().$onUpdate(() => new Date()),
+  updatedAt: timestampWithTimezone("updated_at").notNull().defaultNow().$onUpdate(() => sql`now()`),
 }
 
 export const templates = pgTable("templates", {
