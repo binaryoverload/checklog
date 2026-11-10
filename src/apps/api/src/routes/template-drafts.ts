@@ -72,7 +72,7 @@ templateDraftsRouter.delete("/:id/draft", route({ params: typeIdParamSchema("tem
     await tx.delete(templateVersions).where(eq(templateVersions.id, draft.id))
   })
 
-  res.status(204).send()
+  res.sendStatus(204)
 }))
 
 templateDraftsRouter.post("/:id/draft/publish", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
@@ -246,5 +246,5 @@ templateDraftsRouter.delete("/:id/draft/steps/:stepId", route({ params: typeIdPa
       .where(and(eq(templateSteps.templateVersionId, draft.id), gt(templateSteps.position, deleted.position)))
   })
 
-  res.status(204).send()
+  res.sendStatus(204)
 }))
