@@ -13,7 +13,7 @@ import { toTemplateStepDto, toTemplateVersionDto, toTemplateVersionWithStepsDto 
 import { assertAssigneeValid } from "@/services/assignees.ts"
 import { ensureDraft, requireDraft } from "@/services/templates.ts"
 import { templateStepCreateBodySchema, templateStepUpdateBodySchema } from "@checklog/shared/api"
-import { assigneeToFlat, flatToAssignee, templateStepRuleIssues } from "@checklog/shared/domain"
+import { assigneeToFlat, flatToAssignee, templateStepRuleIssues, templateVersionPublishIssues } from "@checklog/shared/domain"
 import { diffArrays, typeIdParamSchema, typeIdParamsSchema, typeIdSchema } from "@checklog/shared/utils"
 
 export const templateDraftsRouter = Router()
@@ -59,6 +59,57 @@ templateDraftsRouter.post("/:id/draft", route({ params: typeIdParamSchema("templ
   res.json({
     draftVersion: toTemplateVersionWithStepsDto(draft, steps, fields),
   })
+}))
+
+templateDraftsRouter.delete("/:id/draft", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
+  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+
+  await db.transaction(async (tx) => {
+    const draft = await requireDraft(tx, { member, organization }, params.id)
+
+    if (draft.version === 1) throw new HttpError("conflict", "Cannot delete the first version of a template")
+
+    await tx.delete(templateVersions).where(eq(templateVersions.id, draft.id))
+  })
+
+  res.status(204).send()
+}))
+
+templateDraftsRouter.post("/:id/draft/publish", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
+  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+
+  const publishedVersion = await db.transaction(async (tx) => {
+    const draft = await requireDraft(tx, { member, organization }, params.id)
+
+    const steps = (await tx.select().from(templateSteps).where(eq(templateSteps.templateVersionId, draft.id))).map(row => ({ ...row, assignee: flatToAssignee(row) }))
+    const fields = (await tx.select().from(templateFields).where(eq(templateFields.templateVersionId, draft.id)))
+
+    const publishIssues = templateVersionPublishIssues(draft.id, steps, fields)
+
+    if (publishIssues.length > 0) throw new HttpError(
+      "precondition_failed",
+      "Cannot publish template due to precondition issues",
+      publishIssues,
+    )
+
+    const [publishedVersion] = await tx.update(templateVersions)
+      .set({
+        publishedAt: sql`now()`,
+        publishedBy: member.userId,
+        status: "published",
+      })
+      .where(eq(templateVersions.id, draft.id))
+      .returning()
+    if (!publishedVersion) throw new HttpError("internal", "Failed to publish template version")
+
+    await tx.update(templates)
+      .set({ currentVersionId: publishedVersion.id })
+      .where(eq(templates.id, draft.templateId))
+
+    return publishedVersion
+  })
+
+  res.json(toTemplateVersionDto(publishedVersion))
 }))
 
 templateDraftsRouter.post("/:id/draft/steps", route({ params: typeIdParamSchema("templates"), body: templateStepCreateBodySchema }, async ({ params, body, member, organization, res }) => {

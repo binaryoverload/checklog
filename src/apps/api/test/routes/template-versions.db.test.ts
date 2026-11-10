@@ -6,7 +6,7 @@ import { members } from "@/db/auth-schema.ts"
 import { db } from "@/db/index.ts"
 import { templateSteps } from "@/db/schema.ts"
 import type { TemplateFieldDto, TemplateStepDto, TemplateVersionDto } from "@checklog/shared/api"
-import type { FieldOptions } from "@checklog/shared/domain"
+import type { FieldOptions, PreconditionIssue } from "@checklog/shared/domain"
 import { typeIdForTable } from "@checklog/shared/utils"
 import {
   createGroup,
@@ -101,12 +101,25 @@ const versionRoutes: TemplateRoute[] = [
 
 describeTemplateAccess(versionRoutes)
 
-// Checks a refusal from the publish check lists each problem, pointing at the step it's on when there is one
-function expectPreconditionFailed(response: request.Response, problems: number, stepIds: string[] = []) {
+type StepProblem = Extract<PreconditionIssue, { resourceType: "templateStep" }>["problem"]
+type VersionProblem = Extract<PreconditionIssue, { resourceType: "templateVersion" }>["problem"]
+
+// A problem the publish check reports on a step, and on one of its fields when it's about a field
+function stepProblem(problem: StepProblem, stepId: string, fieldId: string | null = null) {
+  return { location: "resource", resourceType: "templateStep", problem, stepId, fieldId, message: expect.any(String) }
+}
+
+// A problem the publish check reports on the version as a whole
+function versionProblem(problem: VersionProblem, versionId: string) {
+  return { location: "resource", resourceType: "templateVersion", problem, versionId, message: expect.any(String) }
+}
+
+// Checks a refusal from the publish check lists exactly these problems, in any order
+function expectPreconditionFailed(response: request.Response, problems: object[]) {
   expectError(response, 400, "precondition_failed")
-  const details = response.body.error.details as unknown[]
-  expect(details).toHaveLength(problems)
-  for (const stepId of stepIds) expect(JSON.stringify(details)).toContain(stepId)
+  const details = response.body.error.details as PreconditionIssue[]
+  expect(details).toHaveLength(problems.length)
+  expect(details).toEqual(expect.arrayContaining(problems))
 }
 
 describe("POST /api/templates/:templateId/draft/publish", () => {
@@ -193,7 +206,7 @@ describe("POST /api/templates/:templateId/draft/publish", () => {
     const { organization } = await signedInMember("owner")
     const { template, draft } = await publishedWithDraft(organization)
 
-    expectPreconditionFailed(await publish(template.id), 1)
+    expectPreconditionFailed(await publish(template.id), [versionProblem("no_steps", draft.id)])
     expect(await storedVersion(draft.id)).toEqual(draft)
     expect(await storedTemplate(template.id)).toEqual(template)
   })
@@ -205,7 +218,7 @@ describe("POST /api/templates/:templateId/draft/publish", () => {
     const step = await insertTemplateStep(db, draft, { assigneeType: "member", assigneeMemberId: removed.id })
     await db.delete(members).where(eq(members.id, removed.id))
 
-    expectPreconditionFailed(await publish(template.id), 1, [step.id])
+    expectPreconditionFailed(await publish(template.id), [stepProblem("missing_assignee", step.id)])
     expect(await storedVersion(draft.id)).toEqual(draft)
     expect(await storedTemplate(template.id)).toEqual(template)
   })
@@ -215,16 +228,16 @@ describe("POST /api/templates/:templateId/draft/publish", () => {
     const { template, draft } = await publishedWithDraft(organization)
     const step = await insertTemplateStep(db, draft, { assigneeType: "team", assigneeTeamId: null })
 
-    expectPreconditionFailed(await publish(template.id), 1, [step.id])
+    expectPreconditionFailed(await publish(template.id), [stepProblem("missing_assignee", step.id)])
     expect(await storedVersion(draft.id)).toEqual(draft)
   })
 
   test("refuses a dropdown field with no choices with precondition_failed, pointing at its step", async () => {
     const { organization } = await signedInMember("owner")
     const { template, draft, steps: [step] } = await publishedWithDraft(organization, ["Step"])
-    await insertTemplateField(db, step!, { type: "dropdown", options: noChoices })
+    const field = await insertTemplateField(db, step!, { type: "dropdown", options: noChoices })
 
-    expectPreconditionFailed(await publish(template.id), 1, [step!.id])
+    expectPreconditionFailed(await publish(template.id), [stepProblem("dropdown_without_choices", step!.id, field.id)])
     expect(await storedVersion(draft.id)).toEqual(draft)
   })
 
@@ -233,10 +246,15 @@ describe("POST /api/templates/:templateId/draft/publish", () => {
     const { template, draft } = await publishedWithDraft(organization)
     const unassigned = await insertTemplateStep(db, draft, { position: 0, assigneeType: "member", assigneeMemberId: null })
     const withDropdown = await insertTemplateStep(db, draft, { position: 1 })
-    await insertTemplateField(db, withDropdown, { type: "dropdown", options: noChoices })
+    const firstDropdown = await insertTemplateField(db, withDropdown, { type: "dropdown", options: noChoices, position: 0 })
+    const secondDropdown = await insertTemplateField(db, withDropdown, { type: "dropdown", options: noChoices, position: 1 })
     await insertTemplateStep(db, draft, { position: 2, title: "Fine" })
 
-    expectPreconditionFailed(await publish(template.id), 2, [unassigned.id, withDropdown.id])
+    expectPreconditionFailed(await publish(template.id), [
+      stepProblem("missing_assignee", unassigned.id),
+      stepProblem("dropdown_without_choices", withDropdown.id, firstDropdown.id),
+      stepProblem("dropdown_without_choices", withDropdown.id, secondDropdown.id),
+    ])
   })
 })
 
