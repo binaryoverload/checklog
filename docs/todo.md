@@ -72,14 +72,29 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 One pull request per item:
 
 - [x] API: create (with an empty version 1 draft), list, get, rename, archive and restore templates; a duplicate active name is `validation_failed` on `name`, archiving archives the template's schedules, and archiving or restoring a template already in that state is `conflict` (person)
-- [x] API: edit the draft's steps (add, reorder, edit, remove) through `ensureDraft`, which copies the current version into a new draft on the first edit; title, instructions, kind, halt, skippable, assignee and due offset, with the step rules from the plan (person)
+- [x] API: edit the draft's steps (add, reorder, edit, remove) through `requireDraft`; title, instructions, kind, halt, skippable, assignee and due offset, with the step rules from the plan (person)
 - [ ] API: `GET /templates/:templateId/draft` returns the draft's steps and their fields, not only the version (person)
-- [x] API: `POST /templates/:templateId/draft` starts editing and is the only route that creates a draft; edits to a template with no draft are `conflict`, so the editor's step IDs are always the draft's (person)
+- [x] API: `POST /templates/:templateId/draft` starts editing through `ensureDraft`, which copies the current version into a new draft, and is the only route that creates one; edits to a template with no draft are `conflict`, so the editor's step IDs are always the draft's (person)
 - [ ] API: edit a step's fields (add, reorder, edit, remove) with labels, keys, help text, required and options; approval steps can have fields (person)
+  - `POST /templates/:templateId/draft/steps/:stepId/fields` adds a field
+  - `PUT /templates/:templateId/draft/steps/:stepId/fields/order` reorders the step's fields
+  - `PATCH /templates/:templateId/draft/steps/:stepId/fields/:fieldId` edits a field
+  - `DELETE /templates/:templateId/draft/steps/:stepId/fields/:fieldId` removes a field
 - [ ] API: `updatedAt` edit-conflict check on step and field `PATCH`es, refusing a stale edit with `conflict` (person)
+  - `PATCH /templates/:templateId/draft/steps/:stepId`
+  - `PATCH /templates/:templateId/draft/steps/:stepId/fields/:fieldId`
 - [ ] `precondition_failed` error code, with details pointing at steps, for the publish and start checks (person)
 - [ ] API: publish the draft with the publish checks, discard a draft, list versions, get one version, and archive a version (person)
+  - `POST /templates/:templateId/draft/publish` publishes the draft and makes it the current version
+  - `DELETE /templates/:templateId/draft` discards the draft
+  - `GET /templates/:templateId/versions` lists versions
+  - `GET /templates/:templateId/versions/:versionId` returns one version with its steps and fields
+  - `POST /templates/:templateId/versions/:versionId/archive` archives a version
 - [ ] API: template access, granting groups and people view, run or edit; can land any time after templates (person)
+  - `GET /templates/:templateId/access` lists the template's grants
+  - `POST /templates/:templateId/access` grants a member or group a level
+  - `PATCH /templates/:templateId/access/:accessId` changes a grant's level
+  - `DELETE /templates/:templateId/access/:accessId` revokes a grant
 - [ ] UI: template list, template editor (steps and fields), publish, versions and access settings (person)
 - [ ] Later: `search` on name in `GET /templates`, an optional `ilike` filter that escapes `%` and `_` (person)
 
