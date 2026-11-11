@@ -40,10 +40,10 @@ const fieldRoutes: TemplateRoute[] = [
     conflictStatus: "archived",
   },
   {
-    name: "PATCH /api/templates/:templateId/draft/fields/:fieldId",
+    name: "PATCH /api/templates/:templateId/draft/steps/:stepId/fields/:fieldId",
     send: async (id) => {
       const field = await draftFieldIn(id)
-      return api().patch(`/api/templates/${id}/draft/fields/${field.id}`).send({ label: "Renamed", updatedAt: field.updatedAt.toISOString() })
+      return api().patch(`/api/templates/${id}/draft/steps/${field.templateStepId}/fields/${field.id}`).send({ label: "Renamed", updatedAt: field.updatedAt.toISOString() })
     },
     needs: "edit",
     impersonation: "allow",
@@ -54,8 +54,7 @@ const fieldRoutes: TemplateRoute[] = [
     name: "PUT /api/templates/:templateId/draft/steps/:stepId/fields/order",
     send: async (id) => {
       const field = await draftFieldIn(id)
-      const stepId = "templateStepId" in field ? field.templateStepId : typeIdForTable("templateSteps").toString()
-      return api().put(`/api/templates/${id}/draft/steps/${stepId}/fields/order`).send({ fieldIds: [field.id] })
+      return api().put(`/api/templates/${id}/draft/steps/${field.templateStepId}/fields/order`).send({ fieldIds: [field.id] })
     },
     needs: "edit",
     impersonation: "allow",
@@ -63,10 +62,10 @@ const fieldRoutes: TemplateRoute[] = [
     conflictStatus: "archived",
   },
   {
-    name: "DELETE /api/templates/:templateId/draft/fields/:fieldId",
+    name: "DELETE /api/templates/:templateId/draft/steps/:stepId/fields/:fieldId",
     send: async (id) => {
       const field = await draftFieldIn(id)
-      return api().delete(`/api/templates/${id}/draft/fields/${field.id}`)
+      return api().delete(`/api/templates/${id}/draft/steps/${field.templateStepId}/fields/${field.id}`)
     },
     needs: "edit",
     impersonation: "allow",
@@ -268,9 +267,11 @@ describe("POST /api/templates/:templateId/draft/steps/:stepId/fields", () => {
   })
 })
 
-describe("PATCH /api/templates/:templateId/draft/fields/:fieldId", () => {
-  const editField = (templateId: string, field: { id: string, updatedAt: Date }, body: object) =>
-    api().patch(`/api/templates/${templateId}/draft/fields/${field.id}`).send({ updatedAt: field.updatedAt.toISOString(), ...body })
+describe("PATCH /api/templates/:templateId/draft/steps/:stepId/fields/:fieldId", () => {
+  const editField = (templateId: string, field: Pick<TemplateField, "id" | "templateStepId" | "updatedAt">, body: object) =>
+    api()
+      .patch(`/api/templates/${templateId}/draft/steps/${field.templateStepId}/fields/${field.id}`)
+      .send({ updatedAt: field.updatedAt.toISOString(), ...body })
 
   test("changes only the settings it's given and returns the field", async () => {
     const { template, step } = await stepWithFields()
@@ -330,14 +331,14 @@ describe("PATCH /api/templates/:templateId/draft/fields/:fieldId", () => {
   test("refuses an edit made from an out-of-date copy with conflict and changes nothing", async () => {
     const { template, fields: [field] } = await stepWithFields(["reading"])
 
-    expectError(await editField(template.id, { id: field!.id, updatedAt: new Date(field!.updatedAt.getTime() - 1000) }, { label: "Stale" }), 409, "conflict")
+    expectError(await editField(template.id, { id: field!.id, templateStepId: field!.templateStepId, updatedAt: new Date(field!.updatedAt.getTime() - 1000) }, { label: "Stale" }), 409, "conflict")
     expect(await storedField(field!.id)).toEqual(field)
   })
 
   test("refuses an edit without updatedAt with validation_failed", async () => {
     const { template, fields: [field] } = await stepWithFields(["reading"])
 
-    expectError(await api().patch(`/api/templates/${template.id}/draft/fields/${field!.id}`).send({ label: "Renamed" }), 400, "validation_failed")
+    expectError(await api().patch(`/api/templates/${template.id}/draft/steps/${field!.templateStepId}/fields/${field!.id}`).send({ label: "Renamed" }), 400, "validation_failed")
     expect(await storedField(field!.id)).toEqual(field)
   })
 
@@ -400,16 +401,30 @@ describe("PATCH /api/templates/:templateId/draft/fields/:fieldId", () => {
     expect(await storedField(field.id)).toEqual(field)
   })
 
+  test("refuses a field on another step of the draft with not_found and changes nothing", async () => {
+    const { template, draft, fields: [field] } = await stepWithFields(["reading"])
+    const otherStep = await insertTemplateStep(db, draft, { title: "Other", position: 1 })
+
+    expectError(await editField(template.id, { ...field!, templateStepId: otherStep.id }, { label: "Changed" }), 404, "not_found")
+    expect(await storedField(field!.id)).toEqual(field)
+  })
+
+  test("refuses a step ID for another table with validation_failed", async () => {
+    const { template, fields: [field] } = await stepWithFields(["reading"])
+
+    expectError(await editField(template.id, { ...field!, templateStepId: typeIdForTable("templateFields").toString() }, { label: "Changed" }), 400, "validation_failed")
+  })
+
   test("refuses a field ID that doesn't exist with not_found", async () => {
     const { template } = await stepWithFields()
 
-    expectError(await editField(template.id, { id: typeIdForTable("templateFields").toString(), updatedAt: new Date() }, { label: "Changed" }), 404, "not_found")
+    expectError(await editField(template.id, { id: typeIdForTable("templateFields").toString(), templateStepId: typeIdForTable("templateSteps").toString(), updatedAt: new Date() }, { label: "Changed" }), 404, "not_found")
   })
 
   test("refuses a field ID for another table with validation_failed", async () => {
     const { template } = await stepWithFields()
 
-    expectError(await editField(template.id, { id: typeIdForTable("templateSteps").toString(), updatedAt: new Date() }, { label: "Changed" }), 400, "validation_failed")
+    expectError(await editField(template.id, { id: typeIdForTable("templateSteps").toString(), templateStepId: typeIdForTable("templateSteps").toString(), updatedAt: new Date() }, { label: "Changed" }), 400, "validation_failed")
   })
 })
 
@@ -548,13 +563,14 @@ describe("PUT /api/templates/:templateId/draft/steps/:stepId/fields/order", () =
   })
 })
 
-describe("DELETE /api/templates/:templateId/draft/fields/:fieldId", () => {
-  const deleteField = (templateId: string, fieldId: string) => api().delete(`/api/templates/${templateId}/draft/fields/${fieldId}`)
+describe("DELETE /api/templates/:templateId/draft/steps/:stepId/fields/:fieldId", () => {
+  const deleteField = (templateId: string, field: { id: string, templateStepId: string }) =>
+    api().delete(`/api/templates/${templateId}/draft/steps/${field.templateStepId}/fields/${field.id}`)
 
   test("removes the field and closes the gap in the step's positions", async () => {
     const { template, step, fields: [, second] } = await stepWithFields(["first", "second", "third"])
 
-    const response = await deleteField(template.id, second!.id)
+    const response = await deleteField(template.id, second!)
 
     expectStatus(response, 204)
     expect(response.text).toBe("")
@@ -567,7 +583,7 @@ describe("DELETE /api/templates/:templateId/draft/fields/:fieldId", () => {
   test("moves the updatedAt of the fields it renumbers forward", async () => {
     const { template, fields: [first, second] } = await stepWithFields(["first", "second"])
 
-    expectStatus(await deleteField(template.id, first!.id), 204)
+    expectStatus(await deleteField(template.id, first!), 204)
 
     expect((await storedField(second!.id))!.updatedAt.getTime()).toBeGreaterThan(second!.updatedAt.getTime())
   })
@@ -577,7 +593,7 @@ describe("DELETE /api/templates/:templateId/draft/fields/:fieldId", () => {
     const otherStep = await insertTemplateStep(db, draft, { title: "Other", position: 1 })
     const otherField = await insertTemplateField(db, otherStep, { key: "other", position: 1 })
 
-    expectStatus(await deleteField(template.id, first!.id), 204)
+    expectStatus(await deleteField(template.id, first!), 204)
 
     expect(await storedField(otherField.id)).toEqual(otherField)
   })
@@ -585,7 +601,7 @@ describe("DELETE /api/templates/:templateId/draft/fields/:fieldId", () => {
   test("frees the key for another field", async () => {
     const { template, step, fields: [field] } = await stepWithFields(["reading"])
 
-    expectStatus(await deleteField(template.id, field!.id), 204)
+    expectStatus(await deleteField(template.id, field!), 204)
 
     expect(await keysOf(step)).toEqual([])
     await expect(insertTemplateField(db, step, { key: "reading" })).resolves.toBeDefined()
@@ -596,7 +612,7 @@ describe("DELETE /api/templates/:templateId/draft/fields/:fieldId", () => {
     const { template, published, steps: [publishedStep] } = await publishedWithSteps(organization, ["Published"])
     const field = await insertTemplateField(db, publishedStep!)
 
-    expectError(await deleteField(template.id, field.id), 409, "conflict")
+    expectError(await deleteField(template.id, field), 409, "conflict")
     expect((await versionsOf(template)).map(version => version.id)).toEqual([published.id])
     expect(await storedField(field.id)).toEqual(field)
   })
@@ -606,7 +622,7 @@ describe("DELETE /api/templates/:templateId/draft/fields/:fieldId", () => {
     const { template, published } = await publishedWithDraft(organization, ["Draft step"])
     const field = await insertTemplateField(db, await insertTemplateStep(db, published, { position: 1 }))
 
-    expectError(await deleteField(template.id, field.id), 404, "not_found")
+    expectError(await deleteField(template.id, field), 404, "not_found")
     expect(await storedField(field.id)).toEqual(field)
   })
 
@@ -615,26 +631,40 @@ describe("DELETE /api/templates/:templateId/draft/fields/:fieldId", () => {
     const { steps: [otherStep] } = await draftWithSteps(organization, ["Other"])
     const field = await insertTemplateField(db, otherStep!)
 
-    expectError(await deleteField(template.id, field.id), 404, "not_found")
+    expectError(await deleteField(template.id, field), 404, "not_found")
     expect(await storedField(field.id)).toEqual(field)
   })
 
-  test("refuses a field ID that doesn't exist with not_found", async () => {
-    const { template } = await stepWithFields()
+  test("refuses a field on another step of the draft with not_found and deletes nothing", async () => {
+    const { template, draft, fields: [field] } = await stepWithFields(["reading"])
+    const otherStep = await insertTemplateStep(db, draft, { title: "Other", position: 1 })
 
-    expectError(await deleteField(template.id, typeIdForTable("templateFields").toString()), 404, "not_found")
+    expectError(await deleteField(template.id, { ...field!, templateStepId: otherStep.id }), 404, "not_found")
+    expect(await storedField(field!.id)).toEqual(field)
+  })
+
+  test("refuses a step ID for another table with validation_failed", async () => {
+    const { template, fields: [field] } = await stepWithFields(["reading"])
+
+    expectError(await deleteField(template.id, { ...field!, templateStepId: typeIdForTable("templateFields").toString() }), 400, "validation_failed")
+  })
+
+  test("refuses a field ID that doesn't exist with not_found", async () => {
+    const { template, step } = await stepWithFields()
+
+    expectError(await deleteField(template.id, { id: typeIdForTable("templateFields").toString(), templateStepId: step.id }), 404, "not_found")
   })
 
   test("refuses a field that's already been deleted with not_found", async () => {
     const { template, fields: [field] } = await stepWithFields(["reading"])
 
-    expectStatus(await deleteField(template.id, field!.id), 204)
-    expectError(await deleteField(template.id, field!.id), 404, "not_found")
+    expectStatus(await deleteField(template.id, field!), 204)
+    expectError(await deleteField(template.id, field!), 404, "not_found")
   })
 
   test("refuses a field ID for another table with validation_failed", async () => {
-    const { template } = await stepWithFields()
+    const { template, step } = await stepWithFields()
 
-    expectError(await deleteField(template.id, typeIdForTable("templateSteps").toString()), 400, "validation_failed")
+    expectError(await deleteField(template.id, { id: typeIdForTable("templateSteps").toString(), templateStepId: step.id }), 400, "validation_failed")
   })
 })

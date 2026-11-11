@@ -2,6 +2,7 @@ import { Router } from "express"
 
 import { templateAccessRouter } from "@/routes/template-access.ts"
 import { templateDraftsRouter } from "@/routes/template-drafts.ts"
+import { templateFieldsRouter } from "@/routes/template-fields.ts"
 
 import { approvalsRouter } from "./approvals.ts"
 import { membersRouter } from "./members.ts"
@@ -17,6 +18,8 @@ export function apiRouter() {
   router.use("/api/templates", templatesRouter)
   router.use("/api/templates", templateDraftsRouter)
   router.use("/api/templates", templateAccessRouter)
+  router.use("/api/templates", templateFieldsRouter)
+
   router.use("/api/runs", runsRouter)
   router.use("/api/approvals", approvalsRouter)
   router.use("/api/schedules", schedulesRouter)

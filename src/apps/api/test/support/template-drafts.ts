@@ -90,7 +90,7 @@ export async function draftStepIn(templateId: string) {
 // Gives the access tests a field on a step in the template's draft, or an unused field ID when the template doesn't exist
 export async function draftFieldIn(templateId: string) {
   const draft = await draftIn(templateId)
-  if (!draft) return { id: typeIdForTable("templateFields").toString(), updatedAt: new Date() }
+  if (!draft) return { id: typeIdForTable("templateFields").toString(), templateStepId: typeIdForTable("templateSteps").toString(), updatedAt: new Date() }
   return insertTemplateField(db, await insertTemplateStep(db, draft))
 }
 
