@@ -97,8 +97,18 @@ export default defineConfig(
     rules: {
       "@stylistic/object-curly-newline": ["error", { multiline: true, consistent: true }],
       "@stylistic/object-property-newline": ["error", { allowAllPropertiesOnSameLine: true }],
-      "@stylistic/array-bracket-newline": ["error", "consistent"],
-      "@stylistic/array-element-newline": ["error", "consistent"],
+      // A list whose first item starts on a new line has every item on its own line: object literals, arrays, and
+      // the arguments and parameters in parentheses. Object literals with six or more properties are always split.
+      // Experimental in Stylistic, so other lists keep the rules around it.
+      "@stylistic/exp-list-style": ["error", {
+        overrides: {
+          "()": { singleLine: { spacing: "never" } },
+          "[]": { singleLine: { spacing: "never" } },
+          "{}": "off",
+          "<>": "off",
+          "ObjectExpression": { singleLine: { spacing: "always", maxItems: 5 } },
+        },
+      }],
     },
   },
 )
