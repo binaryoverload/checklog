@@ -197,7 +197,7 @@ templateDraftsRouter.patch("/:id/draft/steps/:stepId", route({
     const { updatedAt, assignee, ...updateData } = body
 
     if (new Date(updatedAt).getTime() !== existingStep.updatedAt.getTime()) {
-      throw new HttpError("conflict", "Step has been modified since last retrieved")
+      throw new HttpError("conflict", "This step was changed after you loaded it. Reload it and try again.")
     }
 
     const merged = {

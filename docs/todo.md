@@ -75,12 +75,12 @@ One pull request per item:
 - [x] API: edit the draft's steps (add, reorder, edit, remove) through `requireDraft`; title, instructions, kind, halt, skippable, assignee and due offset, with the step rules from the plan (person)
 - [x] API: `GET` and `POST /templates/:templateId/draft` return the draft with its steps and their fields (person)
 - [x] API: `POST /templates/:templateId/draft` starts editing through `ensureDraft`, which copies the current version into a new draft, and is the only route that creates one; edits to a template with no draft are `conflict`, so the editor's step IDs are always the draft's (person)
-- [ ] API: edit a step's fields (add, reorder, edit, remove) with labels, keys, help text, required and options; approval steps can have fields (person)
+- [x] API: edit a step's fields (add, reorder, edit, remove) with labels, keys, help text, required and options; approval steps can have fields (person)
   - `POST /templates/:templateId/draft/steps/:stepId/fields` adds a field
   - `PUT /templates/:templateId/draft/steps/:stepId/fields/order` reorders the step's fields
   - `PATCH /templates/:templateId/draft/steps/:stepId/fields/:fieldId` edits a field
   - `DELETE /templates/:templateId/draft/steps/:stepId/fields/:fieldId` removes a field
-- [ ] API: `updatedAt` edit-conflict check on step and field `PATCH`es, refusing a stale edit with `conflict` (person)
+- [x] API: `updatedAt` edit-conflict check on step and field `PATCH`es, refusing a stale edit with `conflict` (person)
   - `PATCH /templates/:templateId/draft/steps/:stepId`
   - `PATCH /templates/:templateId/draft/steps/:stepId/fields/:fieldId`
 - [x] `precondition_failed` error code, with details pointing at steps, for the publish and start checks (person)

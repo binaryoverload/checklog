@@ -4,6 +4,7 @@ import type { CreatedFields, UpdatedFields } from "./common.ts"
 import { paginationQuerySchema } from "./pagination.ts"
 import { assigneeSchema } from "../domain/assignees.ts"
 import type { Assignee } from "../domain/assignees.ts"
+import { fieldOptionsSchema } from "../domain/fields.ts"
 import type { FieldOptions, FieldType } from "../domain/fields.ts"
 import { templateAccessLevelSchema, templateStatusSchema, templateStepKindSchema, templateStepRuleIssues } from "../domain/templates.ts"
 import type { TemplateAccessLevel, TemplateStatus, TemplateStepKind, TemplateVersionStatus } from "../domain/templates.ts"
@@ -109,7 +110,24 @@ export type TemplateStepWithFieldsDto = TemplateStepDto & {
   fields: TemplateFieldDto[]
 }
 
-// TODO: The request schema for a template field
+const templateFieldFields = z.strictObject({
+  label: requiredString().max(100),
+  key: requiredString().max(50).regex(/^[a-z][a-z0-9_]*$/),
+  helpText: requiredString().max(200).nullish(),
+  required: z.boolean(),
+  options: fieldOptionsSchema,
+})
+
+export const templateFieldCreateBodySchema = templateFieldFields.extend({
+  required: z.boolean().default(true),
+})
+export type TemplateFieldCreateBody = z.infer<typeof templateFieldCreateBodySchema>
+
+export const templateFieldUpdateBodySchema = templateFieldFields.partial()
+  .extend({ updatedAt: z.iso.datetime() })
+  .refine(d => Object.keys(d).some(key => key !== "updatedAt"), "At least one field must be provided")
+export type TemplateFieldUpdateBody = z.infer<typeof templateFieldUpdateBodySchema>
+
 export type TemplateFieldDto = {
   id: string
   templateVersionId: string
