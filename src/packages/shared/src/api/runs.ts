@@ -1,5 +1,6 @@
 import type { CreatedFields, UpdatedFields } from "./common.ts"
-import type { AssigneeType } from "../domain/assignees.ts"
+import type { TemplateFieldDto, TemplateStepDto } from "./templates.ts"
+import type { Assignee } from "../domain/assignees.ts"
 import type { FieldValue } from "../domain/fields.ts"
 import type { RunStatus, RunStepStatus } from "../domain/runs.ts"
 
@@ -7,6 +8,7 @@ import type { RunStatus, RunStepStatus } from "../domain/runs.ts"
 
 export type RunDto = {
   id: string
+  templateId: string
   templateVersionId: string
   scheduleId: string | null
   name: string
@@ -15,28 +17,33 @@ export type RunDto = {
   completedAt: string | null
 } & CreatedFields & UpdatedFields
 
+export type RunWithDetailsDto = RunDto & { steps: RunStepWithDetailsDto[] }
+
 export type RunStepDto = {
   id: string
   runId: string
   templateStepId: string
   status: RunStepStatus
-  assigneeType: AssigneeType | null
-  assigneeMemberId: string | null
-  assigneeTeamId: string | null
-  assigneeRole: string | null
+  assignee: Assignee | null
+  assigneeMissing: boolean
   dueAt: string | null
   completedAt: string | null
   completedBy: string | null
   skipReason: string | null
 } & CreatedFields & UpdatedFields
 
-export type RunFieldValueDto = {
-  id: string
-  runStepId: string
-  templateFieldId: string
+export type RunStepWithDetailsDto = RunStepDto & {
+  blocked: boolean
+  templateStep: TemplateStepDto
+  fields: RunFieldWithValueDto[]
+  notes: StepNoteDto[]
+}
+
+export type RunFieldWithValueDto = TemplateFieldDto & {
   value: FieldValue | null
-  updatedBy: string | null
-} & CreatedFields & UpdatedFields
+  valueUpdatedBy: string | null
+  valueUpdatedAt: string | null
+}
 
 export type StepNoteDto = {
   id: string

@@ -1,9 +1,25 @@
-import type { Run, RunFieldValue, RunStep, StepNote } from "@/util/types.ts"
-import type { RunDto, RunFieldValueDto, RunStepDto, StepNoteDto } from "@checklog/shared/api"
+import { groupBy, keyBy, sortBy } from "es-toolkit"
 
-export function toRunDto(row: Run): RunDto {
+import { toTemplateFieldDto, toTemplateStepDto } from "@/mappers/templates.ts"
+import type { Run, RunFieldValue, RunStep, StepNote, TemplateField, TemplateStep } from "@/util/types.ts"
+import type { RunDto, RunFieldWithValueDto, RunStepDto, RunStepWithDetailsDto, RunWithDetailsDto, StepNoteDto } from "@checklog/shared/api"
+import { blockedStepIds, flatToAssignee } from "@checklog/shared/domain"
+
+// Everything a run's details are built from, loaded by the route
+export interface RunRows {
+  run: Run
+  templateId: string
+  templateSteps: TemplateStep[]
+  steps: RunStep[]
+  fields: TemplateField[]
+  values: RunFieldValue[]
+  notes: StepNote[]
+}
+
+export function toRunDto(row: Run, templateId: string): RunDto {
   return {
     id: row.id,
+    templateId,
     templateVersionId: row.templateVersionId,
     scheduleId: row.scheduleId,
     name: row.name,
@@ -16,16 +32,44 @@ export function toRunDto(row: Run): RunDto {
   }
 }
 
+export function toRunWithDetailsDto(rows: RunRows): RunWithDetailsDto {
+  const templateStepsById = keyBy(rows.templateSteps, step => step.id)
+  const fieldsByStep = groupBy(rows.fields, field => field.templateStepId)
+  const valuesByStep = groupBy(rows.values, value => value.runStepId)
+  const notesByStep = groupBy(rows.notes, note => note.runStepId)
+
+  // Run steps in template order; each needs its template step for the position and halt flag
+  const ordered = sortBy(
+    rows.steps.map(step => ({ step, templateStep: templateStepsById[step.templateStepId]! })),
+    [({ templateStep }) => templateStep.position],
+  )
+
+  const blockedSteps = blockedStepIds(ordered.map(({ step, templateStep }) => ({ id: step.id, isHalt: templateStep.isHalt, status: step.status })))
+  const steps = ordered.map(({ step, templateStep }) => {
+    const dto = toRunStepWithDetailsDto(
+      step,
+      templateStep,
+      fieldsByStep[templateStep.id] ?? [],
+      valuesByStep[step.id] ?? [],
+      notesByStep[step.id] ?? [],
+      blockedSteps.has(step.id),
+    )
+    return dto
+  })
+
+  return { ...toRunDto(rows.run, rows.templateId), steps }
+}
+
 export function toRunStepDto(row: RunStep): RunStepDto {
+  const assignee = flatToAssignee(row)
+
   return {
     id: row.id,
     runId: row.runId,
     templateStepId: row.templateStepId,
     status: row.status,
-    assigneeType: row.assigneeType,
-    assigneeMemberId: row.assigneeMemberId,
-    assigneeTeamId: row.assigneeTeamId,
-    assigneeRole: row.assigneeRole,
+    assignee,
+    assigneeMissing: row.assigneeType != null && assignee == null,
     dueAt: row.dueAt?.toISOString() ?? null,
     completedAt: row.completedAt?.toISOString() ?? null,
     completedBy: row.completedBy,
@@ -36,16 +80,31 @@ export function toRunStepDto(row: RunStep): RunStepDto {
   }
 }
 
-export function toRunFieldValueDto(row: RunFieldValue): RunFieldValueDto {
+export function toRunStepWithDetailsDto(
+  row: RunStep,
+  templateStep: TemplateStep,
+  fields: TemplateField[],
+  values: RunFieldValue[],
+  notes: StepNote[],
+  blocked: boolean,
+): RunStepWithDetailsDto {
+  const valuesByField = keyBy(values, value => value.templateFieldId)
+
   return {
-    id: row.id,
-    runStepId: row.runStepId,
-    templateFieldId: row.templateFieldId,
-    value: row.value,
-    createdAt: row.createdAt.toISOString(),
-    createdBy: row.createdBy,
-    updatedAt: row.updatedAt.toISOString(),
-    updatedBy: row.updatedBy,
+    ...toRunStepDto(row),
+    blocked,
+    templateStep: toTemplateStepDto(templateStep),
+    fields: sortBy(fields, ["position"]).map(field => toRunFieldWithValueDto(field, valuesByField[field.id])),
+    notes: sortBy(notes, ["createdAt", "id"]).map(toStepNoteDto),
+  }
+}
+
+export function toRunFieldWithValueDto(field: TemplateField, value: RunFieldValue | undefined): RunFieldWithValueDto {
+  return {
+    ...toTemplateFieldDto(field),
+    value: value?.value ?? null,
+    valueUpdatedBy: value?.updatedBy ?? null,
+    valueUpdatedAt: value?.updatedAt.toISOString() ?? null,
   }
 }
 
