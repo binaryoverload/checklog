@@ -19,11 +19,25 @@ const sorts: { sort: SortDefinition<TemplateRow>, expectedOrder: SQL[] }[] = [
     expectedOrder: [desc(templates.id)],
   },
   {
-    sort: { key: "name", direction: "asc", column: templates.name, sortValue: row => row.name, idColumn: templates.id, idOf: row => row.id },
+    sort: {
+      key: "name",
+      direction: "asc",
+      column: templates.name,
+      sortValue: row => row.name,
+      idColumn: templates.id,
+      idOf: row => row.id,
+    },
     expectedOrder: [asc(templates.name), asc(templates.id)],
   },
   {
-    sort: { key: "created", direction: "desc", column: templates.createdAt, sortValue: row => row.createdAt, idColumn: templates.id, idOf: row => row.id },
+    sort: {
+      key: "created",
+      direction: "desc",
+      column: templates.createdAt,
+      sortValue: row => row.createdAt,
+      idColumn: templates.id,
+      idOf: row => row.id,
+    },
     expectedOrder: [desc(templates.createdAt), desc(templates.id)],
   },
   {

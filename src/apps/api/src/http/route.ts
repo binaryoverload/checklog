@@ -112,8 +112,7 @@ export function route<S extends RouteOptions>(options: S, handler: RouteHandler<
       session,
       organization: activeOrganization?.organization ?? null,
       member: activeOrganization?.member ?? null,
-    } as RouteContext<S>,
-    )
+    } as RouteContext<S>)
   }
 }
 

@@ -106,7 +106,14 @@ type VersionProblem = Extract<PreconditionIssue, { resourceType: "templateVersio
 
 // A problem the publish check reports on a step, and on one of its fields when it's about a field
 function stepProblem(problem: StepProblem, stepId: string, fieldId: string | null = null) {
-  return { location: "resource", resourceType: "templateStep", problem, stepId, fieldId, message: expect.any(String) }
+  return {
+    location: "resource",
+    resourceType: "templateStep",
+    problem,
+    stepId,
+    fieldId,
+    message: expect.any(String),
+  }
 }
 
 // A problem the publish check reports on the version as a whole

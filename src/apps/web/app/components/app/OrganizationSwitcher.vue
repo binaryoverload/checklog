@@ -8,8 +8,7 @@ const { data: organizations } = useOrganizationsQuery()
 const setActive = useSetActiveOrganization()
 
 const active = computed(() =>
-  organizations.value?.find(org => org.id === session.value?.session.activeOrganizationId),
-)
+  organizations.value?.find(org => org.id === session.value?.session.activeOrganizationId))
 
 const items = computed<DropdownMenuItem[][]>(() => [
   // TODO: Remove - just for test

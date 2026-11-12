@@ -97,7 +97,14 @@ describe("POST /api/templates/:templateId/draft/steps/:stepId/fields", () => {
 
     expectStatus(response, 200)
     const body = response.body as TemplateFieldDto
-    expect(body).toMatchObject({ templateVersionId: draft.id, templateStepId: step.id, label: "Reading", key: "reading", position: 1, type: "text" })
+    expect(body).toMatchObject({
+      templateVersionId: draft.id,
+      templateStepId: step.id,
+      label: "Reading",
+      key: "reading",
+      position: 1,
+      type: "text",
+    })
     expect(body).not.toHaveProperty("organizationId")
     expect(await storedField(body.id)).toBeDefined()
     expect(await keysOf(step)).toEqual(["first", "reading"])

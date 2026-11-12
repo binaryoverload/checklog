@@ -108,14 +108,39 @@ describe("ensureDraft", () => {
     await inRollback(async (tx) => {
       const { context, published, template } = await publishedTemplate(tx)
       await insertTemplateStep(tx, published, { position: 0, title: "Check the backups", instructions: "Look at last night's job", dueOffset: "P1D" })
-      await insertTemplateStep(tx, published, { position: 1, title: "Sign off", kind: "approval", isHalt: true, assigneeType: "role", assigneeRole: "admin" })
+      await insertTemplateStep(tx, published, {
+        position: 1,
+        title: "Sign off",
+        kind: "approval",
+        isHalt: true,
+        assigneeType: "role",
+        assigneeRole: "admin",
+      })
 
       const draft = await ensureDraft(tx, context, template.id)
 
       const copied = await stepsOf(tx, draft)
       expect(copied).toMatchObject([
-        { position: 0, title: "Check the backups", kind: "task", instructions: "Look at last night's job", isHalt: false, skippable: false, dueOffset: "P1D", assigneeType: null },
-        { position: 1, title: "Sign off", kind: "approval", isHalt: true, assigneeType: "role", assigneeRole: "admin", assigneeMemberId: null, assigneeTeamId: null },
+        {
+          position: 0,
+          title: "Check the backups",
+          kind: "task",
+          instructions: "Look at last night's job",
+          isHalt: false,
+          skippable: false,
+          dueOffset: "P1D",
+          assigneeType: null,
+        },
+        {
+          position: 1,
+          title: "Sign off",
+          kind: "approval",
+          isHalt: true,
+          assigneeType: "role",
+          assigneeRole: "admin",
+          assigneeMemberId: null,
+          assigneeTeamId: null,
+        },
       ])
     })
   })
@@ -137,7 +162,15 @@ describe("ensureDraft", () => {
       const draft = await ensureDraft(tx, context, template.id)
 
       expect(await fieldsOf(tx, draft)).toMatchObject([
-        { position: 0, key: "temperature", label: "Temperature", helpText: "In degrees Celsius", required: false, type: "number", options: { type: "number", decimalPlaces: 1, unit: "°C" } },
+        {
+          position: 0,
+          key: "temperature",
+          label: "Temperature",
+          helpText: "In degrees Celsius",
+          required: false,
+          type: "number",
+          options: { type: "number", decimalPlaces: 1, unit: "°C" },
+        },
       ])
     })
   })

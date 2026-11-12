@@ -51,13 +51,27 @@ export function templateVersionPublishIssues(
 
   for (const step of steps) {
     if (step.assigneeType != null && step.assignee == null) {
-      issues.push({ location: "resource", resourceType: "templateStep", problem: "missing_assignee", stepId: step.id, fieldId: null, message: "Step has an invalid assignee" })
+      issues.push({
+        location: "resource",
+        resourceType: "templateStep",
+        problem: "missing_assignee",
+        stepId: step.id,
+        fieldId: null,
+        message: "Step has an invalid assignee",
+      })
     }
   }
 
   for (const field of fields) {
     if (field.options.type === "dropdown" && (field.options.choices.length === 0)) {
-      issues.push({ location: "resource", resourceType: "templateStep", problem: "dropdown_without_choices", stepId: field.templateStepId, fieldId: field.id, message: "Dropdown field has no choices" })
+      issues.push({
+        location: "resource",
+        resourceType: "templateStep",
+        problem: "dropdown_without_choices",
+        stepId: field.templateStepId,
+        fieldId: field.id,
+        message: "Dropdown field has no choices",
+      })
     }
   }
 

@@ -92,7 +92,14 @@ describe("templateVersionPublishIssues", () => {
   const dropdown: FieldOptions = { type: "dropdown", choices: [{ value: "ok", label: "OK" }], multiple: true }
 
   const stepProblem = (problem: StepProblem, stepId: string, fieldId: string | null = null) =>
-    ({ location: "resource", resourceType: "templateStep", problem, stepId, fieldId, message: expect.any(String) })
+    ({
+      location: "resource",
+      resourceType: "templateStep",
+      problem,
+      stepId,
+      fieldId,
+      message: expect.any(String),
+    })
 
   test("allows assigned and unassigned steps with fields of every type", () => {
     expect(templateVersionPublishIssues(versionId, [unassigned, assigned], [
