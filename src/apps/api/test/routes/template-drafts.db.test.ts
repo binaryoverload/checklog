@@ -11,13 +11,15 @@ import {
   createGroup,
   createMember,
   createOrganization,
+  expectCreationKept,
   insertTemplateField,
   insertTemplateStep,
   insertTemplateVersion,
 } from "@test/support/database.ts"
+import { api, expectError, expectStatus } from "@test/support/http.ts"
 import { signedInMember, stubSessions } from "@test/support/session.ts"
 import { draftIn, draftStepIn, draftWithSteps, publishedWithDraft, publishedWithSteps, stepsOf, storedStep, titlesOf, versionsOf } from "@test/support/template-drafts.ts"
-import { api, describeTemplateAccess, expectError, expectStatus } from "@test/support/template-routes.ts"
+import { describeTemplateAccess } from "@test/support/template-routes.ts"
 import type { TemplateRoute } from "@test/support/template-routes.ts"
 
 // Route handlers use the shared connection rather than a test transaction, so these tests commit their rows.
@@ -399,6 +401,15 @@ describe("PATCH /api/templates/:templateId/draft/steps/:stepId", () => {
   const editStep = (templateId: string, step: { id: string, updatedAt: Date }, body: object) =>
     api().patch(`/api/templates/${templateId}/draft/steps/${step.id}`).send({ updatedAt: step.updatedAt.toISOString(), ...body })
 
+  test("keeps who created the step, and when", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, steps: [step] } = await draftWithSteps(organization, ["Step"])
+
+    expectStatus(await editStep(template.id, step!, { title: "Renamed" }), 200)
+
+    expectCreationKept(step!, await storedStep(step!.id))
+  })
+
   test("changes only the settings it's given and returns the step", async () => {
     const { organization } = await signedInMember("owner")
     const { template, draft } = await draftWithSteps(organization)
@@ -616,6 +627,15 @@ describe("PATCH /api/templates/:templateId/draft/steps/:stepId", () => {
 describe("PUT /api/templates/:templateId/draft/steps/order", () => {
   const reorder = (templateId: string, stepIds: string[]) => api().put(`/api/templates/${templateId}/draft/steps/order`).send({ stepIds })
 
+  test("keeps who created each step, and when", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, steps } = await draftWithSteps(organization, ["First", "Second"])
+
+    expectStatus(await reorder(template.id, [steps[1]!.id, steps[0]!.id]), 200)
+
+    for (const step of steps) expectCreationKept(step, await storedStep(step.id))
+  })
+
   test("puts the steps in the given order", async () => {
     const { organization } = await signedInMember("owner")
     const { template, draft, steps: [first, second, third] } = await draftWithSteps(organization, ["First", "Second", "Third"])
@@ -722,6 +742,15 @@ describe("PUT /api/templates/:templateId/draft/steps/order", () => {
 
 describe("DELETE /api/templates/:templateId/draft/steps/:stepId", () => {
   const deleteStep = (templateId: string, stepId: string) => api().delete(`/api/templates/${templateId}/draft/steps/${stepId}`)
+
+  test("keeps who created the steps it renumbers, and when", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, steps: [first, second] } = await draftWithSteps(organization, ["First", "Second"])
+
+    expectStatus(await deleteStep(template.id, first!.id), 204)
+
+    expectCreationKept(second!, await storedStep(second!.id))
+  })
 
   test("removes the step and closes the gap in positions", async () => {
     const { organization } = await signedInMember("owner")

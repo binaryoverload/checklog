@@ -1,4 +1,5 @@
 import { eq, TransactionRollbackError } from "drizzle-orm"
+import { expect } from "vitest"
 
 import { members, organizations, teamMembers, teams, users } from "@/db/auth-schema.ts"
 import { db } from "@/db/index.ts"
@@ -157,4 +158,12 @@ export async function grant(
     level,
     createdBy: "user_test",
   })
+}
+
+// Checks an update left who created the row, and when, as they were
+export function expectCreationKept(
+  before: { createdBy: string, createdAt: Date },
+  after: { createdBy: string, createdAt: Date } | undefined,
+) {
+  expect(after).toMatchObject({ createdBy: before.createdBy, createdAt: before.createdAt })
 }

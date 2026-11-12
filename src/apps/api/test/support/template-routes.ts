@@ -1,33 +1,15 @@
-import { eq } from "drizzle-orm"
-import request from "supertest"
+import type request from "supertest"
 import { describe, expect, test } from "vitest"
 
-import { createApp } from "@/app.ts"
 import { db } from "@/db/index.ts"
-import { templates } from "@/db/schema.ts"
 import type { Organization, Template } from "@/util/types.ts"
 import { templateAccessLevels } from "@checklog/shared/domain"
 import type { TemplateAccessLevel, TemplateStatus } from "@checklog/shared/domain"
 import { typeIdForTable } from "@checklog/shared/utils"
 import { addToGroup, createGroup, createMember, createOrganization, grant, insertTemplate } from "@test/support/database.ts"
+import { expectError, expectStatus } from "@test/support/http.ts"
 import { signedInMember } from "@test/support/session.ts"
-
-export const api = () => request(createApp())
-
-// Checks the status, putting the response body in the failure message so it shows why the request got another status
-export function expectStatus(response: request.Response, status: number) {
-  expect(response.status, `Response body: ${JSON.stringify(response.body, null, 2)}`).toBe(status)
-}
-
-export function expectError(response: request.Response, status: number, code: string) {
-  expectStatus(response, status)
-  expect(response.body.error.code).toBe(code)
-}
-
-async function storedTemplate(templateId: string) {
-  const [row] = await db.select().from(templates).where(eq(templates.id, templateId))
-  return row!
-}
+import { storedTemplate } from "@test/support/template-drafts.ts"
 
 // A route on one template, so the access and ID rules are checked the same way for each
 export interface TemplateRoute {

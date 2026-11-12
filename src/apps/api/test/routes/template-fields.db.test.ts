@@ -4,7 +4,8 @@ import { db } from "@/db/index.ts"
 import type { TemplateField } from "@/util/types.ts"
 import type { TemplateFieldDto } from "@checklog/shared/api"
 import { typeIdForTable } from "@checklog/shared/utils"
-import { insertTemplateField, insertTemplateStep } from "@test/support/database.ts"
+import { expectCreationKept, insertTemplateField, insertTemplateStep } from "@test/support/database.ts"
+import { api, expectError, expectStatus } from "@test/support/http.ts"
 import { signedInMember, stubSessions } from "@test/support/session.ts"
 import {
   draftFieldIn,
@@ -17,7 +18,7 @@ import {
   storedField,
   versionsOf,
 } from "@test/support/template-drafts.ts"
-import { api, describeTemplateAccess, expectError, expectStatus } from "@test/support/template-routes.ts"
+import { describeTemplateAccess } from "@test/support/template-routes.ts"
 import type { TemplateRoute } from "@test/support/template-routes.ts"
 
 // Route handlers use the shared connection rather than a test transaction, so these tests commit their rows.
@@ -292,6 +293,20 @@ describe("PATCH /api/templates/:templateId/draft/steps/:stepId/fields/:fieldId",
     expect(await storedField(field.id)).toMatchObject({ label: "Renamed", key: "reading", helpText: "Keep this", required: false, type: "text" })
   })
 
+  test("keeps who created the field, when, and where it belongs", async () => {
+    const { template, step, fields: [field] } = await stepWithFields(["reading"])
+
+    expectStatus(await editField(template.id, field!, { label: "Renamed" }), 200)
+
+    const stored = await storedField(field!.id)
+    expectCreationKept(field!, stored)
+    expect(stored).toMatchObject({
+      organizationId: field!.organizationId,
+      templateVersionId: field!.templateVersionId,
+      templateStepId: step.id,
+    })
+  })
+
   test("changes the key", async () => {
     const { template, fields: [field] } = await stepWithFields(["reading"])
 
@@ -439,6 +454,14 @@ describe("PUT /api/templates/:templateId/draft/steps/:stepId/fields/order", () =
   const reorder = (templateId: string, stepId: string, fieldIds: string[]) =>
     api().put(`/api/templates/${templateId}/draft/steps/${stepId}/fields/order`).send({ fieldIds })
 
+  test("keeps who created each field, and when", async () => {
+    const { template, step, fields } = await stepWithFields(["first", "second"])
+
+    expectStatus(await reorder(template.id, step.id, [fields[1]!.id, fields[0]!.id]), 200)
+
+    for (const field of fields) expectCreationKept(field, await storedField(field.id))
+  })
+
   test("puts the step's fields in the given order", async () => {
     const { template, step, fields: [first, second, third] } = await stepWithFields(["first", "second", "third"])
 
@@ -573,6 +596,14 @@ describe("PUT /api/templates/:templateId/draft/steps/:stepId/fields/order", () =
 describe("DELETE /api/templates/:templateId/draft/steps/:stepId/fields/:fieldId", () => {
   const deleteField = (templateId: string, field: { id: string, templateStepId: string }) =>
     api().delete(`/api/templates/${templateId}/draft/steps/${field.templateStepId}/fields/${field.id}`)
+
+  test("keeps who created the fields it renumbers, and when", async () => {
+    const { template, fields: [first, second] } = await stepWithFields(["first", "second"])
+
+    expectStatus(await deleteField(template.id, first!), 204)
+
+    expectCreationKept(second!, await storedField(second!.id))
+  })
 
   test("removes the field and closes the gap in the step's positions", async () => {
     const { template, step, fields: [, second] } = await stepWithFields(["first", "second", "third"])

@@ -6,9 +6,10 @@ import { templateAccess, templates } from "@/db/schema.ts"
 import type { Organization } from "@/util/types.ts"
 import type { TemplateAccessDto } from "@checklog/shared/api"
 import { typeIdForModel, typeIdForTable } from "@checklog/shared/utils"
-import { createGroup, createMember, createOrganization, grant, insertTemplate } from "@test/support/database.ts"
+import { createGroup, createMember, createOrganization, expectCreationKept, grant, insertTemplate } from "@test/support/database.ts"
+import { api, expectError, expectStatus } from "@test/support/http.ts"
 import { signedInMember, stubSessions } from "@test/support/session.ts"
-import { api, describeTemplateAccess, expectError, expectStatus } from "@test/support/template-routes.ts"
+import { describeTemplateAccess } from "@test/support/template-routes.ts"
 import type { TemplateRoute } from "@test/support/template-routes.ts"
 
 // Route handlers use the shared connection rather than a test transaction, so these tests commit their rows.
@@ -122,6 +123,17 @@ describe("GET /api/templates/:templateId/access", () => {
 
 describe("PUT /api/templates/:templateId/access", () => {
   const putGrant = (templateId: string, body: object) => api().put(`/api/templates/${templateId}/access`).send(body)
+
+  test("keeps who created an existing grant, and when, when its level changes", async () => {
+    const { organization } = await signedInMember("owner")
+    const { member } = await createMember(db, organization, "viewer")
+    const template = await insertTemplate(db, organization)
+    const existing = (await storedGrant(await insertGrant(template.id, organization.id, { memberId: member.id }, "view")))!
+
+    expectStatus(await putGrant(template.id, { memberId: member.id, level: "edit" }), 200)
+
+    expectCreationKept(existing, await storedGrant(existing.id))
+  })
 
   test("grants a member a level and returns the grant", async () => {
     const { organization, member: signedIn } = await signedInMember("owner")

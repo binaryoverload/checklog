@@ -11,12 +11,14 @@ import { typeIdForTable } from "@checklog/shared/utils"
 import {
   createGroup,
   createMember,
+  expectCreationKept,
   insertTemplate,
   insertTemplateField,
   insertTemplateStep,
   insertTemplateVersion,
   setCurrentVersion,
 } from "@test/support/database.ts"
+import { api, expectError, expectStatus } from "@test/support/http.ts"
 import { signedInMember, stubSessions } from "@test/support/session.ts"
 import {
   draftStepIn,
@@ -31,7 +33,7 @@ import {
   titlesOf,
   versionsOf,
 } from "@test/support/template-drafts.ts"
-import { api, describeTemplateAccess, expectError, expectStatus } from "@test/support/template-routes.ts"
+import { describeTemplateAccess } from "@test/support/template-routes.ts"
 import type { TemplateRoute } from "@test/support/template-routes.ts"
 
 // Route handlers use the shared connection rather than a test transaction, so these tests commit their rows.
@@ -131,6 +133,16 @@ function expectPreconditionFailed(response: request.Response, problems: object[]
 
 describe("POST /api/templates/:templateId/draft/publish", () => {
   const publish = (templateId: string) => api().post(`/api/templates/${templateId}/draft/publish`)
+
+  test("keeps who created the draft and the template, and when", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, draft } = await publishedWithDraft(organization, ["Step"])
+
+    expectStatus(await publish(template.id), 200)
+
+    expectCreationKept(draft, await storedVersion(draft.id))
+    expectCreationKept(template, await storedTemplate(template.id))
+  })
 
   test("publishes the draft, makes it the current version and returns it", async () => {
     const { organization, member } = await signedInMember("owner")
@@ -462,6 +474,14 @@ describe("POST /api/templates/:templateId/versions/:versionId/archive", () => {
     const template = await setCurrentVersion(db, inserted, current)
     return { organization, template, earlier, current }
   }
+
+  test("keeps who created the version, and when", async () => {
+    const { template, earlier } = await twoPublishedVersions()
+
+    expectStatus(await archiveVersion(template.id, earlier.id), 200)
+
+    expectCreationKept(earlier, await storedVersion(earlier.id))
+  })
 
   test("archives an earlier published version and returns it", async () => {
     const { template, earlier } = await twoPublishedVersions()

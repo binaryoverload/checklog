@@ -12,13 +12,16 @@ import {
   createGroup,
   createMember,
   createOrganization,
+  expectCreationKept,
   grant,
   insertSchedule,
   insertTemplate,
   insertTemplateVersion,
 } from "@test/support/database.ts"
+import { api, expectError, expectStatus } from "@test/support/http.ts"
 import { signedInMember, stubSessions } from "@test/support/session.ts"
-import { api, describeTemplateAccess, expectError, expectStatus } from "@test/support/template-routes.ts"
+import { storedTemplate } from "@test/support/template-drafts.ts"
+import { describeTemplateAccess } from "@test/support/template-routes.ts"
 import type { TemplateRoute } from "@test/support/template-routes.ts"
 
 // Route handlers use the shared connection rather than a test transaction, so these tests commit their rows.
@@ -30,11 +33,6 @@ async function insertTemplates(organization: Organization, names: string[], crea
   const rows: Template[] = []
   for (const name of names) rows.push(await insertTemplate(db, organization, { name, createdBy }))
   return rows
-}
-
-async function storedTemplate(templateId: string) {
-  const [row] = await db.select().from(templates).where(eq(templates.id, templateId))
-  return row!
 }
 
 async function templatesIn(organizationId: string) {
@@ -578,6 +576,15 @@ describe("PATCH /api/templates/:templateId", () => {
     return insertTemplate(db, organization, { name: "Server checks", description: "Weekly" })
   }
 
+  test("keeps who created the template, and when", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await templateWithDescription(organization)
+
+    expectStatus(await updateTemplate(template.id, { name: "Database checks" }), 200)
+
+    expectCreationKept(template, await storedTemplate(template.id))
+  })
+
   test("renames the template and responds with it", async () => {
     const { organization } = await signedInMember("admin")
     const template = await templateWithDescription(organization)
@@ -685,6 +692,18 @@ describe("POST /api/templates/:templateId/archive", () => {
     return api().post(`/api/templates/${templateId}/archive`)
   }
 
+  test("keeps who created the template and its schedules, and when", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization)
+    const schedule = await insertSchedule(db, template, "active")
+
+    expectStatus(await archiveTemplate(template.id), 200)
+
+    expectCreationKept(template, await storedTemplate(template.id))
+    const [storedSchedule] = await db.select().from(schedules).where(eq(schedules.id, schedule.id))
+    expectCreationKept(schedule, storedSchedule)
+  })
+
   test("archives the template and responds with it", async () => {
     const { organization } = await signedInMember("admin")
     const template = await insertTemplate(db, organization, { name: "Server checks" })
@@ -765,6 +784,15 @@ describe("POST /api/templates/:templateId/restore", () => {
   function restoreTemplate(templateId: string) {
     return api().post(`/api/templates/${templateId}/restore`)
   }
+
+  test("keeps who created the template, and when", async () => {
+    const { organization } = await signedInMember("admin")
+    const template = await insertTemplate(db, organization, { status: "archived" })
+
+    expectStatus(await restoreTemplate(template.id), 200)
+
+    expectCreationKept(template, await storedTemplate(template.id))
+  })
 
   test("restores the template and responds with it", async () => {
     const { organization } = await signedInMember("admin")
