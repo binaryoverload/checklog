@@ -1,11 +1,13 @@
 import z from "zod"
 
 import type { CreatedFields, UpdatedFields } from "./common.ts"
+import { paginationQuerySchema } from "./pagination.ts"
 import { assigneeSchema } from "../domain/assignees.ts"
 import type { Assignee } from "../domain/assignees.ts"
 import type { FieldOptions, FieldType } from "../domain/fields.ts"
-import { templateAccessLevelSchema, templateStepKindSchema, templateStepRuleIssues } from "../domain/templates.ts"
+import { templateAccessLevelSchema, templateStatusSchema, templateStepKindSchema, templateStepRuleIssues } from "../domain/templates.ts"
 import type { TemplateAccessLevel, TemplateStatus, TemplateStepKind, TemplateVersionStatus } from "../domain/templates.ts"
+import { typeIdSchema } from "../utils/typeid.ts"
 import { requiredString } from "../utils/zod.ts"
 
 export const templateNameSchema = requiredString().max(200)
@@ -18,6 +20,14 @@ export type CreateTemplateBody = z.infer<typeof createTemplateBodySchema>
 
 export const updateTemplateBodySchema = createTemplateBodySchema.partial().refine(d => Object.keys(d).length > 0, "At least one field must be provided")
 export type UpdateTemplateBody = z.infer<typeof updateTemplateBodySchema>
+
+export const listTemplatesQuerySchema = paginationQuerySchema().and(z.object({ status: templateStatusSchema.default("active") }))
+export type ListTemplatesQuery = z.infer<typeof listTemplatesQuerySchema>
+
+// The IDs of every item in a list exactly once, in their new order
+function orderedIdsSchema(table: Parameters<typeof typeIdSchema>[0], message: string) {
+  return z.array(typeIdSchema(table)).refine(ids => new Set(ids).size === ids.length, message)
+}
 
 export type TemplateDto = {
   id: string
@@ -74,6 +84,12 @@ export const templateStepUpdateBodySchema = templateStepFields
   .extend({ updatedAt: z.iso.datetime() })
   .refine(d => Object.keys(d).some(key => key !== "updatedAt"), "At least one field must be provided")
 export type TemplateStepUpdateBody = z.infer<typeof templateStepUpdateBodySchema>
+
+export const templateStepOrderBodySchema = z.strictObject({ stepIds: orderedIdsSchema("templateSteps", "Each step must appear once") })
+export type TemplateStepOrderBody = z.infer<typeof templateStepOrderBodySchema>
+
+export const templateFieldOrderBodySchema = z.strictObject({ fieldIds: orderedIdsSchema("templateFields", "Each field must appear once") })
+export type TemplateFieldOrderBody = z.infer<typeof templateFieldOrderBodySchema>
 
 export type TemplateStepDto = {
   id: string

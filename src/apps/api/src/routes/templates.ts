@@ -1,7 +1,6 @@
 import { and, asc, count, eq, inArray, desc } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { Router } from "express"
-import z from "zod"
 
 import { assertCan, assertTemplateAccessLevel, templateAccessLevel, visibleTemplatesWhere } from "@/core/permissions.ts"
 import { db } from "@/db/index.ts"
@@ -14,8 +13,7 @@ import { isUniqueViolation } from "@/util/db.ts"
 import { cursorCondition, orderFor, toPage } from "@/util/pagination.ts"
 import type { SortDefinition } from "@/util/pagination.ts"
 import type { Template } from "@/util/types.ts"
-import { createTemplateBodySchema, paginationQuerySchema, updateTemplateBodySchema } from "@checklog/shared/api"
-import { templateStatusSchema } from "@checklog/shared/domain"
+import { createTemplateBodySchema, listTemplatesQuerySchema, updateTemplateBodySchema } from "@checklog/shared/api"
 import { typeIdParamSchema, typeIdParamsSchema } from "@checklog/shared/utils"
 
 export const templatesRouter = Router()
@@ -60,7 +58,7 @@ const templateSort: SortDefinition<Template> = {
   idOf: row => row.id,
 }
 
-templatesRouter.get("/", route({ query: paginationQuerySchema().and(z.object({ status: templateStatusSchema.default("active") })) }, async ({ query, member, organization, res }) => {
+templatesRouter.get("/", route({ query: listTemplatesQuerySchema }, async ({ query, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "view")
 
   const [rows, [counted]] = await Promise.all([

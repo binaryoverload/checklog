@@ -1,8 +1,7 @@
 import { and, eq, sql, gt, gte } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
-import { sortBy, uniq } from "es-toolkit"
+import { sortBy } from "es-toolkit"
 import { Router } from "express"
-import z from "zod"
 
 import { assertTemplateAccessLevel, visibleTemplatesWhere } from "@/core/permissions.ts"
 import { db } from "@/db/index.ts"
@@ -12,9 +11,9 @@ import { route } from "@/http/route.ts"
 import { toTemplateStepDto, toTemplateVersionDto, toTemplateVersionWithStepsDto } from "@/mappers/templates.ts"
 import { assertAssigneeValid } from "@/services/assignees.ts"
 import { ensureDraft, requireDraft } from "@/services/templates.ts"
-import { templateStepCreateBodySchema, templateStepUpdateBodySchema } from "@checklog/shared/api"
+import { templateStepCreateBodySchema, templateStepOrderBodySchema, templateStepUpdateBodySchema } from "@checklog/shared/api"
 import { assigneeToFlat, flatToAssignee, templateStepRuleIssues, templateVersionPublishIssues } from "@checklog/shared/domain"
-import { diffArrays, typeIdParamSchema, typeIdParamsSchema, typeIdSchema } from "@checklog/shared/utils"
+import { diffArrays, typeIdParamSchema, typeIdParamsSchema } from "@checklog/shared/utils"
 
 export const templateDraftsRouter = Router()
 
@@ -153,9 +152,7 @@ templateDraftsRouter.post("/:id/draft/steps", route({ params: typeIdParamSchema(
 
 templateDraftsRouter.put("/:id/draft/steps/order", route({
   params: typeIdParamSchema("templates"),
-  body: z.strictObject({
-    stepIds: z.array(typeIdSchema("templateSteps")).refine(ids => uniq(ids).length === ids.length, "Each step must appear once"),
-  }),
+  body: templateStepOrderBodySchema,
 }, async ({ params, body, member, organization, res }) => {
   await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
 
