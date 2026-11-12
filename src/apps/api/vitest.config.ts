@@ -3,6 +3,10 @@ import { defineConfig } from "vitest/config"
 export default defineConfig({
   resolve: { tsconfigPaths: true },
   test: {
+    // In GitHub Actions, failures are also annotated on the pull request and the results go in the job summary
+    reporters: process.env.GITHUB_ACTIONS === "true"
+      ? ["default", ["github-actions", { jobSummary: { title: "API tests" } }]]
+      : undefined,
     // Placeholder values so core/config.ts parses. Database tests replace DATABASE_URL with their container's.
     env: {
       PUBLIC_URL: "http://localhost:3000",
