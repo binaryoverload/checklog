@@ -50,11 +50,14 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 
 ### Time zones
 
-- [ ] Add Luxon to the catalog and the API (and the web app for display) (agent)
+- [x] Add Luxon to the catalog, the API and the shared package (agent)
+- [ ] Add Luxon to the web app for display (agent)
 - [x] Migration: `runs.timezone` text, and `template_steps.due_offset` from `interval` to `text` (person)
-- [ ] `util/time.ts`: `addOffset`, `todayIn`, and rrule date conversion with `keepLocalTime` (person)
-- [ ] Tests for `util/time.ts` with the DST fixtures in the plan's Luxon table (agent, reviewed by a person)
-- [ ] `X-Timezone` header in `useApi()`, and its parsing and validation in `route()` (person)
+- [x] Shared `utils/time.ts`: `addOffset`, `dateInTimezone` and `canonicalTimezone` (person)
+- [x] Tests for `utils/time.ts` with the DST fixtures in the plan's Luxon table (agent, reviewed by a person)
+- [ ] Rrule date conversion with `keepLocalTime` in `utils/time.ts`, with tests for the spring gap and autumn overlap fixtures (person, tests by agent)
+- [x] `X-Timezone` parsing and validation in `route()`: a missing header is UTC, and an invalid zone or a fixed offset is `bad_request` (person)
+- [ ] `X-Timezone` header in `useApi()` (person)
 - [ ] Date and time formatting helper in the web app (person)
 - [ ] Validate zones with Luxon's `IANAZone.isValidZone` and store their canonical names, replacing the `Intl` check in `timezoneSchema` (person)
 - [ ] Move the schedule calculations onto Luxon (person)
@@ -98,6 +101,14 @@ One pull request per item:
 - [ ] Later: `search` on name in `GET /templates`, an optional `ilike` filter that escapes `%` and `_` (person)
 
 ### Runs
+
+Helpers the run routes share, each its own small pull request or part of the first route that needs it:
+
+- [ ] Shared `missingRequiredFields(fields, values)` and `allStepsResolved(steps)` in `domain/runs.ts`, alongside `blockedStepIds` (person)
+- [ ] `visibleRunsWhere(context)` in `core/permissions.ts`: runs of templates the member can view, or with a step assigned to them, their groups or their roles (person)
+- [ ] `memberTeamIds(db, member)`, loaded once per request for the `groups` scope and `canActOnStep` (person)
+- [ ] `services/runs.ts`: `startRun` and `runStartIssues` for the start check, reusing the publish check's missing-assignee rule (person)
+- [ ] `services/runs.ts`: `lockRun` (visible, locked with `FOR UPDATE`, status checked by the route after permissions), `requireRunStep`, `loadRunRows` for the mapper, and `completeRunIfResolved` (person)
 
 - [ ] API: `startRun` from a template's current version, creating its run steps with resolved assignees and due dates from `addOffset`; `runs.timezone` from the schedule, or from `X-Timezone` for an ad hoc run (person)
 - [ ] API: run start check, refused with `precondition_failed`: the template is active with a current version that isn't archived, no missing assignees (`assignee_type` set but its column null), and assigned members and groups still belong to the organization (person). See [Missing assignees](plans/db-structure.md#missing-assignees).
