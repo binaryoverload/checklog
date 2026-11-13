@@ -1,7 +1,7 @@
 import { IANAZone } from "luxon"
 import { describe, expect, test } from "vitest"
 
-import { addOffset, canonicalTimezone, dateInTimezone } from "@checklog/shared/utils"
+import { addOffset, canonicalTimezone, dateInTimezone, isValidTimezone } from "@checklog/shared/utils"
 
 // Europe/London's 2026 changes: the clocks go forward at 01:00 GMT on 29 March, and back at 02:00 BST on 25 October.
 // Instants are written in UTC, with the London wall-clock time in the test name.
@@ -80,6 +80,30 @@ describe("dateInTimezone", () => {
     ["UTC", "2026-11-06T23:59:59Z", "UTC", "2026-11-06"],
   ])("gives the date in %s", (_description, date, zone, expected) => {
     expect(dateInTimezone(at(date), zone)).toBe(expected)
+  })
+})
+
+describe("isValidTimezone", () => {
+  test.each([
+    ["a canonical IANA name", "Europe/London"],
+    ["a name in the wrong case", "europe/london"],
+    ["UTC", "UTC"],
+    ["an older alias", "US/Eastern"],
+    ["an Etc zone with a fixed offset in its name", "Etc/GMT+1"],
+  ])("accepts %s", (_description, zone) => {
+    expect(isValidTimezone(zone)).toBe(true)
+  })
+
+  test.each([
+    ["a name that isn't a zone", "Mars/Olympus_Mons"],
+    ["an empty string", ""],
+    ["a name with surrounding spaces", " Europe/London "],
+    ["a fixed offset with a colon", "+01:00"],
+    ["a negative fixed offset", "-05:00"],
+    ["a fixed offset without a colon", "+0100"],
+    ["an offset written after UTC", "UTC+1"],
+  ])("refuses %s", (_description, zone) => {
+    expect(isValidTimezone(zone)).toBe(false)
   })
 })
 

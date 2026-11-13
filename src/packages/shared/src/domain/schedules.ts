@@ -1,17 +1,14 @@
 import z from "zod"
 
+import { canonicalTimezone, isValidTimezone } from "../utils/time.ts"
+
 export const scheduleStatuses = ["active", "paused", "archived"] as const
 export const scheduleStatusSchema = z.enum(scheduleStatuses)
 export type ScheduleStatus = z.infer<typeof scheduleStatusSchema>
 
-export const timezoneSchema = z.string().refine((timezone) => {
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: timezone })
-    return true
-  } catch {
-    return false
-  }
-}, "Must be an IANA timezone, such as Europe/London")
+export const timezoneSchema = z.string()
+  .refine(isValidTimezone, "Must be an IANA timezone, such as Europe/London")
+  .transform(canonicalTimezone)
 
 export const scheduleRecurrenceSchema = z.object({
   frequency: z.enum(["yearly", "monthly", "weekly", "daily", "hourly"]),
