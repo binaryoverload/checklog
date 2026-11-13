@@ -58,7 +58,6 @@ function grantAppliesTo({ organization, member }: UserContext): SQL {
   return or(eq(templateAccess.memberId, member.id), inArray(templateAccess.teamId, memberTeamIds))!
 }
 
-// Condition for queries on templates: the ones this member can reach at the needed level
 export function visibleTemplatesWhere(context: UserContext, needs: TemplateAccessLevel = "view"): SQL {
   if (context.organization.deletedAt) return sql`false`
 
