@@ -50,7 +50,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 
 ### Time zones
 
-- [x] Add Luxon to the catalog, the API and the shared package (agent)
+- [x] Add Luxon to the catalog, the API and the shared package (person)
 - [ ] Add Luxon to the web app for display (agent)
 - [x] Migration: `runs.timezone` text, and `template_steps.due_offset` from `interval` to `text` (person)
 - [x] Shared `utils/time.ts`: `addOffset`, `dateInTimezone` and `canonicalTimezone` (person)
