@@ -73,6 +73,10 @@ function testApp() {
     res.json({ userId: session.user.id, organization, member })
   }))
 
+  app.get("/timezone", route({}, ({ timezone, res }) => {
+    res.json({ timezone: timezone.name, isValid: timezone.isValid })
+  }))
+
   app.get("/missing-thing", route({}, () => {
     throw new HttpError("not_found", "Thing not found")
   }))
@@ -236,6 +240,53 @@ describe("route() organizations", () => {
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ userId: "user_test", organization: null, member: null })
     expect(findMember).not.toHaveBeenCalled()
+  })
+})
+
+describe("route() time zones", () => {
+  test("uses UTC when there's no X-Timezone header", async () => {
+    const res = await request(testApp()).get("/timezone")
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ timezone: "UTC", isValid: true })
+  })
+
+  test("passes the X-Timezone header's zone to the handler", async () => {
+    const res = await request(testApp()).get("/timezone").set("X-Timezone", "Europe/London")
+
+    expect(res.body).toEqual({ timezone: "Europe/London", isValid: true })
+  })
+
+  test("reads the header whatever the case of its name", async () => {
+    const res = await request(testApp()).get("/timezone").set("x-timezone", "America/New_York")
+
+    expect(res.body).toEqual({ timezone: "America/New_York", isValid: true })
+  })
+
+  test.each([
+    ["a name in the wrong case", "europe/london", "Europe/London"],
+    ["Etc/UTC", "Etc/UTC", "UTC"],
+  ])("passes %s in its canonical form", async (_description, header, expected) => {
+    const res = await request(testApp()).get("/timezone").set("X-Timezone", header)
+
+    expect(res.body).toEqual({ timezone: expected, isValid: true })
+  })
+
+  test.each([
+    ["a name that isn't a zone", "Mars/Olympus_Mons"],
+    ["a fixed offset", "+01:00"],
+  ])("refuses %s with bad_request", async (_description, header) => {
+    const res = await request(testApp()).get("/timezone").set("X-Timezone", header)
+
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe("bad_request")
+  })
+
+  test("refuses an invalid zone with bad_request even on a route that doesn't use it", async () => {
+    const res = await request(testApp()).get("/me").set("X-Timezone", "Mars/Olympus_Mons")
+
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe("bad_request")
   })
 })
 

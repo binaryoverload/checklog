@@ -61,6 +61,25 @@ describe("POST /api/runs", () => {
     expect(response.body).toMatchObject({ name: "Monday checks" })
   })
 
+  test("uses UTC when there's no X-Timezone header", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template } = await publishedTemplate(organization, [{}])
+
+    const response = await startRun({ templateId: template.id }, null)
+
+    expectStatus(response, 200)
+    expect(response.body).toMatchObject({ timezone: "UTC" })
+  })
+
+  test("stores the X-Timezone header's zone in its canonical form", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template } = await publishedTemplate(organization, [{}])
+
+    const response = await startRun({ templateId: template.id }, "europe/london")
+
+    expect(response.body).toMatchObject({ timezone: "Europe/London" })
+  })
+
   test("takes the run's time zone from the X-Timezone header", async () => {
     const { organization } = await signedInMember("owner")
     const { template } = await publishedTemplate(organization, [{}])
@@ -250,19 +269,19 @@ describe("POST /api/runs", () => {
       expect(await runsOf(template)).toEqual([])
     })
 
-    test("refuses a request without an X-Timezone header with validation_failed and starts nothing", async () => {
+    test("refuses an X-Timezone that isn't an IANA zone with bad_request and starts nothing", async () => {
       const { organization } = await signedInMember("owner")
       const { template } = await publishedTemplate(organization, [{}])
 
-      expectError(await startRun({ templateId: template.id }, null), 400, "validation_failed")
+      expectError(await startRun({ templateId: template.id }, "Mars/Olympus_Mons"), 400, "bad_request")
       expect(await runsOf(template)).toEqual([])
     })
 
-    test("refuses an X-Timezone that isn't an IANA zone with validation_failed and starts nothing", async () => {
+    test("refuses an X-Timezone that's a fixed offset with bad_request and starts nothing", async () => {
       const { organization } = await signedInMember("owner")
       const { template } = await publishedTemplate(organization, [{}])
 
-      expectError(await startRun({ templateId: template.id }, "Mars/Olympus_Mons"), 400, "validation_failed")
+      expectError(await startRun({ templateId: template.id }, "+01:00"), 400, "bad_request")
       expect(await runsOf(template)).toEqual([])
     })
   })

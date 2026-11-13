@@ -1,6 +1,7 @@
 import { fromNodeHeaders } from "better-auth/node"
 import { and, eq } from "drizzle-orm"
 import type { Request, RequestHandler, Response } from "express"
+import { IANAZone } from "luxon"
 import type { z } from "zod"
 
 import { auth } from "@/core/auth.ts"
@@ -8,6 +9,7 @@ import { members } from "@/db/auth-schema.ts"
 import { db } from "@/db/index.ts"
 import type { Member, Organization, Session } from "@/util/types.ts"
 import type { ApiErrorDetail } from "@checklog/shared/api"
+import { canonicalTimezone } from "@checklog/shared/utils"
 
 import { HttpError } from "./errors.ts"
 
@@ -50,6 +52,7 @@ type RouteContext<S extends RouteOptions> = {
   session: S["auth"] extends "public" ? Session | null : Session
   organization: S["auth"] extends "public" ? null : S["organization"] extends "none" ? null : Organization
   member: S["auth"] extends "public" ? null : S["organization"] extends "none" ? null : Member
+  timezone: IANAZone<true>
 } & ParsedSchemas<S>
 
 type RouteHandler<S extends RouteOptions> = (context: RouteContext<S>) => void | Promise<void>
@@ -104,6 +107,16 @@ export function route<S extends RouteOptions>(options: S, handler: RouteHandler<
       throw new HttpError("validation_failed", "The request is invalid", details)
     }
 
+    const tzHeader = req.header("X-Timezone")
+    let timezone = IANAZone.create("UTC")
+    if (tzHeader) {
+      try {
+        timezone = IANAZone.create(canonicalTimezone(tzHeader))
+      } catch {
+        throw new HttpError("bad_request", "X-Timezone must be an IANA time zone, such as Europe/London")
+      }
+    }
+
     // Cast required because TypeScript cannot narrow the type of session based on the options
     await handler({
       ...input,
@@ -112,6 +125,7 @@ export function route<S extends RouteOptions>(options: S, handler: RouteHandler<
       session,
       organization: activeOrganization?.organization ?? null,
       member: activeOrganization?.member ?? null,
+      timezone,
     } as RouteContext<S>)
   }
 }
