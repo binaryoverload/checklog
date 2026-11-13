@@ -51,15 +51,15 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 ### Time zones
 
 - [x] Add Luxon to the catalog, the API and the shared package (person)
-- [ ] Add Luxon to the web app for display (agent)
+- [x] Add Luxon to the web app for display (person)
 - [x] Migration: `runs.timezone` text, and `template_steps.due_offset` from `interval` to `text` (person)
 - [x] Shared `utils/time.ts`: `addOffset`, `dateInTimezone` and `canonicalTimezone` (person)
 - [x] Tests for `utils/time.ts` with the DST fixtures in the plan's Luxon table (agent, reviewed by a person)
 - [ ] Rrule date conversion with `keepLocalTime` in `utils/time.ts`, with tests for the spring gap and autumn overlap fixtures (person, tests by agent)
 - [x] `X-Timezone` parsing and validation in `route()`: a missing header is UTC, and an invalid zone or a fixed offset is `bad_request` (person)
-- [ ] `X-Timezone` header in `useApi()` (person)
+- [x] `X-Timezone` header in `useApi()`, sent from the browser only (person)
 - [ ] Date and time formatting helper in the web app (person)
-- [ ] Validate zones with Luxon's `IANAZone.isValidZone` and store their canonical names, replacing the `Intl` check in `timezoneSchema` (person)
+- [x] Validate zones with Luxon's `IANAZone.isValidZone`, refusing fixed offsets, and store their canonical names, replacing the `Intl` check in `timezoneSchema` (person)
 - [ ] Move the schedule calculations onto Luxon (person)
 
 ### Web app
