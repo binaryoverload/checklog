@@ -104,7 +104,7 @@ One pull request per item:
 
 Helpers the run routes share, each its own small pull request or part of the first route that needs it:
 
-- [ ] Shared `missingRequiredFields(fields, values)` and `allStepsResolved(steps)` in `domain/runs.ts`, alongside `blockedStepIds` (person)
+- [x] Shared `missingRequiredFields(fields, values)`, `isEmptyFieldValue(value)` and `allStepsResolved(steps)` in `domain/runs.ts`, alongside `blockedStepIds` (person)
 - [ ] `visibleRunsWhere(context)` in `core/permissions.ts`: runs of templates the member can view, or with a step assigned to them, their groups or their roles (person)
 - [ ] `memberTeamIds(db, member)`, loaded once per request for the `groups` scope and `canActOnStep` (person)
 - [ ] `services/runs.ts`: `startRun` and `runStartIssues` for the start check, reusing the publish check's missing-assignee rule (person)
@@ -114,7 +114,7 @@ Helpers the run routes share, each its own small pull request or part of the fir
 - [ ] API: run start check, refused with `precondition_failed`: the template is active with a current version that isn't archived, no missing assignees (`assignee_type` set but its column null), and assigned members and groups still belong to the organization (person). See [Missing assignees](plans/db-structure.md#missing-assignees).
 - [ ] Run step permission check `canActOnStep` in `core/permissions.ts`: the step's assignee (member, group or role), or anyone with `run` on the template when the step is unassigned (person)
 - [ ] API: list runs (mine, my groups', all, plus status) and get one run with its steps, fields, values, notes and a computed `blocked`; anyone with `view` on the template or assigned a step sees the whole run (person)
-- [ ] Shared `validateFieldValue(options, value)` in `domain/fields.ts`, used by the API and the web app (person)
+- [x] Shared `validateFieldValue(options, value, now)` in `domain/fields.ts`, used by the API and the web app (person)
 - [ ] API: set field values by key and complete a step, enforcing required fields, halt steps and `allowFuture` (date fields against `todayIn` the user's zone) (person)
 - [ ] API: skip a skippable step with a reason (person)
 - [ ] API: add notes to a step (person)

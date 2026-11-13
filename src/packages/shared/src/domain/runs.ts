@@ -1,5 +1,7 @@
 import z from "zod"
 
+import type { FieldValue } from "./fields.ts"
+
 export const runStatuses = ["in_progress", "completed", "cancelled"] as const
 export const runStatusSchema = z.enum(runStatuses)
 export type RunStatus = z.infer<typeof runStatusSchema>
@@ -20,4 +22,23 @@ export function blockedStepIds(steps: { id: string, isHalt: boolean, status: Run
     if (s.isHalt && s.status === "pending") halt = true
   }
   return blocked
+}
+
+export function missingRequiredFields<TField extends { id: string, required: boolean }>(
+  fields: TField[],
+  values: { templateFieldId: string, value: FieldValue | null }[],
+): TField[] {
+  const valuesByField = new Map(values.map(v => [v.templateFieldId, v.value]))
+  return fields.filter(field => field.required && isEmptyFieldValue(valuesByField.get(field.id) ?? null))
+}
+
+export function isEmptyFieldValue(value: FieldValue | null): boolean {
+  if (value === null) return true
+  if (value.type === "text") return value.value.trim() === ""
+  if (value.type === "dropdown") return value.values.length === 0
+  return false
+}
+
+export function allStepsResolved(steps: { status: RunStepStatus }[]) {
+  return steps.every(s => s.status !== "pending")
 }
