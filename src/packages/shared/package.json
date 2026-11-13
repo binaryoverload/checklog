@@ -14,13 +14,13 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
-    "@types/luxon": "catalog:",
     "better-auth": "catalog:",
     "luxon": "catalog:",
     "typeid-js": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/luxon": "catalog:",
     "@vitest/ui": "catalog:",
     "type-fest": "catalog:",
     "typescript": "catalog:",

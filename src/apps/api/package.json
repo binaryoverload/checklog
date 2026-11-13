@@ -21,7 +21,6 @@
   "dependencies": {
     "@better-auth/drizzle-adapter": "catalog:",
     "@checklog/shared": "workspace:*",
-    "@types/luxon": "catalog:",
     "better-auth": "catalog:",
     "cors": "catalog:",
     "drizzle-orm": "catalog:",
@@ -40,6 +39,7 @@
     "@testcontainers/postgresql": "catalog:",
     "@types/cors": "catalog:",
     "@types/express": "catalog:",
+    "@types/luxon": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "@types/supertest": "catalog:",

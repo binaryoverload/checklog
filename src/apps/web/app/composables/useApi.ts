@@ -2,7 +2,12 @@
 // with the visitor's cookie; in the browser it uses the same-origin /api path. Failures throw an ApiError.
 export function useApi() {
   const config = useRuntimeConfig()
-  const headers = import.meta.server ? useRequestHeaders(["cookie"]) : undefined
+  const headers: Record<string, string> = import.meta.server ? useRequestHeaders(["cookie"]) : {}
+
+  if (import.meta.client) {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    headers["x-timezone"] = timezone
+  }
 
   return $fetch.create({
     baseURL: import.meta.server ? `${config.apiInternalUrl}/api` : config.public.apiBase,

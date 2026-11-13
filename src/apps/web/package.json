@@ -19,12 +19,14 @@
     "@nuxt/ui": "catalog:",
     "@tanstack/vue-query": "catalog:",
     "better-auth": "catalog:",
+    "luxon": "catalog:",
     "nuxt": "catalog:",
     "tailwindcss": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@nuxt/eslint": "catalog:",
+    "@types/luxon": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",
     "vue-tsc": "catalog:"
