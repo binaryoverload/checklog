@@ -21,11 +21,13 @@
   "dependencies": {
     "@better-auth/drizzle-adapter": "catalog:",
     "@checklog/shared": "workspace:*",
+    "@types/luxon": "catalog:",
     "better-auth": "catalog:",
     "cors": "catalog:",
     "drizzle-orm": "catalog:",
     "es-toolkit": "catalog:",
     "express": "catalog:",
+    "luxon": "catalog:",
     "nodemailer": "catalog:",
     "pg": "catalog:",
     "pg-boss": "catalog:",
