@@ -40,7 +40,7 @@ templatesRouter.post("/", route({ body: createTemplateBodySchema }, async ({ bod
       return template
     })
 
-    res.status(200).json(toTemplateDto(result))
+    res.json(toTemplateDto(result))
   } catch (error) {
     if (isUniqueViolation(error, "templates_name_unique_idx")) {
       throw new HttpError("validation_failed", "Template name must be unique", [{ location: "body", path: ["name"], message: "Template name must be unique" }])
@@ -69,7 +69,15 @@ templatesRouter.get("/", route({ query: listTemplatesQuerySchema }, async ({ que
     db.select({ total: count() }).from(templates).where(and(eq(templates.status, query.status), visible)),
   ])
 
-  res.status(200).json(toPage(rows, { limit: query.limit, total: counted!.total, sort: templateSort, map: toTemplateDto }))
+  res.json(toPage(
+    rows,
+    {
+      limit: query.limit,
+      total: counted!.total,
+      sort: templateSort,
+      map: toTemplateDto,
+    },
+  ))
 }))
 
 templatesRouter.get("/:id", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
@@ -166,7 +174,7 @@ templatesRouter.patch("/:id", route({ params: typeIdParamSchema("templates"), bo
       throw new HttpError("forbidden", "You need edit access to this template")
     }
 
-    res.status(200).json(toTemplateDto(updated))
+    res.json(toTemplateDto(updated))
   } catch (error) {
     if (isUniqueViolation(error, "templates_name_unique_idx")) {
       throw new HttpError("validation_failed", "Template name must be unique", [{ location: "body", path: ["name"], message: "Template name must be unique" }])
@@ -222,7 +230,7 @@ templatesRouter.post("/:id/restore", route({ params: typeIdParamSchema("template
       throw new HttpError("conflict", "Template is not archived")
     }
 
-    res.status(200).json(toTemplateDto(updated))
+    res.json(toTemplateDto(updated))
   } catch (error) {
     if (isUniqueViolation(error, "templates_name_unique_idx")) {
       throw new HttpError("conflict", "An active template already uses this name; rename one of them first")
