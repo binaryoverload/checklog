@@ -7,11 +7,12 @@ import { runs, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import { route } from "@/http/route.ts"
 import { toRunDto, toRunWithDetailsDto } from "@/mappers/runs.ts"
-import { loadRunRows } from "@/services/runs.ts"
+import { loadRunRows, lockRun } from "@/services/runs.ts"
 import { cursorCondition, orderFor, toPage } from "@/util/pagination.ts"
 import type { SortDefinition } from "@/util/pagination.ts"
 import type { Run } from "@/util/types.ts"
 import { listRunsQuerySchema } from "@checklog/shared/api"
+import { templateAccessIncludes } from "@checklog/shared/domain"
 import { typeIdParamSchema } from "@checklog/shared/utils"
 
 export const runsRouter = Router()
@@ -66,6 +67,22 @@ runsRouter.post("/", route({}, ({ res }) => {
   throw new Error("Not implemented")
 }))
 
-runsRouter.post("/:id/cancel", route({ params: typeIdParamSchema("runs") }, ({ res }) => {
-  throw new Error("Not implemented")
+runsRouter.post("/:id/cancel", route({ params: typeIdParamSchema("runs") }, async ({ params, member, organization, res }) => {
+  const runData = await db.transaction(async (tx) => {
+    const { run, templateId, templateAccessLevel } = await lockRun(tx, params.id, { member, organization })
+    if (!templateAccessLevel || !templateAccessIncludes(templateAccessLevel, "run")) {
+      throw new HttpError("forbidden", "You need run access to the template to cancel this run")
+    }
+
+    if (run.status !== "in_progress") throw new HttpError("conflict", "Run not in progress")
+
+    const [updatedRun] = await tx.update(runs).set({ status: "cancelled" }).where(eq(runs.id, run.id)).returning()
+    if (!updatedRun) throw new HttpError("internal", "Failed to update run")
+
+    const runData = await loadRunRows(tx, updatedRun, templateId)
+
+    return runData
+  })
+
+  res.json(toRunWithDetailsDto(runData))
 }))

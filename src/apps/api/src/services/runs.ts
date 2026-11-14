@@ -1,8 +1,10 @@
-import { eq, getTableColumns } from "drizzle-orm"
+import { eq, and, getTableColumns } from "drizzle-orm"
 
-import { runFieldValues, runSteps, stepNotes, templateFields, templateSteps } from "@/db/schema.ts"
+import { templateAccessLevel, visibleRunsWhere } from "@/core/permissions.ts"
+import { runFieldValues, runs, runSteps, stepNotes, templateFields, templateSteps, templateVersions } from "@/db/schema.ts"
+import { HttpError } from "@/http/errors.ts"
 import type { RunRows } from "@/mappers/runs.ts"
-import type { Database, Run } from "@/util/types.ts"
+import type { Database, Run, UserContext } from "@/util/types.ts"
 
 export async function loadRunRows(tx: Database, run: Run, templateId: string): Promise<RunRows> {
   const templateStepsResult = await tx.select().from(templateSteps)
@@ -30,5 +32,19 @@ export async function loadRunRows(tx: Database, run: Run, templateId: string): P
     runSteps: runStepResult,
     runStepNotes: runStepNotesResult,
     runFieldValues: runFieldValuesResult,
+  }
+}
+
+export async function lockRun(tx: Database, runId: string, context: UserContext) {
+  const [row] = await tx.select({ run: runs, templateId: templateVersions.templateId }).from(runs)
+    .innerJoin(templateVersions, eq(templateVersions.id, runs.templateVersionId))
+    .where(and(eq(runs.id, runId), visibleRunsWhere(context)))
+    .for("update", { of: runs })
+  if (!row) throw new HttpError("not_found", "Run not found")
+  const accessLevel = await templateAccessLevel(tx, context, row.templateId)
+  return {
+    run: row.run,
+    templateId: row.templateId,
+    templateAccessLevel: accessLevel,
   }
 }
