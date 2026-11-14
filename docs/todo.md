@@ -105,8 +105,8 @@ One pull request per item:
 Helpers the run routes share, each its own small pull request or part of the first route that needs it:
 
 - [x] Shared `missingRequiredFields(fields, values)`, `isEmptyFieldValue(value)` and `allStepsResolved(steps)` in `domain/runs.ts`, alongside `blockedStepIds` (person)
-- [ ] `visibleRunsWhere(context)` in `core/permissions.ts`: runs of templates the member can view, or with a step assigned to them, their groups or their roles (person)
-- [ ] `memberTeamIds(db, member)`, loaded once per request for the `groups` scope and `canActOnStep` (person)
+- [x] `visibleRunsWhere(context)` and `runScopeWhere(context, scope)` in `core/permissions.ts`: runs of templates the member can view, with a step assigned to them, their groups or their roles, or that they started; the scope narrows the list to `mine` or `groups` (person)
+- [x] `memberTeamIdsQuery` as a subquery for `where` clauses, and `getMemberTeamIds` to load the IDs for `canActOnStep` (person)
 - [ ] `services/runs.ts`: `startRun` and `runStartIssues` for the start check, reusing the publish check's missing-assignee rule (person)
 - [ ] `services/runs.ts`: `lockRun` (visible, locked with `FOR UPDATE`, status checked by the route after permissions), `requireRunStep`, `loadRunRows` for the mapper, and `completeRunIfResolved` (person)
 
