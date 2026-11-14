@@ -118,6 +118,32 @@ function describeStepActors(actions: StepAction[]): void {
       expect(await storedRunStep(step.id)).toEqual(step)
     })
 
+    test("refuses an owner on a step assigned to a role they don't hold, since roles match exactly", async () => {
+      const { organization } = await signedInMember("owner")
+      const { run, step } = await runForAction(organization, action, { assigneeType: "role", assigneeRole: "editor" })
+
+      expectError(await action.send(run, step), 403, "forbidden")
+      expect(await storedRunStep(step.id)).toEqual(step)
+    })
+
+    test("lets a member with several roles take a step assigned to one of them", async () => {
+      const { organization } = await signedInMember("viewer,editor")
+      const { run, step } = await runForAction(organization, action, { assigneeType: "role", assigneeRole: "editor" })
+
+      expectStatus(await action.send(run, step), 200)
+    })
+
+    test.each([
+      ["member", { assigneeType: "member" as const, assigneeMemberId: null }],
+      ["group", { assigneeType: "team" as const, assigneeTeamId: null }],
+    ])("refuses even an owner on a step whose assigned %s has been removed, and changes nothing", async (_kind, assignee) => {
+      const { organization } = await signedInMember("owner")
+      const { run, step } = await runForAction(organization, action, assignee)
+
+      expectError(await action.send(run, step), 403, "forbidden")
+      expect(await storedRunStep(step.id)).toEqual(step)
+    })
+
     test("refuses a member with a role other than the one assigned with forbidden", async () => {
       const { organization, member } = await signedInMember("viewer")
       const { template, run, step } = await runForAction(organization, action, { assigneeType: "role", assigneeRole: "editor" })
