@@ -108,12 +108,13 @@ Helpers the run routes share, each its own small pull request or part of the fir
 - [x] `visibleRunsWhere(context)` and `runScopeWhere(context, scope)` in `core/permissions.ts`: runs of templates the member can view, with a step assigned to them, their groups or their roles, or that they started; the scope narrows the list to `mine` or `groups` (person)
 - [x] `memberTeamIdsQuery` as a subquery for `where` clauses, and `getMemberTeamIds` to load the IDs for `canActOnStep` (person)
 - [ ] `services/runs.ts`: `startRun` and `runStartIssues` for the start check, reusing the publish check's missing-assignee rule (person)
-- [ ] `services/runs.ts`: `lockRun` (visible, locked with `FOR UPDATE`, status checked by the route after permissions), `requireRunStep`, `loadRunRows` for the mapper, and `completeRunIfResolved` (person)
+- [x] `services/runs.ts`: `loadRunRows`, loading a run's steps, fields, values and notes for the mapper with the caller's handle (person)
+- [ ] `services/runs.ts`: `lockRun` (visible, locked with `FOR UPDATE`, status checked by the route after permissions), `requireRunStep` and `completeRunIfResolved` (person)
 
 - [ ] API: `startRun` from a template's current version, creating its run steps with resolved assignees and due dates from `addOffset`; `runs.timezone` from the schedule, or from `X-Timezone` for an ad hoc run (person)
 - [ ] API: run start check, refused with `precondition_failed`: the template is active with a current version that isn't archived, no missing assignees (`assignee_type` set but its column null), and assigned members and groups still belong to the organization (person). See [Missing assignees](plans/db-structure.md#missing-assignees).
 - [ ] Run step permission check `canActOnStep` in `core/permissions.ts`: the step's assignee (member, group or role), or anyone with `run` on the template when the step is unassigned (person)
-- [ ] API: list runs (mine, my groups', all, plus status) and get one run with its steps, fields, values, notes and a computed `blocked`; anyone with `view` on the template or assigned a step sees the whole run (person)
+- [x] API: list runs (mine, my groups', all, plus status) and get one run with its steps, fields, values, notes and a computed `blocked`; anyone with `view` on the template, assigned a step or who started the run sees the whole run (person)
 - [x] Shared `validateFieldValue(options, value, now)` in `domain/fields.ts`, used by the API and the web app (person)
 - [ ] API: set field values by key and complete a step, enforcing required fields, halt steps and `allowFuture` (date fields against `todayIn` the user's zone) (person)
 - [ ] API: skip a skippable step with a reason (person)

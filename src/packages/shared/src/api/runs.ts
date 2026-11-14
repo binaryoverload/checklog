@@ -1,10 +1,19 @@
+import z from "zod"
+
 import type { CreatedFields, UpdatedFields } from "./common.ts"
+import { paginationQuerySchema } from "./pagination.ts"
 import type { TemplateFieldDto, TemplateStepDto } from "./templates.ts"
 import type { Assignee } from "../domain/assignees.ts"
 import type { FieldValue } from "../domain/fields.ts"
+import { runListScopeSchema, runStatusSchema } from "../domain/runs.ts"
 import type { RunStatus, RunStepStatus } from "../domain/runs.ts"
 
-// TODO (person): request schemas for the run routes
+export const listRunsQuerySchema = paginationQuerySchema()
+  .and(z.object({
+    scope: runListScopeSchema.default("all"),
+    status: runStatusSchema.optional(),
+  }))
+export type ListRunsQuery = z.infer<typeof listRunsQuerySchema>
 
 export type RunDto = {
   id: string

@@ -10,10 +10,10 @@ export interface RunRows {
   run: Run
   templateId: string
   templateSteps: TemplateStep[]
-  steps: RunStep[]
-  fields: TemplateField[]
-  values: RunFieldValue[]
-  notes: StepNote[]
+  templateFields: TemplateField[]
+  runSteps: RunStep[]
+  runStepNotes: StepNote[]
+  runFieldValues: RunFieldValue[]
 }
 
 export function toRunDto(row: Run, templateId: string): RunDto {
@@ -34,13 +34,13 @@ export function toRunDto(row: Run, templateId: string): RunDto {
 
 export function toRunWithDetailsDto(rows: RunRows): RunWithDetailsDto {
   const templateStepsById = keyBy(rows.templateSteps, step => step.id)
-  const fieldsByStep = groupBy(rows.fields, field => field.templateStepId)
-  const valuesByStep = groupBy(rows.values, value => value.runStepId)
-  const notesByStep = groupBy(rows.notes, note => note.runStepId)
+  const fieldsByStep = groupBy(rows.templateFields, field => field.templateStepId)
+  const valuesByStep = groupBy(rows.runFieldValues, value => value.runStepId)
+  const notesByStep = groupBy(rows.runStepNotes, note => note.runStepId)
 
   // Run steps in template order; each needs its template step for the position and halt flag
   const ordered = sortBy(
-    rows.steps.map(step => ({ step, templateStep: templateStepsById[step.templateStepId]! })),
+    rows.runSteps.map(step => ({ step, templateStep: templateStepsById[step.templateStepId]! })),
     [({ templateStep }) => templateStep.position],
   )
 
