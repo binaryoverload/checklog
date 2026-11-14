@@ -5,7 +5,7 @@ import { teamMembers, teams } from "@/db/auth-schema.ts"
 import { db } from "@/db/index.ts"
 import { runs, runSteps, templateAccess, templates, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
-import type { Database, Member, UserContext, User } from "@/util/types.ts"
+import type { Database, Member, UserContext, User, RunStep } from "@/util/types.ts"
 import { orgRoles, platformRoles } from "@checklog/shared/auth"
 import type { OrgStatementsCheckInput, PlatformStatementsCheckInput } from "@checklog/shared/auth"
 import { highestTemplateAccessLevel, templateAccessIncludes, templateAccessLevels } from "@checklog/shared/domain"
@@ -156,6 +156,18 @@ export function runScopeWhere(context: UserContext, scope: RunListScope): SQL | 
     case "all": return undefined
     case "mine": return hasStepAssigned(member)
     case "groups": return hasStepAssigned(teams, roles)
+  }
+}
+
+type ActOnStepInput = Pick<RunStep, "assigneeType" | "assigneeMemberId" | "assigneeTeamId" | "assigneeRole">
+export function canActOnStep(step: ActOnStepInput, member: Member, teamIds: string[], templateAccessLevel: TemplateAccessLevel | null) {
+  const roles = memberRoles(member)
+
+  switch (step.assigneeType) {
+    case "member": return step.assigneeMemberId === member.id
+    case "team": return step.assigneeTeamId != null && teamIds.includes(step.assigneeTeamId)
+    case "role": return step.assigneeRole != null && roles.includes(step.assigneeRole)
+    case null: return templateAccessLevel != null && templateAccessIncludes(templateAccessLevel, "run")
   }
 }
 

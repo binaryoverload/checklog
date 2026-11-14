@@ -113,7 +113,7 @@ Helpers the run routes share, each its own small pull request or part of the fir
 
 - [ ] API: `startRun` from a template's current version, creating its run steps with resolved assignees and due dates from `addOffset`; `runs.timezone` from the schedule, or from `X-Timezone` for an ad hoc run (person)
 - [ ] API: run start check, refused with `precondition_failed`: the template is active with a current version that isn't archived, no missing assignees (`assignee_type` set but its column null), and assigned members and groups still belong to the organization (person). See [Missing assignees](plans/db-structure.md#missing-assignees).
-- [ ] Run step permission check `canActOnStep` in `core/permissions.ts`: the step's assignee (member, group or role), or anyone with `run` on the template when the step is unassigned (person)
+- [x] Run step permission check `canActOnStep` in `core/permissions.ts`: the step's assignee (member, group or exact role, with no role hierarchy), or anyone with `run` on the template when the step is unassigned; nobody when the assigned member or group has been removed (person)
 - [x] API: list runs (mine, my groups', all, plus status) and get one run with its steps, fields, values, notes and a computed `blocked`; anyone with `view` on the template, assigned a step or who started the run sees the whole run (person)
 - [x] Shared `validateFieldValue(options, value, now)` in `domain/fields.ts`, used by the API and the web app (person)
 - [ ] API: set field values by key and complete a step, enforcing required fields, halt steps and `allowFuture` (date fields against `todayIn` the user's zone) (person)
