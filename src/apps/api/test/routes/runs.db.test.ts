@@ -214,6 +214,25 @@ describe("GET /api/runs/:runId", () => {
       expectStatus(await getRun(run.id), 200)
     })
 
+    test("lets the member who started the run see it without template access or an assigned step", async () => {
+      const { organization, member } = await signedInMember("viewer")
+      const { version, templateSteps: [templateStep] } = await publishedTemplate(organization, [{}])
+      const run = await insertRun(version, { createdBy: member.userId })
+      await insertRunStep(run, templateStep!)
+
+      expectStatus(await getRun(run.id), 200)
+    })
+
+    test("refuses a run someone else started, without template access or an assigned step, with not_found", async () => {
+      const { organization } = await signedInMember("viewer")
+      const { member: starter } = await createMember(db, organization, "viewer")
+      const { version, templateSteps: [templateStep] } = await publishedTemplate(organization, [{}])
+      const run = await insertRun(version, { createdBy: starter.userId })
+      await insertRunStep(run, templateStep!)
+
+      expectError(await getRun(run.id), 404, "not_found")
+    })
+
     test("refuses a run whose steps are assigned only to someone else with not_found", async () => {
       const { organization } = await signedInMember("viewer")
       const { member: someoneElse } = await createMember(db, organization, "viewer")
@@ -263,6 +282,29 @@ describe("GET /api/runs", () => {
     expect(body.items.map(run => run.id)).toEqual([third!.id, second!.id, first!.id])
     expect(body).toMatchObject({ nextCursor: null, total: 3 })
     expect(body.items[0]).not.toHaveProperty("organizationId")
+  })
+
+  test("includes runs the member started for scope=all, but not for scope=mine or scope=groups", async () => {
+    const { organization, member } = await signedInMember("viewer")
+    const { version, templateSteps: [templateStep] } = await publishedTemplate(organization, [{}])
+    const started = await insertRun(version, { createdBy: member.userId })
+    await insertRunStep(started, templateStep!)
+
+    expect(((await listRuns()).body as Paginated<RunDto>).items.map(run => run.id)).toEqual([started.id])
+    expect(((await listRuns({ scope: "mine" })).body as Paginated<RunDto>).items).toEqual([])
+    expect(((await listRuns({ scope: "groups" })).body as Paginated<RunDto>).items).toEqual([])
+  })
+
+  test("returns only the admin's assigned runs for scope=mine, not every run in the organization", async () => {
+    const { organization, member } = await signedInMember("admin")
+    const { version, templateSteps: [templateStep] } = await publishedTemplate(organization, [{}])
+    const mine = await insertRun(version)
+    await insertRunStep(mine, templateStep!, { assigneeType: "member", assigneeMemberId: member.id })
+    const other = await insertRun(version)
+    await insertRunStep(other, templateStep!)
+
+    expect(((await listRuns({ scope: "mine" })).body as Paginated<RunDto>).items.map(run => run.id)).toEqual([mine.id])
+    expect(((await listRuns()).body as Paginated<RunDto>).items.map(run => run.id).sort()).toEqual([mine.id, other.id].sort())
   })
 
   test("includes runs with a step assigned to the member, and leaves out runs they can't see", async () => {
