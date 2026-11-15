@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm"
 import { auth } from "@/core/auth.ts"
 import { logger } from "@/core/logger.ts"
 import { members, organizations, users } from "@/db/auth-schema.ts"
-import { db, pool } from "@/db/index.ts"
+import { db } from "@/db/index.ts"
 import type { OrgRole } from "@checklog/shared/auth"
 import { platformAdminRoleName } from "@checklog/shared/auth"
 
@@ -26,8 +26,18 @@ const seedOrganizations = [
   { name: "Globex", slug: "globex" },
 ]
 
-if (process.env.NODE_ENV === "production") {
-  throw new Error("Refusing to seed a production database")
+export const signInEmails = [platformAdmin, ...organizationUsers].map(({ email }) => email)
+
+// A seeded member of an organization, as the later seeds need them
+export interface SeededMember {
+  userId: string
+  memberId: string
+}
+
+export interface SeededOrganization {
+  id: string
+  name: string
+  members: Record<OrgRole, SeededMember>
 }
 
 // Users and organizations go through Better Auth so passwords are hashed and IDs are generated as usual.
@@ -41,13 +51,6 @@ async function findOrCreateUser({ name, email, role }: { name: string, email: st
   return userId
 }
 
-await findOrCreateUser(platformAdmin)
-const seededMembers = []
-for (const { organizationRole, ...user } of organizationUsers) {
-  seededMembers.push({ userId: await findOrCreateUser({ ...user, role: "user" }), organizationRole })
-}
-const ownerId = seededMembers.find(({ organizationRole }) => organizationRole === "owner")!.userId
-
 // Creating an organization through Better Auth also makes its creator the owner
 async function findOrCreateOrganization({ name, slug }: { name: string, slug: string }, ownerId: string) {
   const existing = await db.query.organizations.findFirst({ where: eq(organizations.slug, slug) })
@@ -59,21 +62,35 @@ async function findOrCreateOrganization({ name, slug }: { name: string, slug: st
 }
 
 // Adds a missing membership through Better Auth, and puts back a role that was changed since
-async function ensureMembership(organizationId: string, userId: string, role: OrgRole) {
+async function ensureMembership(organizationId: string, userId: string, role: OrgRole): Promise<string> {
   const membership = await db.query.members.findFirst({ where: and(eq(members.userId, userId), eq(members.organizationId, organizationId)) })
   if (!membership) {
-    await auth.api.addMember({ body: { organizationId, userId, role } })
-  } else if (membership.role !== role) {
+    const added = await auth.api.addMember({ body: { organizationId, userId, role } })
+    return added!.id
+  }
+  if (membership.role !== role) {
     await db.update(members).set({ role }).where(eq(members.id, membership.id))
   }
+  return membership.id
 }
 
-for (const seedOrganization of seedOrganizations) {
-  const organizationId = await findOrCreateOrganization(seedOrganization, ownerId)
-  for (const { userId, organizationRole } of seededMembers) {
-    await ensureMembership(organizationId, userId, organizationRole)
+export async function seedAccounts(): Promise<SeededOrganization[]> {
+  await findOrCreateUser(platformAdmin)
+
+  const seededUsers = []
+  for (const { organizationRole, ...user } of organizationUsers) {
+    seededUsers.push({ userId: await findOrCreateUser({ ...user, role: "user" }), organizationRole })
   }
-}
+  const ownerId = seededUsers.find(({ organizationRole }) => organizationRole === "owner")!.userId
 
-logger.info(`Seed complete; sign in with ${[platformAdmin, ...organizationUsers].map(({ email }) => email).join(", ")}`)
-await pool.end()
+  const seeded: SeededOrganization[] = []
+  for (const seedOrganization of seedOrganizations) {
+    const organizationId = await findOrCreateOrganization(seedOrganization, ownerId)
+    const organizationMembers = {} as Record<OrgRole, SeededMember>
+    for (const { userId, organizationRole } of seededUsers) {
+      organizationMembers[organizationRole] = { userId, memberId: await ensureMembership(organizationId, userId, organizationRole) }
+    }
+    seeded.push({ id: organizationId, name: seedOrganization.name, members: organizationMembers })
+  }
+  return seeded
+}

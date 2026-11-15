@@ -39,6 +39,8 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 - [x] API structure: a router per area under `/api`, the typed `route()` helper validating with Zod schemas from `packages/shared`, the error format with an error handler, and a not-found handler; see [API and auth](implementation-notes.md#api-and-auth) (agent)
 - [x] Session middleware: read the Better Auth session on every API request and expose the user and active organization to handlers (person)
 - [x] Development seed: `pnpm db:seed` creates sign-in accounts and an organization through Better Auth (agent)
+- [x] Seed groups and templates, split into modules: published, draft-only and archived templates and versions, every field type and assignee kind, and access grants (agent)
+- [ ] Seed runs once `startRun` exists: in-progress, completed and cancelled runs with values and notes (agent)
 - [x] The permission function: one place that answers "can this user do this in this organization", from the member's role and `template_access`, in `core/permissions.ts` (person)
 - [ ] **Shared API contracts:** request schemas (Zod) and response types (plain TypeScript, `Dto` suffix) in the shared package's `api` entry point, filled by mappers in the API
   - [x] Restructure `packages/shared` into the `api`, `domain`, `auth` and `utils` entry points: split `enums.ts` and the area files between `api/` and `domain/`, switch to subpath exports with no root entry, update every import and the tsdown `alwaysBundle` pattern (agent, behaviour-neutral refactor)
