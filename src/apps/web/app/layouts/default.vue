@@ -19,7 +19,7 @@ const organization: NavigationMenuItem[] = [
 const activeOrganization = useActiveOrganization()
 
 useHead(computed(() => ({
-  title: route.meta.title ?? "Checklog",
+  title: route.meta.title ? `Checklog - ${route.meta.title}` : "Checklog",
 })))
 </script>
 

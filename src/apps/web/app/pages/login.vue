@@ -8,11 +8,7 @@ import { requiredString } from "@checklog/shared/utils"
 definePageMeta({
   layout: "auth",
   auth: "public",
-})
-
-useSeoMeta({
   title: "Login",
-  description: "Login to your account to continue",
 })
 
 const fields = [{

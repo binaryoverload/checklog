@@ -7,11 +7,7 @@ import { requiredString } from "@checklog/shared/utils"
 definePageMeta({
   layout: "auth",
   auth: "public",
-})
-
-useSeoMeta({
   title: "Sign up",
-  description: "Create an account to get started",
 })
 
 const fields = [{
