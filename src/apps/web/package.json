@@ -20,6 +20,7 @@
     "@nuxt/ui": "catalog:",
     "@tanstack/vue-query": "catalog:",
     "better-auth": "catalog:",
+    "es-toolkit": "catalog:",
     "luxon": "catalog:",
     "nuxt": "catalog:",
     "tailwindcss": "catalog:",

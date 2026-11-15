@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import type { ButtonProps, TableColumn } from "@nuxt/ui"
+import { capitalize } from "es-toolkit"
 
 import { TemplateSlideover } from "#components"
 import type { TemplateListItemDto } from "@checklog/shared/api"
+import type { TemplateStatus } from "@checklog/shared/domain"
+import { templateStatuses } from "@checklog/shared/domain"
 import { useTemplatesQuery } from "~/queries/templates.ts"
 
 definePageMeta({ title: "Templates" })
-
-const { data, isLoading } = useTemplatesQuery({ status: "active", limit: 100 })
 
 const VersionTags = resolveComponent("VersionTags")
 const UserDisplay = resolveComponent("UserDisplay")
@@ -46,29 +47,42 @@ const columns: TableColumn<TemplateListItemDto>[] = [
 ]
 
 const pageDescription = computed(() => `${data.value?.pages[0]?.total ?? "-"} templates`)
-const pageLinks: ButtonProps[] = [
+
+const can = useCan()
+
+const pageLinks = computed<ButtonProps[]>(() => [
   {
     label: "New Template",
     color: "primary",
     variant: "soft",
     icon: "i-lucide-plus",
-    to: "/templates/new",
+    onClick: () => createModalOpen.value = true,
+    disabled: !can({ template: ["create"] }),
   },
-]
+])
 
 const overlay = useOverlay()
-
 const slideover = overlay.create(TemplateSlideover)
+
+const createModalOpen = ref(false)
+const selectedTab = ref<TemplateStatus>("active")
+
+const tabItems = templateStatuses.map(s => ({ label: capitalize(s), value: s }))
+
+const { data, isLoading } = useTemplatesQuery(() => ({ status: selectedTab.value, limit: 100 }))
 
 </script>
 
 <template>
   <div>
+    <CreateTemplateModal :open="createModalOpen" @close="createModalOpen = false" />
     <UPageHeader
       title="Templates"
       :description="pageDescription"
       :links="pageLinks"
     />
+    <div class="w-max"><UTabs v-model="selectedTab" variant="pill" :items="tabItems" /></div>
+
     <UTable
       :ui="{ tr: 'data-[selectable=true]:cursor-pointer' }"
       :loading="isLoading"

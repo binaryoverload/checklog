@@ -1,6 +1,6 @@
-import { infiniteQueryOptions, queryOptions, skipToken, useInfiniteQuery, useQuery } from "@tanstack/vue-query"
+import { infiniteQueryOptions, queryOptions, skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/vue-query"
 
-import type { TemplateAccessWithNameDto, ListTemplatesQuery, Paginated, TemplateDetailsDto, TemplateDto, TemplateVersionDto, TemplateVersionWithStepsDto, TemplateListItemDto } from "@checklog/shared/api"
+import type { TemplateAccessWithNameDto, ListTemplatesQuery, Paginated, TemplateDetailsDto, TemplateVersionDto, TemplateVersionWithStepsDto, TemplateListItemDto, CreateTemplateBody, TemplateDto, UpdateTemplateBody } from "@checklog/shared/api"
 
 type Api = ReturnType<typeof useApi>
 type TemplateListFilters = Omit<ListTemplatesQuery, "cursor">
@@ -86,4 +86,22 @@ export function useTemplateAccessQuery(templateId: MaybeRefOrGetter<string>) {
   const query = useQuery(computed(() => templateQueries.access(api, toValue(templateId))))
   onServerPrefetch(query.suspense)
   return query
+}
+
+export function useCreateTemplateMutation() {
+  const api = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: CreateTemplateBody) => api<TemplateDto>(`/templates`, { method: "POST", body }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: templateKeys.lists() }),
+  })
+}
+
+export function useUpdateTemplateMutation() {
+  const api = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (params: { id: string, body: UpdateTemplateBody }) => api<TemplateDto>(`/templates/${params.id}`, { method: "PATCH", body: params.body }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: templateKeys.lists() }),
+  })
 }
