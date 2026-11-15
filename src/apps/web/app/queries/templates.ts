@@ -1,6 +1,6 @@
-import { infiniteQueryOptions, queryOptions, useInfiniteQuery, useQuery } from "@tanstack/vue-query"
+import { infiniteQueryOptions, queryOptions, skipToken, useInfiniteQuery, useQuery } from "@tanstack/vue-query"
 
-import type { ListTemplatesQuery, Paginated, TemplateDetails, TemplateDto } from "@checklog/shared/api"
+import type { TemplateAccessWithNameDto, ListTemplatesQuery, Paginated, TemplateDetailsDto, TemplateDto, TemplateVersionDto, TemplateVersionWithStepsDto, TemplateListItemDto } from "@checklog/shared/api"
 
 type Api = ReturnType<typeof useApi>
 type TemplateListFilters = Omit<ListTemplatesQuery, "cursor">
@@ -19,13 +19,31 @@ export const templateKeys = {
 export const templateQueries = {
   list: (api: Api, filters: TemplateListFilters) => infiniteQueryOptions({
     queryKey: templateKeys.list(filters),
-    queryFn: ({ pageParam, signal }) => api<Paginated<TemplateDto>>("/templates", { query: { ...filters, cursor: pageParam }, signal }),
+    queryFn: ({ pageParam, signal }) => api<Paginated<TemplateListItemDto>>("/templates", { query: { ...filters, cursor: pageParam }, signal }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
   }),
   detail: (api: Api, id: string) => queryOptions({
     queryKey: templateKeys.detail(id),
-    queryFn: ({ signal }) => api<TemplateDetails>(`/templates/${id}`, { signal }),
+    queryFn: ({ signal }) => api<TemplateDetailsDto>(`/templates/${id}`, { signal }),
+  }),
+  versions: (api: Api, id: string) => queryOptions({
+    queryKey: templateKeys.versions(id),
+    queryFn: ({ signal }) => api<TemplateVersionDto[]>(`/templates/${id}/versions`, { signal }),
+  }),
+  version: (api: Api, id: string, versionId: string | null | undefined) => queryOptions({
+    queryKey: templateKeys.version(id, versionId ?? ""),
+    queryFn: versionId
+      ? ({ signal }) => api<TemplateVersionWithStepsDto>(`/templates/${id}/versions/${versionId}`, { signal })
+      : skipToken,
+  }),
+  draft: (api: Api, id: string) => queryOptions({
+    queryKey: templateKeys.draft(id),
+    queryFn: ({ signal }) => api<TemplateVersionWithStepsDto>(`/templates/${id}/draft`, { signal }),
+  }),
+  access: (api: Api, id: string) => queryOptions({
+    queryKey: templateKeys.access(id),
+    queryFn: ({ signal }) => api<TemplateAccessWithNameDto[]>(`/templates/${id}/access`, { signal }),
   }),
 }
 
@@ -36,9 +54,36 @@ export function useTemplatesQuery(filters: MaybeRefOrGetter<TemplateListFilters>
   return query
 }
 
-export function useTemplateQuery(id: MaybeRefOrGetter<string>) {
+export function useTemplateQuery(templateId: MaybeRefOrGetter<string>) {
   const api = useApi()
-  const query = useQuery(computed(() => templateQueries.detail(api, toValue(id))))
+  const query = useQuery(computed(() => templateQueries.detail(api, toValue(templateId))))
+  onServerPrefetch(query.suspense)
+  return query
+}
+
+export function useTemplateVersionsQuery(templateId: MaybeRefOrGetter<string>) {
+  const api = useApi()
+  const query = useQuery(computed(() => templateQueries.versions(api, toValue(templateId))))
+  onServerPrefetch(query.suspense)
+  return query
+}
+
+export function useTemplateVersionQuery(templateId: MaybeRefOrGetter<string>, versionId: MaybeRefOrGetter<string | null | undefined>) {
+  const api = useApi()
+  const query = useQuery(computed(() => templateQueries.version(api, toValue(templateId), toValue(versionId))))
+  return query
+}
+
+export function useTemplateDraftQuery(templateId: MaybeRefOrGetter<string>) {
+  const api = useApi()
+  const query = useQuery(computed(() => templateQueries.draft(api, toValue(templateId))))
+  onServerPrefetch(query.suspense)
+  return query
+}
+
+export function useTemplateAccessQuery(templateId: MaybeRefOrGetter<string>) {
+  const api = useApi()
+  const query = useQuery(computed(() => templateQueries.access(api, toValue(templateId))))
   onServerPrefetch(query.suspense)
   return query
 }
