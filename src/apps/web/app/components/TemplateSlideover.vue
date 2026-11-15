@@ -9,14 +9,14 @@ const { data: templateVersion, isLoading: versionLoading } = useTemplateVersionQ
   () => props.template.id,
   () => props.template.currentVersion?.id,
 )
-const emit = defineEmits<{ close: [boolean] }>()
+const emit = defineEmits<{ close: [] }>()
 
 </script>
 
 <template>
   <USlideover
     title="Template preview"
-    :close="{ onClick: () => emit('close', false) }"
+    :close="{ onClick: () => emit('close') }"
   >
     <template #body>
       <UPageHeader :title="template.name" :description="template.description ?? undefined" />
@@ -55,8 +55,8 @@ const emit = defineEmits<{ close: [boolean] }>()
           <p class="mb-4">Steps</p>
           <div class="space-y-2">
             <template v-for="step in templateVersion.steps" :key="step.id">
-              <div class="grid grid-cols-[10px_auto_1fr] gap-2">
-                <div class="flex items-center">
+              <div class="grid grid-cols-[20px_auto_1fr] gap-2">
+                <div class="flex items-center justify-center">
                   <p class="text-muted text-sm">{{ step.position + 1 }}</p>
                 </div>
                 <div class="flex items-center">
