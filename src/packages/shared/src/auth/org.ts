@@ -1,6 +1,8 @@
 import { createAccessControl } from "better-auth/plugins/access"
 import { defaultStatements } from "better-auth/plugins/organization/access"
 
+import { memberRoles } from "./utils.ts"
+
 const appStatements = {
   template: [
     "create", // Can create new templates
@@ -56,3 +58,15 @@ export const orgRoles = {
 }
 
 export type OrgRole = keyof typeof orgRoles
+
+export function memberCan(member: { role: string }, permissions: OrgStatementsCheckInput): boolean {
+  const roles = memberRoles(member)
+
+  return roles.some((roleName) => {
+    if (!Object.hasOwn(orgRoles, roleName)) return false
+
+    const role = orgRoles[roleName as keyof typeof orgRoles]
+
+    return role.authorize(permissions).success
+  })
+}
