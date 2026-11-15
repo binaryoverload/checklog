@@ -33,7 +33,10 @@ type VersionWithSteps = TemplateVersionDto & { steps: (TemplateStepDto & { field
 const draftRoutes: TemplateRoute[] = [
   {
     name: "GET /api/templates/:templateId/draft",
-    send: id => api().get(`/api/templates/${id}/draft`),
+    send: async (id) => {
+      await draftIn(id)
+      return api().get(`/api/templates/${id}/draft`)
+    },
     needs: "view",
     impersonation: "allow",
     status: "active",
@@ -110,7 +113,7 @@ describe("GET /api/templates/:templateId/draft", () => {
     const response = await getDraft(template.id)
 
     expectStatus(response, 200)
-    const draftVersion = (response.body as { draftVersion: VersionWithSteps }).draftVersion
+    const draftVersion = response.body as VersionWithSteps
     expect(draftVersion).toMatchObject({ id: draft.id, version: 1, status: "draft" })
     expect(draftVersion.steps.map(step => step.title)).toEqual(["First", "Second"])
     expect(draftVersion.steps.map(step => step.fields.map(field => field.key))).toEqual([["earlier", "later"], ["other"]])
@@ -122,7 +125,7 @@ describe("GET /api/templates/:templateId/draft", () => {
     await db.update(templateSteps).set({ assigneeType: "member", assigneeMemberId: member.id }).where(eq(templateSteps.id, step!.id))
     await insertTemplateField(db, step!, { key: "reading", type: "number", options: { type: "number", unit: "°C" } })
 
-    const draftVersion = ((await getDraft(template.id)).body as { draftVersion: VersionWithSteps }).draftVersion
+    const draftVersion = (await getDraft(template.id)).body as VersionWithSteps
 
     expect(draftVersion).not.toHaveProperty("organizationId")
     expect(draftVersion.steps[0]).toMatchObject({ assignee: { type: "member", memberId: member.id }, assigneeMissing: false })
@@ -137,24 +140,24 @@ describe("GET /api/templates/:templateId/draft", () => {
 
     const response = await getDraft(template.id)
 
-    expect((response.body as { draftVersion: VersionWithSteps }).draftVersion.steps).toEqual([])
+    expect((response.body as VersionWithSteps).steps).toEqual([])
   })
 
-  test("returns null when the template has no draft, without the published version's steps", async () => {
+  test("refuses a template with no draft with not_found, without the published version's steps", async () => {
     const { organization } = await signedInMember("owner")
     const { template } = await publishedWithSteps(organization, ["Published"])
 
     const response = await getDraft(template.id)
 
-    expectStatus(response, 200)
-    expect(response.body).toEqual({ draftVersion: null })
+    expectError(response, 404, "not_found")
+    expect(response.body).not.toHaveProperty("steps")
   })
 
   test("returns only the draft's steps when there's also a published version", async () => {
     const { organization } = await signedInMember("owner")
     const { template, draft } = await publishedWithDraft(organization, ["Draft step"])
 
-    const draftVersion = ((await getDraft(template.id)).body as { draftVersion: VersionWithSteps }).draftVersion
+    const draftVersion = (await getDraft(template.id)).body as VersionWithSteps
 
     expect(draftVersion.id).toBe(draft.id)
     expect(draftVersion.steps.map(step => step.title)).toEqual(["Draft step"])
@@ -164,7 +167,7 @@ describe("GET /api/templates/:templateId/draft", () => {
     const { organization } = await signedInMember("owner")
     const { template, published } = await publishedWithSteps(organization, ["Published"])
 
-    expectStatus(await getDraft(template.id), 200)
+    expectError(await getDraft(template.id), 404, "not_found")
 
     expect((await versionsOf(template)).map(version => version.id)).toEqual([published.id])
   })
@@ -195,7 +198,7 @@ describe("POST /api/templates/:templateId/draft", () => {
 
     const response = await startEditing(template.id)
 
-    const draftVersion = (response.body as { draftVersion: VersionWithSteps }).draftVersion
+    const draftVersion = response.body as VersionWithSteps
     expect(draftVersion).toMatchObject({ version: 2, status: "draft" })
     expect(draftVersion.id).not.toBe(published.id)
     expect(draftVersion.steps.map(step => step.title)).toEqual(["First", "Second"])
@@ -208,7 +211,7 @@ describe("POST /api/templates/:templateId/draft", () => {
     const { organization } = await signedInMember("owner")
     const { template, draft } = await draftWithSteps(organization, ["Edited"])
 
-    const draftVersion = ((await startEditing(template.id)).body as { draftVersion: VersionWithSteps }).draftVersion
+    const draftVersion = (await startEditing(template.id)).body as VersionWithSteps
 
     expect(draftVersion.id).toBe(draft.id)
     expect(draftVersion.steps.map(step => step.title)).toEqual(["Edited"])

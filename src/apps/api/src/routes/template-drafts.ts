@@ -28,19 +28,14 @@ templateDraftsRouter.get("/:id/draft", route({ params: typeIdParamSchema("templa
     .where(and(eq(templates.id, params.id), visible))
 
   if (!row) throw new HttpError("not_found", "Template not found")
-  if (!row.draft) {
-    res.json({ draftVersion: null })
-    return
-  }
+  if (!row.draft) throw new HttpError("not_found", "Template has no draft")
 
   const [steps, fields] = await Promise.all([
     db.select().from(templateSteps).where(eq(templateSteps.templateVersionId, row.draft.id)),
     db.select().from(templateFields).where(eq(templateFields.templateVersionId, row.draft.id)),
   ])
 
-  res.json({
-    draftVersion: toTemplateVersionWithStepsDto(row.draft, steps, fields),
-  })
+  res.json(toTemplateVersionWithStepsDto(row.draft, steps, fields))
 }))
 
 templateDraftsRouter.post("/:id/draft", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
@@ -55,9 +50,7 @@ templateDraftsRouter.post("/:id/draft", route({ params: typeIdParamSchema("templ
     return [draft, steps, fields]
   })
 
-  res.json({
-    draftVersion: toTemplateVersionWithStepsDto(draft, steps, fields),
-  })
+  res.json(toTemplateVersionWithStepsDto(draft, steps, fields))
 }))
 
 templateDraftsRouter.delete("/:id/draft", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
