@@ -1,16 +1,49 @@
 <script setup lang="ts">
 import type { TemplateListItemDto } from "@checklog/shared/api"
 import { templateAccessIncludes } from "@checklog/shared/domain"
-import { useTemplateVersionQuery } from "~/queries/templates.ts"
+import { useArchiveTemplateMutation, useRestoreTemplateMutation, useTemplateQuery, useTemplateVersionQuery } from "~/queries/templates.ts"
 
 const props = defineProps<{ template: TemplateListItemDto }>()
 
+const { data: details } = useTemplateQuery(() => props.template.id)
+const template = computed(() => details.value ?? props.template)
+
 const { data: templateVersion, isLoading: versionLoading } = useTemplateVersionQuery(
-  () => props.template.id,
-  () => props.template.currentVersion?.id,
+  () => template.value.id,
+  () => template.value.currentVersion?.id,
 )
+
 const emit = defineEmits<{ close: [] }>()
 
+const toast = useToast()
+const confirm = useConfirm()
+const archiveMutation = useArchiveTemplateMutation()
+const restoreMutation = useRestoreTemplateMutation()
+
+const archived = computed(() => template.value.status === "archived")
+
+const canEdit = computed(() => templateAccessIncludes(template.value.accessLevel, "edit"))
+const canRun = computed(() => templateAccessIncludes(template.value.accessLevel, "run") && !archived.value)
+
+async function archiveTemplate() {
+  const confirmed = await confirm({
+    title: "Archive template?",
+    description: `Are you sure you would like to archive the template '${template.value.name}'?`,
+    confirmLabel: "Archive",
+    color: "error",
+  })
+  if (confirmed) {
+    archiveMutation.mutate(template.value.id, {
+      onSuccess: () => toast.add({ title: "Template archived" }),
+    })
+  }
+}
+
+function restoreTemplate() {
+  restoreMutation.mutate(template.value.id, {
+    onSuccess: () => toast.add({ title: "Template restored" }),
+  })
+}
 </script>
 
 <template>
@@ -19,20 +52,32 @@ const emit = defineEmits<{ close: [] }>()
     :close="{ onClick: () => emit('close') }"
   >
     <template #body>
-      <UPageHeader :title="template.name" :description="template.description ?? undefined" />
-      <div v-if="templateAccessIncludes(template.accessLevel, 'run')" class="flex gap-2 mb-4">
-        <UButton v-if="templateAccessIncludes(template.accessLevel, 'edit')" label="Edit" color="neutral" />
+      <UPageHeader :title="template.name" :description="template.description ?? undefined" :ui="{ title: 'flex items-center gap-2' }">
+        <template #title>
+          <span>{{ template.name }}</span><UBadge v-if="archived" color="warning" label="Archived" />
+        </template>
+      </UPageHeader>
+      <div v-if="canRun || canEdit" class="flex gap-2 mb-4">
+        <UButton v-if="canEdit && !archived" label="Edit" color="neutral" />
         <UButton
-          v-if="templateAccessIncludes(template.accessLevel, 'run')"
+          v-if="canRun"
           label="Start Run"
           color="primary"
           icon="i-lucide-circle-play"
         />
         <UButton
-          v-if="templateAccessIncludes(template.accessLevel, 'edit')"
+          v-if="canEdit && !archived"
           label="Archive"
           color="error"
           icon="i-lucide-archive"
+          @click="archiveTemplate"
+        />
+        <UButton
+          v-if="canEdit && archived"
+          label="Restore"
+          color="success"
+          icon="i-lucide-archive-restore"
+          @click="restoreTemplate"
         />
       </div>
       <USeparator class="mb-4" />

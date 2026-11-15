@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import type { TemplateListItemDto } from "@checklog/shared/api"
-
-defineProps<{ template: TemplateListItemDto }>()
+defineProps<{ template: { currentVersion: { version: number } | null, draftVersion: { version: number } | null } }>()
 </script>
 
 <template>

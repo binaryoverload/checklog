@@ -105,3 +105,27 @@ export function useUpdateTemplateMutation() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: templateKeys.lists() }),
   })
 }
+
+export function useArchiveTemplateMutation() {
+  const api = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api<TemplateDto>(`/templates/${id}/archive`, { method: "POST" }),
+    onSuccess: (_template, id) => Promise.all([
+      queryClient.invalidateQueries({ queryKey: templateKeys.lists() }),
+      queryClient.invalidateQueries({ queryKey: templateKeys.detail(id) }),
+    ]),
+  })
+}
+
+export function useRestoreTemplateMutation() {
+  const api = useApi()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api<TemplateDto>(`/templates/${id}/restore`, { method: "POST" }),
+    onSuccess: (_template, id) => Promise.all([
+      queryClient.invalidateQueries({ queryKey: templateKeys.lists() }),
+      queryClient.invalidateQueries({ queryKey: templateKeys.detail(id) }),
+    ]),
+  })
+}
