@@ -38,9 +38,18 @@ export type TemplateDto = {
   currentVersionId: string | null
 } & CreatedFields & UpdatedFields
 
-export type TemplateDetails = TemplateDto & {
+export type TemplateVersionSummaryDto = Pick<TemplateVersionDto, "id" | "version"> & { stepCount: number }
+
+export type TemplateListItemDto = TemplateDto & {
+  currentVersion: TemplateVersionSummaryDto | null
+  draftVersion: Pick<TemplateVersionDto, "id" | "version"> | null
+  accessLevel: TemplateAccessLevel
+}
+
+export type TemplateDetailsDto = TemplateDto & {
   currentVersion: TemplateVersionDto | null
   draftVersion: TemplateVersionDto | null
+  accessLevel: TemplateAccessLevel
 }
 
 export type TemplateVersionDto = {

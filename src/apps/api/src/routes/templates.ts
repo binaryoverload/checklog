@@ -1,13 +1,13 @@
-import { and, asc, count, eq, inArray, desc } from "drizzle-orm"
+import { and, asc, count, eq, inArray, desc, aliasedTable } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { Router } from "express"
 
-import { assertCan, assertTemplateAccessLevel, templateAccessLevel, visibleTemplatesWhere } from "@/core/permissions.ts"
+import { assertCan, assertTemplateAccessLevel, templateAccessLevel, templateAccessLevelSql, visibleTemplatesWhere } from "@/core/permissions.ts"
 import { db } from "@/db/index.ts"
 import { schedules, templateFields, templates, templateSteps, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import { route } from "@/http/route.ts"
-import { toTemplateDto, toTemplateVersionDto, toTemplateVersionWithStepsDto } from "@/mappers/templates.ts"
+import { toTemplateDetailsDto, toTemplateDto, toTemplateListItemDto, toTemplateVersionDto, toTemplateVersionWithStepsDto } from "@/mappers/templates.ts"
 import { lockTemplate } from "@/services/templates.ts"
 import { isUniqueViolation } from "@/util/db.ts"
 import { cursorCondition, orderFor, toPage } from "@/util/pagination.ts"
@@ -49,21 +49,41 @@ templatesRouter.post("/", route({ body: createTemplateBodySchema }, async ({ bod
   }
 }))
 
-const templateSort: SortDefinition<Template> = {
+type TemplateListItem = {
+  template: Template
+  currentVersion: { id: string, version: number, stepCount: number } | null
+  draftVersion: { id: string, version: number } | null
+}
+
+const templateSort: SortDefinition<TemplateListItem> = {
   key: "name",
   direction: "asc",
   column: templates.name,
-  sortValue: row => row.name,
+  sortValue: row => row.template.name,
   idColumn: templates.id,
-  idOf: row => row.id,
+  idOf: row => row.template.id,
 }
 
 templatesRouter.get("/", route({ query: listTemplatesQuerySchema }, async ({ query, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "view")
 
+  const currentVersion = aliasedTable(templateVersions, "current_version")
+  const draftVersion = aliasedTable(templateVersions, "draft")
+
   const [rows, [counted]] = await Promise.all([
-    db.select().from(templates)
+    db.select({
+      template: templates,
+      currentVersion: {
+        id: currentVersion.id,
+        version: currentVersion.version,
+        stepCount: db.$count(templateSteps, eq(templateSteps.templateVersionId, currentVersion.id)),
+      },
+      draftVersion: { id: draftVersion.id, version: draftVersion.version },
+      accessLevel: templateAccessLevelSql({ member, organization }),
+    }).from(templates)
       .where(and(eq(templates.status, query.status), visible, cursorCondition(templateSort, query.cursor)))
+      .leftJoin(currentVersion, eq(currentVersion.id, templates.currentVersionId))
+      .leftJoin(draftVersion, and(eq(draftVersion.templateId, templates.id), eq(draftVersion.status, "draft")))
       .orderBy(asc(templates.status), ...orderFor(templateSort))
       .limit(query.limit + 1),
     db.select({ total: count() }).from(templates).where(and(eq(templates.status, query.status), visible)),
@@ -75,7 +95,7 @@ templatesRouter.get("/", route({ query: listTemplatesQuerySchema }, async ({ que
       limit: query.limit,
       total: counted!.total,
       sort: templateSort,
-      map: toTemplateDto,
+      map: row => toTemplateListItemDto(row.template, row.currentVersion, row.draftVersion, row.accessLevel),
     },
   ))
 }))
@@ -86,7 +106,12 @@ templatesRouter.get("/:id", route({ params: typeIdParamSchema("templates") }, as
   const currentVersion = alias(templateVersions, "current_version")
   const draft = alias(templateVersions, "draft")
   const [row] = await db
-    .select({ template: templates, currentVersion, draft })
+    .select({
+      template: templates,
+      currentVersion,
+      draft,
+      accessLevel: templateAccessLevelSql({ member, organization }),
+    })
     .from(templates)
     .leftJoin(currentVersion, eq(currentVersion.id, templates.currentVersionId))
     .leftJoin(draft, and(eq(draft.templateId, templates.id), eq(draft.status, "draft")))
@@ -94,11 +119,7 @@ templatesRouter.get("/:id", route({ params: typeIdParamSchema("templates") }, as
 
   if (!row) throw new HttpError("not_found", "Template not found")
 
-  res.json({
-    ...toTemplateDto(row.template),
-    currentVersion: row.currentVersion ? toTemplateVersionDto(row.currentVersion) : null,
-    draftVersion: row.draft ? toTemplateVersionDto(row.draft) : null,
-  })
+  res.json(toTemplateDetailsDto(row.template, row.currentVersion, row.draft, row.accessLevel))
 }))
 
 templatesRouter.get("/:id/versions", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {

@@ -1,8 +1,9 @@
 import { sortBy } from "es-toolkit"
 
 import type { Template, TemplateAccess, TemplateField, TemplateStep, TemplateVersion } from "@/util/types.ts"
-import type { TemplateAccessDto, TemplateAccessWithNameDto, TemplateDto, TemplateFieldDto, TemplateStepDto, TemplateStepWithFieldsDto, TemplateVersionDto, TemplateVersionWithStepsDto } from "@checklog/shared/api"
+import type { TemplateAccessDto, TemplateAccessWithNameDto, TemplateDetailsDto, TemplateDto, TemplateFieldDto, TemplateListItemDto, TemplateStepDto, TemplateStepWithFieldsDto, TemplateVersionDto, TemplateVersionWithStepsDto } from "@checklog/shared/api"
 import { flatToAssignee } from "@checklog/shared/domain"
+import type { TemplateAccessLevel } from "@checklog/shared/domain"
 
 export function toTemplateDto(row: Template): TemplateDto {
   return {
@@ -14,6 +15,34 @@ export function toTemplateDto(row: Template): TemplateDto {
     createdAt: row.createdAt.toISOString(),
     createdBy: row.createdBy,
     updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+export function toTemplateDetailsDto(
+  row: Template,
+  currentVersion: TemplateVersion | null,
+  draftVersion: TemplateVersion | null,
+  accessLevel: TemplateAccessLevel,
+): TemplateDetailsDto {
+  return {
+    ...toTemplateDto(row),
+    currentVersion: currentVersion ? toTemplateVersionDto(currentVersion) : null,
+    draftVersion: draftVersion ? toTemplateVersionDto(draftVersion) : null,
+    accessLevel,
+  }
+}
+
+export function toTemplateListItemDto(
+  row: Template,
+  currentVersion: { id: string, version: number, stepCount: number } | null,
+  draftVersion: { id: string, version: number } | null,
+  accessLevel: TemplateAccessLevel,
+): TemplateListItemDto {
+  return {
+    ...toTemplateDto(row),
+    currentVersion: currentVersion ? { id: currentVersion.id, version: currentVersion.version, stepCount: currentVersion.stepCount } : null,
+    draftVersion: draftVersion ? { id: draftVersion.id, version: draftVersion.version } : null,
+    accessLevel,
   }
 }
 

@@ -5,8 +5,9 @@ import { describe, expect, test } from "vitest"
 import { db } from "@/db/index.ts"
 import { schedules, templates, templateVersions } from "@/db/schema.ts"
 import { encodeCursor } from "@/util/pagination.ts"
-import type { Organization, Template, TemplateVersion } from "@/util/types.ts"
-import type { TemplateDetails, TemplateVersionDto } from "@checklog/shared/api"
+import type { Organization, Template, TemplateVersion, UserContext } from "@/util/types.ts"
+import type { TemplateDetailsDto, TemplateListItemDto, TemplateVersionDto } from "@checklog/shared/api"
+import type { TemplateAccessLevel } from "@checklog/shared/domain"
 import {
   addToGroup,
   createGroup,
@@ -16,7 +17,9 @@ import {
   grant,
   insertSchedule,
   insertTemplate,
+  insertTemplateStep,
   insertTemplateVersion,
+  setCurrentVersion,
 } from "@test/support/database.ts"
 import { api, expectError, expectStatus } from "@test/support/http.ts"
 import { signedInMember, stubSessions } from "@test/support/session.ts"
@@ -197,6 +200,39 @@ describe("POST /api/templates", () => {
   })
 })
 
+// Each way a member gets a level on a template, for the list and detail access level tests
+type AccessLevelCase = [description: string, role: string, setUp: (context: UserContext, template: Template) => Promise<void>, expected: TemplateAccessLevel]
+
+const accessLevelCases: AccessLevelCase[] = [
+  ["an owner", "owner", async () => {}, "edit"],
+  ["an admin", "admin", async () => {}, "edit"],
+  ["the editor who created it", "editor", async ({ member }, template) => {
+    await db.update(templates).set({ createdBy: member.userId }).where(eq(templates.id, template.id))
+  }, "edit"],
+  ["a viewer who created it", "viewer", async ({ member }, template) => {
+    await db.update(templates).set({ createdBy: member.userId }).where(eq(templates.id, template.id))
+  }, "edit"],
+  ...(["view", "run", "edit"] as const).map((level): AccessLevelCase => [`a viewer granted ${level}`, "viewer", async ({ organization, member }, template) => {
+    await grant(db, template.id, { organization, memberId: member.id }, level)
+  }, level]),
+  ...(["view", "run", "edit"] as const).map((level): AccessLevelCase => [`a viewer whose group is granted ${level}`, "viewer", async ({ organization, member }, template) => {
+    await grant(db, template.id, { organization, teamId: await createGroup(db, organization, [member]) }, level)
+  }, level]),
+  ["an editor with view directly and run through a group, as the higher one", "editor", async ({ organization, member }, template) => {
+    await grant(db, template.id, { organization, memberId: member.id }, "view")
+    await grant(db, template.id, { organization, teamId: await createGroup(db, organization, [member]) }, "run")
+  }, "run"],
+  ["a viewer with run and edit grants through two groups, as edit", "viewer", async ({ organization, member }, template) => {
+    await grant(db, template.id, { organization, teamId: await createGroup(db, organization, [member]) }, "run")
+    await grant(db, template.id, { organization, teamId: await createGroup(db, organization, [member]) }, "edit")
+  }, "edit"],
+  ["a viewer granted view, while someone else has edit", "viewer", async ({ organization, member }, template) => {
+    const { member: someoneElse } = await createMember(db, organization, "viewer")
+    await grant(db, template.id, { organization, memberId: member.id }, "view")
+    await grant(db, template.id, { organization, memberId: someoneElse.id }, "edit")
+  }, "view"],
+]
+
 describe("GET /api/templates", () => {
   function listTemplates(query: Record<string, string | number> = {}) {
     return api().get("/api/templates").query(query)
@@ -241,6 +277,118 @@ describe("GET /api/templates", () => {
       createdAt: created!.createdAt.toISOString(),
       createdBy: created!.createdBy,
       updatedAt: created!.updatedAt.toISOString(),
+      currentVersion: null,
+      draftVersion: null,
+      accessLevel: "edit",
+    } satisfies TemplateListItemDto)
+  })
+
+  describe("access level", () => {
+    test.each(accessLevelCases)("gives %s the right level", async (_description, role, setUp, expected) => {
+      const context = await signedInMember(role)
+      const template = await insertTemplate(db, context.organization)
+      await setUp(context, template)
+
+      const response = await listTemplates()
+
+      expectStatus(response, 200)
+      expect(response.body.items).toEqual([expect.objectContaining({ id: template.id, accessLevel: expected })])
+    })
+
+    test("gives each template its own level", async () => {
+      const { organization, member } = await signedInMember("viewer")
+      const [viewed, run, edited] = await insertTemplates(organization, ["A", "B", "C"])
+      await grant(db, viewed!.id, { organization, memberId: member.id }, "view")
+      await grant(db, run!.id, { organization, memberId: member.id }, "run")
+      await grant(db, edited!.id, { organization, memberId: member.id }, "edit")
+
+      const response = await listTemplates()
+
+      expect(response.body.items.map((item: TemplateListItemDto) => [item.name, item.accessLevel])).toEqual([["A", "view"], ["B", "run"], ["C", "edit"]])
+    })
+  })
+
+  describe("versions", () => {
+    function itemFor(response: request.Response, templateId: string): TemplateListItemDto {
+      return response.body.items.find((item: TemplateListItemDto) => item.id === templateId)
+    }
+
+    test("includes the current version with its step count", async () => {
+      const { organization } = await signedInMember("admin")
+      const template = await insertTemplate(db, organization)
+      const published = await insertTemplateVersion(db, template, 1, "published")
+      await insertTemplateStep(db, published, { position: 0 })
+      await insertTemplateStep(db, published, { position: 1 })
+      await setCurrentVersion(db, template, published)
+
+      const item = itemFor(await listTemplates(), template.id)
+
+      expect(item.currentVersion).toEqual({ id: published.id, version: 1, stepCount: 2 })
+      expect(item.draftVersion).toBeNull()
+    })
+
+    test("includes a draft-only template's draft, with no current version", async () => {
+      const { organization } = await signedInMember("admin")
+      const template = await insertTemplate(db, organization)
+      const draft = await insertTemplateVersion(db, template, 1, "draft")
+      await insertTemplateStep(db, draft)
+
+      const item = itemFor(await listTemplates(), template.id)
+
+      expect(item.currentVersion).toBeNull()
+      expect(item.draftVersion).toEqual({ id: draft.id, version: 1 })
+    })
+
+    test("counts only the current version's steps when there's also a draft", async () => {
+      const { organization } = await signedInMember("admin")
+      const template = await insertTemplate(db, organization)
+      const published = await insertTemplateVersion(db, template, 1, "published")
+      await insertTemplateStep(db, published)
+      const draft = await insertTemplateVersion(db, template, 2, "draft")
+      for (const position of [0, 1, 2]) await insertTemplateStep(db, draft, { position })
+      await setCurrentVersion(db, template, published)
+
+      const item = itemFor(await listTemplates(), template.id)
+
+      expect(item.currentVersion).toEqual({ id: published.id, version: 1, stepCount: 1 })
+      expect(item.draftVersion).toEqual({ id: draft.id, version: 2 })
+    })
+
+    test("counts a current version with no steps as zero", async () => {
+      const { organization } = await signedInMember("admin")
+      const template = await insertTemplate(db, organization)
+      const published = await insertTemplateVersion(db, template, 1, "published")
+      await setCurrentVersion(db, template, published)
+
+      const item = itemFor(await listTemplates(), template.id)
+
+      expect(item.currentVersion).toEqual({ id: published.id, version: 1, stepCount: 0 })
+    })
+
+    test("doesn't treat older published or archived versions as the current version or the draft", async () => {
+      const { organization } = await signedInMember("admin")
+      const template = await insertTemplate(db, organization)
+      await insertTemplateVersion(db, template, 1, "archived")
+      const current = await insertTemplateVersion(db, template, 2, "published")
+      await setCurrentVersion(db, template, current)
+
+      const item = itemFor(await listTemplates(), template.id)
+
+      expect(item.currentVersion).toMatchObject({ id: current.id, version: 2 })
+      expect(item.draftVersion).toBeNull()
+    })
+
+    test("lists each template once, alongside its versions", async () => {
+      const { organization } = await signedInMember("admin")
+      const template = await insertTemplate(db, organization, { name: "Server checks" })
+      const published = await insertTemplateVersion(db, template, 1, "published")
+      await insertTemplateVersion(db, template, 2, "draft")
+      await setCurrentVersion(db, template, published)
+
+      const response = await listTemplates()
+
+      expect(names(response)).toEqual(["Server checks"])
+      expect(response.body.total).toBe(1)
     })
   })
 
@@ -439,7 +587,8 @@ describe("GET /api/templates/:templateId", () => {
       updatedAt: template.updatedAt.toISOString(),
       currentVersion: versionDto(published),
       draftVersion: versionDto(draft),
-    } satisfies TemplateDetails)
+      accessLevel: "edit",
+    } satisfies TemplateDetailsDto)
   })
 
   test("responds with a new template's version 1 draft and no current version", async () => {
@@ -554,6 +703,19 @@ describe("GET /api/templates/:templateId", () => {
     const response = await getTemplate(template.id)
 
     expect(response.body.draftVersion.id).toBe(draft.id)
+  })
+
+  describe("access level", () => {
+    test.each(accessLevelCases)("gives %s the right level", async (_description, role, setUp, expected) => {
+      const context = await signedInMember(role)
+      const template = await insertTemplate(db, context.organization)
+      await setUp(context, template)
+
+      const response = await getTemplate(template.id)
+
+      expectStatus(response, 200)
+      expect(response.body.accessLevel).toBe(expected)
+    })
   })
 
   test("refuses a template the member can't see with not_found, even when it has versions", async () => {

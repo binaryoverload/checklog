@@ -6,29 +6,13 @@ import { db } from "@/db/index.ts"
 import { runs, runSteps, templateAccess, templates, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import type { Database, Member, UserContext, User, RunStep } from "@/util/types.ts"
-import { orgRoles, platformRoles } from "@checklog/shared/auth"
+import { memberCan, memberRoles, platformRoles } from "@checklog/shared/auth"
 import type { OrgStatementsCheckInput, PlatformStatementsCheckInput } from "@checklog/shared/auth"
 import { highestTemplateAccessLevel, templateAccessIncludes, templateAccessLevels } from "@checklog/shared/domain"
 import type { RunListScope, TemplateAccessLevel } from "@checklog/shared/domain"
 
-export function memberRoles(member: Member): string[] {
-  return member.role.split(",").map(r => r.trim())
-}
-
-export function can(member: Member, permissions: OrgStatementsCheckInput): boolean {
-  const roles = memberRoles(member)
-
-  return roles.some((roleName) => {
-    if (!Object.hasOwn(orgRoles, roleName)) return false
-
-    const role = orgRoles[roleName as keyof typeof orgRoles]
-
-    return role.authorize(permissions).success
-  })
-}
-
 export function assertCan(member: Member, permissions: OrgStatementsCheckInput): void {
-  if (!can(member, permissions)) {
+  if (!memberCan(member, permissions)) {
     throw new HttpError("forbidden", "You do not have permission to perform this action")
   }
 }
@@ -70,24 +54,39 @@ function grantAppliesTo({ organization, member }: UserContext): SQL {
   return or(eq(templateAccess.memberId, member.id), inArray(templateAccess.teamId, memberTeamIds))!
 }
 
-export function visibleTemplatesWhere(context: UserContext, needs: TemplateAccessLevel = "view"): SQL {
-  if (context.organization.deletedAt) return sql`false`
-
-  const isInOrg = eq(templates.organizationId, context.organization.id)
-  if (can(context.member, { template: ["manage"] })) return isInOrg
-
-  const grantedLevels = templateAccessLevels.slice(templateAccessLevels.indexOf(needs))
-  const hasGrant = exists(
+// A grant on the template, at one of these levels, to the member or one of their groups
+function hasTemplateGrant(context: UserContext, levels: readonly TemplateAccessLevel[]): SQL {
+  return exists(
     db.select({ one: sql`1` })
       .from(templateAccess)
       .where(and(
         eq(templateAccess.templateId, templates.id),
-        inArray(templateAccess.level, grantedLevels),
+        inArray(templateAccess.level, [...levels]),
         grantAppliesTo(context),
       )),
   )
+}
 
-  return and(isInOrg, or(eq(templates.createdBy, context.member.userId), hasGrant))!
+export function visibleTemplatesWhere(context: UserContext, needs: TemplateAccessLevel = "view"): SQL {
+  if (context.organization.deletedAt) return sql`false`
+
+  const isInOrg = eq(templates.organizationId, context.organization.id)
+  if (memberCan(context.member, { template: ["manage"] })) return isInOrg
+
+  const grantedLevels = templateAccessLevels.slice(templateAccessLevels.indexOf(needs))
+  return and(isInOrg, or(eq(templates.createdBy, context.member.userId), hasTemplateGrant(context, grantedLevels)))!
+}
+
+// The member's level on each template, for selects already limited by visibleTemplatesWhere(context, "view")
+export function templateAccessLevelSql(context: UserContext): SQL<TemplateAccessLevel> {
+  if (memberCan(context.member, { template: ["manage"] })) return sql<TemplateAccessLevel>`'edit'`
+
+  return sql<TemplateAccessLevel>`case
+    when ${templates.createdBy} = ${context.member.userId} then 'edit'
+    when ${hasTemplateGrant(context, ["edit"])} then 'edit'
+    when ${hasTemplateGrant(context, ["run"])} then 'run'
+    else 'view'
+  end`
 }
 
 /**
@@ -123,7 +122,7 @@ export function visibleRunsWhere(context: UserContext): SQL {
   if (context.organization.deletedAt) return sql`false`
 
   const isInOrg = eq(runs.organizationId, context.organization.id)
-  if (can(context.member, { template: ["manage"] })) return isInOrg
+  if (memberCan(context.member, { template: ["manage"] })) return isInOrg
 
   const templateVisible = exists(
     db.select({ one: sql`1` })
@@ -186,7 +185,7 @@ export async function templateAccessLevel(
   // Either the template does not exist or it's from a different organization
   if (!template) return null
 
-  if (can(member, { template: ["manage"] })) return "edit"
+  if (memberCan(member, { template: ["manage"] })) return "edit"
   if (template.createdBy === member.userId) return "edit"
 
   const grants = await tx
