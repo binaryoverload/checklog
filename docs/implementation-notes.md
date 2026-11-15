@@ -57,6 +57,7 @@ Setup details agreed alongside the [decisions](decisions.md). The repo scaffold 
 
 - TanStack Query handles all API calls (not `useFetch`)
 - A Nuxt plugin dehydrates server-fetched queries and hydrates them in the browser so SSR pages do not fetch twice
+- Query and mutation errors are typed as `ApiError` (`app/types/vue-query.d.ts`). Queries retry only network failures and 5xx, never a 4xx. A failed mutation shows a toast unless it sets `meta: { handlesErrors: true }`, for example when a form shows the errors against its fields
 - `useApi()` calls the API: during SSR it goes straight to `NUXT_API_INTERNAL_URL` with the visitor's cookie, in the browser through `/api`. Errors throw an `ApiError` parsed with the shared error schema
 - Better Auth's client is used for auth calls only; the session and organization list live in TanStack Query (`useSessionQuery`, `useOrganizationsQuery`), and switching organization refetches every query
 - Pages are signed-in only; `definePageMeta({ auth: "public" })` opts out, matching the API's `route()` option. The guard never redirects `/login` itself, so a missing sign-in page can't loop
