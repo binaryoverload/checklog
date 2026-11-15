@@ -96,5 +96,5 @@ export function useAuth() {
 
 export function useCan() {
   const { data: member } = useActiveMemberQuery()
-  return computed(() => (permissions: OrgStatementsCheckInput) => member.value ? memberCan(member.value, permissions) : false)
+  return (permissions: OrgStatementsCheckInput) => member.value ? memberCan(member.value, permissions) : false
 }
