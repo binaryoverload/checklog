@@ -61,7 +61,7 @@ export function useActiveMemberQuery() {
   const organization = useActiveOrganization()
   const query = useQuery(computed(() => queryOptions({
     ...activeMemberQueryOptions($authClient, organization.value?.id ?? ""),
-    enabled: organization.value?.id !== null,
+    enabled: !!organization.value?.id,
   })))
   onServerPrefetch(query.suspense)
   return query
