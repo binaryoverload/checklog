@@ -5,6 +5,15 @@ export default defineNuxtConfig({
 
   css: ["~/assets/css/main.css"],
 
+  app: {
+    head: {
+      link: [
+        { rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
+        { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      ],
+    },
+  },
+
   runtimeConfig: {
     // Server-side base URL for SSR calls to the API (NUXT_API_INTERNAL_URL)
     apiInternalUrl: "http://localhost:3001",

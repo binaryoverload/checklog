@@ -11,7 +11,8 @@
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
     "lint:inspect": "eslint --inspect-config .",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "favicons": "node scripts/favicons.mjs"
   },
   "dependencies": {
     "@checklog/shared": "workspace:*",
@@ -28,6 +29,7 @@
     "@nuxt/eslint": "catalog:",
     "@types/luxon": "catalog:",
     "eslint": "catalog:",
+    "sharp": "catalog:",
     "typescript": "catalog:",
     "vue-tsc": "catalog:"
   }
