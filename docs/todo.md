@@ -73,7 +73,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 - [ ] Create a personal organization after sign-up, and the empty state when a user has none (person)
 - [ ] Members: list, invite by email, change role, remove; accept-invitation page (person)
 - [ ] Groups: create, rename, delete, add and remove members (person)
-- [ ] `useConfirm()` composable over `useOverlay` with a shared confirm modal, resolving `true` or `false`, for archiving, deleting and leaving with unsaved changes (person)
+- [x] `useConfirm()` composable over `useOverlay` with a shared confirm modal, resolving `true` or `false`, for archiving, deleting and leaving with unsaved changes (person)
 - [ ] Switching organization: invalidate the session and organization queries and reset the rest, rather than `resetQueries()` on everything, which briefly shows `SelectOrganizationScreen` (person)
 - [ ] Template list: load more than the first page of 100, and say "1 template" for a single template (person)
 
