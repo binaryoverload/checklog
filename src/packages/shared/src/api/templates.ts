@@ -11,11 +11,11 @@ import type { TemplateAccessLevel, TemplateStatus, TemplateStepKind, TemplateVer
 import { typeIdSchema } from "../utils/typeid.ts"
 import { requiredString } from "../utils/zod.ts"
 
-export const templateNameSchema = requiredString().max(200)
+export const templateNameSchema = requiredString().max(200, "Name is too long")
 
 export const createTemplateBodySchema = z.strictObject({
   name: templateNameSchema,
-  description: z.string().max(2000).nullable().optional(),
+  description: z.string().max(2000, "Description is too long").nullable().optional(),
 })
 export type CreateTemplateBody = z.infer<typeof createTemplateBodySchema>
 
