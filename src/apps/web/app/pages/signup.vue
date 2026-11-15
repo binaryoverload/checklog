@@ -39,13 +39,17 @@ const auth = useAuth()
 
 const signUpSuccess = ref(false)
 
+const isLoading = ref(false)
+
 async function onSubmit(payload: FormSubmitEvent<Schema>) {
+  isLoading.value = true
   const { error } = await auth.signUp.email({
     name: payload.data.name,
     email: payload.data.email,
     password: payload.data.password,
   })
   if (error) {
+    isLoading.value = false
     // TODO: Do something with this error
     console.error(error)
     return
@@ -64,6 +68,7 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
     :fields="fields"
     :schema="schema"
     title="Create an account"
+    :loading="isLoading"
     :submit="{ label: 'Create account' }"
     @submit="onSubmit"
   >

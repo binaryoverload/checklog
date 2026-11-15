@@ -42,13 +42,17 @@ const auth = useAuth()
 const queryClient = useQueryClient()
 const route = useRoute()
 
+const isLoading = ref(false)
+
 async function onSubmit(payload: FormSubmitEvent<Schema>) {
+  isLoading.value = true
   const { error } = await auth.signIn.email({
     email: payload.data.email,
     password: payload.data.password,
     rememberMe: payload.data.remember,
   })
   if (error) {
+    isLoading.value = false
     // TODO: Do something with this error
     console.error(error)
     return
@@ -63,6 +67,7 @@ async function onSubmit(payload: FormSubmitEvent<Schema>) {
   <UAuthForm
     :fields="fields"
     :schema="schema"
+    :loading="isLoading"
     title="Welcome back"
     icon="i-lucide-lock"
     @submit="onSubmit"
