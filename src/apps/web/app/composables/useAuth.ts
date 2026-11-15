@@ -1,9 +1,12 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/vue-query"
 
-type AuthClient = ReturnType<typeof useNuxtApp>["$authClient"]
+import { memberCan } from "@checklog/shared/auth"
+import type { OrgStatementsCheckInput } from "@checklog/shared/auth"
+
+export type AuthClient = ReturnType<typeof useNuxtApp>["$authClient"]
 
 // Better Auth's client returns { data, error } instead of throwing; TanStack Query needs a throw
-function unwrap<T>({ data, error }: { data: T, error: { message?: string } | null }): NonNullable<T> | null {
+export function unwrap<T>({ data, error }: { data: T, error: { message?: string } | null }): NonNullable<T> | null {
   if (error) {
     throw new Error(error.message ?? "Authentication request failed")
   }
@@ -46,13 +49,31 @@ export function useActiveOrganization() {
   return computed(() => organizations.value?.find(org => org.id === session.value?.session.activeOrganizationId) ?? null)
 }
 
+export function activeMemberQueryOptions(authClient: AuthClient, organizationId: string) {
+  return queryOptions({
+    queryKey: ["organizations", organizationId, "activeMember"],
+    queryFn: async () => unwrap(await authClient.organization.getActiveMember()),
+  })
+}
+
+export function useActiveMemberQuery() {
+  const { $authClient } = useNuxtApp()
+  const organization = useActiveOrganization()
+  const query = useQuery(computed(() => queryOptions({
+    ...activeMemberQueryOptions($authClient, organization.value?.id ?? ""),
+    enabled: organization.value?.id !== null,
+  })))
+  onServerPrefetch(query.suspense)
+  return query
+}
+
 // Everything cached belongs to the old organization, so all queries are refetched after switching
 export function useSetActiveOrganization() {
   const { $authClient } = useNuxtApp()
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (organizationId: string | null) => unwrap(await $authClient.organization.setActive({ organizationId })),
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => queryClient.resetQueries(),
   })
 }
 
@@ -71,4 +92,9 @@ export function useSignOut() {
 export function useAuth() {
   const { $authClient } = useNuxtApp()
   return $authClient
+}
+
+export function useCan() {
+  const { data: member } = useActiveMemberQuery()
+  return computed(() => (permissions: OrgStatementsCheckInput) => member.value ? memberCan(member.value, permissions) : false)
 }
