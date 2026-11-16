@@ -46,7 +46,7 @@ const columns: TableColumn<TemplateListItemDto>[] = [
   },
 ]
 
-const pageDescription = computed(() => `${data.value?.pages[0]?.total ?? "-"} templates`)
+const pageDescription = computed(() => `${data.value?.total ?? "-"} templates`)
 
 const can = useCan()
 
@@ -67,10 +67,19 @@ const slideover = overlay.create(TemplateSlideover)
 const createModalOpen = ref(false)
 const selectedTab = ref<TemplateStatus>("active")
 
+watch(selectedTab, () => {
+  page.value = 1
+})
+
 const tabItems = templateStatuses.map(s => ({ label: capitalize(s), value: s }))
 
-const { data, isLoading } = useTemplatesQuery(() => ({ status: selectedTab.value, limit: 100 }))
+const itemsPerPage = 10
+const page = ref(1)
 
+const { data, isLoading } = useTemplatesQuery(() => ({ status: selectedTab.value, limit: itemsPerPage, page: page.value }))
+
+const templates = computed(() => data.value?.items ?? [])
+const total = computed(() => data.value?.total)
 </script>
 
 <template>
@@ -86,9 +95,12 @@ const { data, isLoading } = useTemplatesQuery(() => ({ status: selectedTab.value
     <UTable
       :ui="{ tr: 'data-[selectable=true]:cursor-pointer' }"
       :loading="isLoading"
-      :data="data?.pages.flatMap(p => p.items)"
+      :data="templates"
       :columns="columns"
       @select="(_event, row) => slideover.open({ template: row.original })"
     />
+    <div v-if="(total ?? 0) > itemsPerPage" class="flex justify-center py-4">
+      <UPagination v-model:page="page" :total="total ?? 0" :items-per-page="itemsPerPage" />
+    </div>
   </div>
 </template>
