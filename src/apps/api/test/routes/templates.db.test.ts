@@ -4,7 +4,6 @@ import { describe, expect, test } from "vitest"
 
 import { db } from "@/db/index.ts"
 import { schedules, templates, templateVersions } from "@/db/schema.ts"
-import { encodeCursor } from "@/util/pagination.ts"
 import type { Organization, Template, TemplateVersion, UserContext } from "@/util/types.ts"
 import type { TemplateDetailsDto, TemplateListItemDto, TemplateVersionDto } from "@checklog/shared/api"
 import type { TemplateAccessLevel } from "@checklog/shared/domain"
@@ -242,20 +241,22 @@ describe("GET /api/templates", () => {
     return response.body.items.map((item: { name: string }) => item.name)
   }
 
-  async function pageThrough(query: Record<string, string | number>) {
+  // Requests pages from 1 until one comes back short of the limit
+  async function pageThrough(query: Record<string, string | number>, limit: number) {
     const seen: string[] = []
     const totals: number[] = []
-    let cursor: string | null = null
-    let pageCount = 0
+    let page = 0
+    let count: number
     do {
-      const response = await listTemplates(cursor ? { ...query, cursor } : query)
+      page++
+      const response = await listTemplates({ ...query, page, limit })
       expectStatus(response, 200)
+      expect(response.body).toMatchObject({ page, limit })
+      count = response.body.items.length
       seen.push(...names(response))
       totals.push(response.body.total)
-      cursor = response.body.nextCursor
-      pageCount++
-    } while (cursor !== null && pageCount < 10)
-    return { seen, totals, pageCount }
+    } while (count === limit && page < 10)
+    return { seen, totals, pageCount: page }
   }
 
   test("lists the organization's templates by name", async () => {
@@ -266,8 +267,7 @@ describe("GET /api/templates", () => {
 
     expectStatus(response, 200)
     expect(names(response)).toEqual(["Backups", "Fire alarm", "Server checks"])
-    expect(response.body.total).toBe(3)
-    expect(response.body.nextCursor).toBeNull()
+    expect(response.body).toMatchObject({ total: 3, page: 1, limit: 100 })
     expect(response.body.items[2]).toEqual({
       id: created!.id,
       name: "Server checks",
@@ -392,25 +392,52 @@ describe("GET /api/templates", () => {
     })
   })
 
-  test("pages through every template once with the cursor", async () => {
+  test("pages through every template once", async () => {
     const { organization } = await signedInMember("admin")
     await insertTemplates(organization, ["E", "C", "A", "D", "B"])
 
-    const { seen, totals, pageCount } = await pageThrough({ limit: 2 })
+    const { seen, totals, pageCount } = await pageThrough({}, 2)
 
     expect(seen).toEqual(["A", "B", "C", "D", "E"])
     expect(totals).toEqual([5, 5, 5])
     expect(pageCount).toBe(3)
   })
 
-  test("returns no cursor when the last page is exactly full", async () => {
+  test("returns the requested page", async () => {
+    const { organization } = await signedInMember("admin")
+    await insertTemplates(organization, ["E", "C", "A", "D", "B"])
+
+    const response = await listTemplates({ page: 2, limit: 2 })
+
+    expectStatus(response, 200)
+    expect(names(response)).toEqual(["C", "D"])
+    expect(response.body).toMatchObject({ total: 5, page: 2, limit: 2 })
+  })
+
+  test("returns an empty page past the end, with the total", async () => {
     const { organization } = await signedInMember("admin")
     await insertTemplates(organization, ["A", "B"])
 
-    const response = await listTemplates({ limit: 2 })
+    const response = await listTemplates({ page: 3, limit: 2 })
 
-    expect(names(response)).toEqual(["A", "B"])
-    expect(response.body.nextCursor).toBeNull()
+    expectStatus(response, 200)
+    expect(response.body).toEqual({ items: [], total: 2, page: 3, limit: 2 })
+  })
+
+  // Only active names are unique, so archived templates can share one
+  test("lists archived templates with the same name once each across pages", async () => {
+    const { organization } = await signedInMember("admin")
+    const created: Template[] = []
+    for (let index = 0; index < 3; index++) created.push(await insertTemplate(db, organization, { name: "Same", status: "archived" }))
+
+    const ids: string[] = []
+    for (const page of [1, 2, 3]) {
+      const response = await listTemplates({ status: "archived", page, limit: 1 })
+      ids.push(...response.body.items.map((item: TemplateListItemDto) => item.id))
+    }
+
+    expect(ids).toHaveLength(3)
+    expect([...ids].sort()).toEqual(created.map(template => template.id).sort())
   })
 
   test("leaves out other organizations' templates", async () => {
@@ -448,26 +475,21 @@ describe("GET /api/templates", () => {
 
     const response = await listTemplates()
 
-    expect(response.body).toEqual({ items: [], total: 0, nextCursor: null })
+    expect(response.body).toEqual({ items: [], total: 0, page: 1, limit: 100 })
   })
 
   test.each([
-    ["a cursor that isn't base64url JSON", "not-a-cursor"],
-    ["a cursor for a different sort", encodeCursor("oldest", null, "tmpl_x")],
-  ])("refuses %s with bad_request", async (_description, cursor) => {
+    ["a limit of 0", { limit: 0 }],
+    ["a limit over 100", { limit: 101 }],
+    ["a limit that isn't a whole number", { limit: 1.5 }],
+    ["a page of 0", { page: 0 }],
+    ["a negative page", { page: -1 }],
+    ["a page that isn't a whole number", { page: 1.5 }],
+    ["a page that isn't a number", { page: "next" }],
+  ])("refuses %s with validation_failed", async (_description, query) => {
     await signedInMember("admin")
 
-    expectError(await listTemplates({ cursor }), 400, "bad_request")
-  })
-
-  test.each([
-    ["a limit of 0", 0],
-    ["a limit over 100", 101],
-    ["a limit that isn't a whole number", 1.5],
-  ])("refuses %s with validation_failed", async (_description, limit) => {
-    await signedInMember("admin")
-
-    expectError(await listTemplates({ limit }), 400, "validation_failed")
+    expectError(await listTemplates(query), 400, "validation_failed")
   })
 
   test("refuses a signed-out request with unauthorized", async () => {
@@ -512,12 +534,12 @@ describe("GET /api/templates", () => {
       expect(response.body.total).toBe(1)
     })
 
-    test("pages through archived templates with the cursor", async () => {
+    test("pages through archived templates", async () => {
       const { organization } = await signedInMember("admin")
       for (const name of ["E", "C", "A", "D", "B"]) await insertTemplate(db, organization, { name, status: "archived" })
       await insertTemplates(organization, ["Active"])
 
-      const { seen, totals } = await pageThrough({ status: "archived", limit: 2 })
+      const { seen, totals } = await pageThrough({ status: "archived" }, 2)
 
       expect(seen).toEqual(["A", "B", "C", "D", "E"])
       expect(totals).toEqual([5, 5, 5])

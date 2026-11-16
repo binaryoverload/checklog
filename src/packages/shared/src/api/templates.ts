@@ -1,7 +1,7 @@
 import z from "zod"
 
 import type { CreatedFields, UpdatedFields } from "./common.ts"
-import { paginationQuerySchema } from "./pagination.ts"
+import { pageQuerySchema } from "./pagination.ts"
 import { assigneeSchema } from "../domain/assignees.ts"
 import type { Assignee } from "../domain/assignees.ts"
 import { fieldOptionsSchema } from "../domain/fields.ts"
@@ -22,7 +22,7 @@ export type CreateTemplateBody = z.infer<typeof createTemplateBodySchema>
 export const updateTemplateBodySchema = createTemplateBodySchema.partial().refine(d => Object.keys(d).length > 0, "At least one field must be provided")
 export type UpdateTemplateBody = z.infer<typeof updateTemplateBodySchema>
 
-export const listTemplatesQuerySchema = paginationQuerySchema().and(z.object({ status: templateStatusSchema.default("active") }))
+export const listTemplatesQuerySchema = pageQuerySchema().and(z.object({ status: templateStatusSchema.default("active") }))
 export type ListTemplatesQuery = z.infer<typeof listTemplatesQuerySchema>
 
 // The IDs of every item in a list exactly once, in their new order

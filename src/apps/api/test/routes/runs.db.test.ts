@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest"
 
 import { db } from "@/db/index.ts"
-import type { Paginated, RunDto, RunWithDetailsDto } from "@checklog/shared/api"
+import type { PageResult, RunDto, RunWithDetailsDto } from "@checklog/shared/api"
 import {
   addToGroup,
   createGroup,
@@ -278,9 +278,9 @@ describe("GET /api/runs", () => {
     const response = await listRuns()
 
     expectStatus(response, 200)
-    const body = response.body as Paginated<RunDto>
+    const body = response.body as PageResult<RunDto>
     expect(body.items.map(run => run.id)).toEqual([third!.id, second!.id, first!.id])
-    expect(body).toMatchObject({ nextCursor: null, total: 3 })
+    expect(body).toMatchObject({ total: 3, page: 1, limit: 100 })
     expect(body.items[0]).not.toHaveProperty("organizationId")
   })
 
@@ -290,9 +290,9 @@ describe("GET /api/runs", () => {
     const started = await insertRun(version, { createdBy: member.userId })
     await insertRunStep(started, templateStep!)
 
-    expect(((await listRuns()).body as Paginated<RunDto>).items.map(run => run.id)).toEqual([started.id])
-    expect(((await listRuns({ scope: "mine" })).body as Paginated<RunDto>).items).toEqual([])
-    expect(((await listRuns({ scope: "groups" })).body as Paginated<RunDto>).items).toEqual([])
+    expect(((await listRuns()).body as PageResult<RunDto>).items.map(run => run.id)).toEqual([started.id])
+    expect(((await listRuns({ scope: "mine" })).body as PageResult<RunDto>).items).toEqual([])
+    expect(((await listRuns({ scope: "groups" })).body as PageResult<RunDto>).items).toEqual([])
   })
 
   test("returns only the admin's assigned runs for scope=mine, not every run in the organization", async () => {
@@ -303,8 +303,8 @@ describe("GET /api/runs", () => {
     const other = await insertRun(version)
     await insertRunStep(other, templateStep!)
 
-    expect(((await listRuns({ scope: "mine" })).body as Paginated<RunDto>).items.map(run => run.id)).toEqual([mine.id])
-    expect(((await listRuns()).body as Paginated<RunDto>).items.map(run => run.id).sort()).toEqual([mine.id, other.id].sort())
+    expect(((await listRuns({ scope: "mine" })).body as PageResult<RunDto>).items.map(run => run.id)).toEqual([mine.id])
+    expect(((await listRuns()).body as PageResult<RunDto>).items.map(run => run.id).sort()).toEqual([mine.id, other.id].sort())
   })
 
   test("includes runs with a step assigned to the member, and leaves out runs they can't see", async () => {
@@ -315,7 +315,7 @@ describe("GET /api/runs", () => {
     const hidden = await insertRun(version)
     await insertRunStep(hidden, templateStep!)
 
-    const body = (await listRuns()).body as Paginated<RunDto>
+    const body = (await listRuns()).body as PageResult<RunDto>
 
     expect(body.items.map(run => run.id)).toEqual([assigned.id])
   })
@@ -324,7 +324,7 @@ describe("GET /api/runs", () => {
     await runWithSteps(await createOrganization(db), [{}])
     await signedInMember("owner")
 
-    expect(((await listRuns()).body as Paginated<RunDto>).items).toEqual([])
+    expect(((await listRuns()).body as PageResult<RunDto>).items).toEqual([])
   })
 
   test("returns only runs with a step assigned to the member for scope=mine", async () => {
@@ -337,7 +337,7 @@ describe("GET /api/runs", () => {
     const ourGroup = await insertRun(version)
     await insertRunStep(ourGroup, templateStep!, { assigneeType: "team", assigneeTeamId: teamId })
 
-    const body = (await listRuns({ scope: "mine" })).body as Paginated<RunDto>
+    const body = (await listRuns({ scope: "mine" })).body as PageResult<RunDto>
 
     expect(body.items.map(run => run.id)).toEqual([mine.id])
     expect(body.items.map(run => run.id)).not.toContain(viewable!.id)
@@ -355,7 +355,7 @@ describe("GET /api/runs", () => {
     const mine = await insertRun(version)
     await insertRunStep(mine, templateStep!, { assigneeType: "member", assigneeMemberId: member.id })
 
-    const body = (await listRuns({ scope: "groups" })).body as Paginated<RunDto>
+    const body = (await listRuns({ scope: "groups" })).body as PageResult<RunDto>
 
     expect(body.items.map(run => run.id).sort()).toEqual([group.id, role.id].sort())
   })
@@ -367,7 +367,7 @@ describe("GET /api/runs", () => {
     const assigned = await insertRun(version)
     await insertRunStep(assigned, templateStep!, { assigneeType: "member", assigneeMemberId: member.id })
 
-    const body = (await listRuns({ scope: "all" })).body as Paginated<RunDto>
+    const body = (await listRuns({ scope: "all" })).body as PageResult<RunDto>
 
     expect(body.items.map(run => run.id).sort()).toEqual([viewable!.id, assigned.id].sort())
   })
@@ -379,28 +379,40 @@ describe("GET /api/runs", () => {
     const completed = await insertRun(version, { status: "completed", completedAt: new Date() })
     const cancelled = await insertRun(version, { status: "cancelled" })
 
-    expect(((await listRuns({ status: "completed" })).body as Paginated<RunDto>).items.map(run => run.id)).toEqual([completed.id])
-    expect(((await listRuns()).body as Paginated<RunDto>).items.map(run => run.id).sort())
+    expect(((await listRuns({ status: "completed" })).body as PageResult<RunDto>).items.map(run => run.id)).toEqual([completed.id])
+    expect(((await listRuns()).body as PageResult<RunDto>).items.map(run => run.id).sort())
       .toEqual([inProgress.id, completed.id, cancelled.id].sort())
   })
 
-  test("returns the next page from the cursor", async () => {
+  test("returns the requested page", async () => {
     const { organization, member } = await signedInMember("viewer")
     const [first, second, third] = await viewableRuns(organization, member.id, 3)
 
-    const firstPage = (await listRuns({ limit: 2 })).body as Paginated<RunDto>
-    const secondPage = (await listRuns({ limit: 2, cursor: firstPage.nextCursor! })).body as Paginated<RunDto>
+    const firstPage = (await listRuns({ page: 1, limit: 2 })).body as PageResult<RunDto>
+    const secondPage = (await listRuns({ page: 2, limit: 2 })).body as PageResult<RunDto>
 
     expect(firstPage.items.map(run => run.id)).toEqual([third!.id, second!.id])
-    expect(firstPage.total).toBe(3)
+    expect(firstPage).toMatchObject({ total: 3, page: 1, limit: 2 })
     expect(secondPage.items.map(run => run.id)).toEqual([first!.id])
-    expect(secondPage.nextCursor).toBeNull()
+    expect(secondPage).toMatchObject({ total: 3, page: 2, limit: 2 })
+  })
+
+  test("returns an empty page past the end, with the total", async () => {
+    const { organization, member } = await signedInMember("viewer")
+    await viewableRuns(organization, member.id, 2)
+
+    const response = await listRuns({ page: 3, limit: 2 })
+
+    expectStatus(response, 200)
+    expect(response.body).toEqual({ items: [], total: 2, page: 3, limit: 2 })
   })
 
   test.each([
     ["an unknown scope", { scope: "everyone" }],
     ["an unknown status", { status: "paused" }],
     ["a limit of 0", { limit: 0 }],
+    ["a page of 0", { page: 0 }],
+    ["a page that isn't a whole number", { page: 1.5 }],
   ])("refuses %s with validation_failed", async (_description, query) => {
     await signedInMember("owner")
 

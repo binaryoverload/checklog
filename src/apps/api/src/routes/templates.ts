@@ -10,9 +10,7 @@ import { route } from "@/http/route.ts"
 import { toTemplateDetailsDto, toTemplateDto, toTemplateListItemDto, toTemplateVersionDto, toTemplateVersionWithStepsDto } from "@/mappers/templates.ts"
 import { lockTemplate } from "@/services/templates.ts"
 import { isUniqueViolation } from "@/util/db.ts"
-import { cursorCondition, orderFor, toPage } from "@/util/pagination.ts"
-import type { SortDefinition } from "@/util/pagination.ts"
-import type { Template } from "@/util/types.ts"
+import { toPageResult } from "@/util/pagination.ts"
 import { createTemplateBodySchema, listTemplatesQuerySchema, updateTemplateBodySchema } from "@checklog/shared/api"
 import { typeIdParamSchema, typeIdParamsSchema } from "@checklog/shared/utils"
 
@@ -49,21 +47,6 @@ templatesRouter.post("/", route({ body: createTemplateBodySchema }, async ({ bod
   }
 }))
 
-type TemplateListItem = {
-  template: Template
-  currentVersion: { id: string, version: number, stepCount: number } | null
-  draftVersion: { id: string, version: number } | null
-}
-
-const templateSort: SortDefinition<TemplateListItem> = {
-  key: "name",
-  direction: "asc",
-  column: templates.name,
-  sortValue: row => row.template.name,
-  idColumn: templates.id,
-  idOf: row => row.template.id,
-}
-
 templatesRouter.get("/", route({ query: listTemplatesQuerySchema }, async ({ query, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "view")
 
@@ -81,20 +64,21 @@ templatesRouter.get("/", route({ query: listTemplatesQuerySchema }, async ({ que
       draftVersion: { id: draftVersion.id, version: draftVersion.version },
       accessLevel: templateAccessLevelSql({ member, organization }),
     }).from(templates)
-      .where(and(eq(templates.status, query.status), visible, cursorCondition(templateSort, query.cursor)))
+      .where(and(eq(templates.status, query.status), visible))
       .leftJoin(currentVersion, eq(currentVersion.id, templates.currentVersionId))
       .leftJoin(draftVersion, and(eq(draftVersion.templateId, templates.id), eq(draftVersion.status, "draft")))
-      .orderBy(asc(templates.status), ...orderFor(templateSort))
-      .limit(query.limit + 1),
+      .orderBy(asc(templates.name), asc(templates.id))
+      .limit(query.limit)
+      .offset((query.page - 1) * query.limit),
     db.select({ total: count() }).from(templates).where(and(eq(templates.status, query.status), visible)),
   ])
 
-  res.json(toPage(
+  res.json(toPageResult(
     rows,
     {
+      page: query.page,
       limit: query.limit,
       total: counted!.total,
-      sort: templateSort,
       map: row => toTemplateListItemDto(row.template, row.currentVersion, row.draftVersion, row.accessLevel),
     },
   ))

@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from "vitest"
 
 import { templates } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
-import { decodeCursor, encodeCursor, toPage } from "@/util/pagination.ts"
+import { decodeCursor, encodeCursor, toCursorResult, toPageResult } from "@/util/pagination.ts"
 import type { SortDefinition } from "@/util/pagination.ts"
 
 const id = "tmpl_01jc5x7m3pfq9a8b2c3d4e5f6g"
@@ -131,45 +131,53 @@ const rows: Row[] = [
   { id: "tmpl_01jc5x7m3pfq9a8b2c3d4e5f63", name: "Delta" },
 ]
 
-describe("toPage", () => {
+describe("toCursorResult", () => {
   test("returns every row and no next cursor when there's no extra row", () => {
-    const page = toPage(rows.slice(0, 3), { limit: 3, total: 3, sort: byName, map: row => row.name })
+    const page = toCursorResult(rows.slice(0, 3), { limit: 3, sort: byName, map: row => row.name })
 
-    expect(page).toEqual({ items: ["Alpha", "Bravo", "Charlie"], nextCursor: null, total: 3 })
+    expect(page).toEqual({ items: ["Alpha", "Bravo", "Charlie"], nextCursor: null })
   })
 
   test("drops the extra row and returns a next cursor when there is one", () => {
-    const page = toPage(rows, { limit: 3, total: 10, sort: byName, map: row => row.name })
+    const page = toCursorResult(rows, { limit: 3, sort: byName, map: row => row.name })
 
     expect(page.items).toEqual(["Alpha", "Bravo", "Charlie"])
     expect(page.nextCursor).not.toBeNull()
   })
 
   test("points the next cursor at the last returned row, not the extra one", () => {
-    const page = toPage(rows, { limit: 3, total: 10, sort: byName, map: row => row.name })
+    const page = toCursorResult(rows, { limit: 3, sort: byName, map: row => row.name })
 
     expect(decodeCursor("name", page.nextCursor!)).toEqual({ value: "Charlie", id: rows[2]!.id })
   })
 
   test("only maps the rows it returns", () => {
     const map = vi.fn((row: Row) => row.name)
-    toPage(rows, { limit: 3, total: 10, sort: byName, map })
+    toCursorResult(rows, { limit: 3, sort: byName, map })
 
     expect(map).toHaveBeenCalledTimes(3)
   })
 
-  test("passes the total through", () => {
-    expect(toPage(rows.slice(0, 1), { limit: 3, total: 42, sort: byName, map: row => row }).total).toBe(42)
-  })
-
   test("handles an empty page", () => {
-    expect(toPage([], { limit: 3, total: 0, sort: byName, map: row => row })).toEqual({ items: [], nextCursor: null, total: 0 })
+    expect(toCursorResult([], { limit: 3, sort: byName, map: row => row })).toEqual({ items: [], nextCursor: null })
   })
 
   test("uses a null value in the cursor for an ID-only sort", () => {
     const newest: SortDefinition<Row> = { key: "newest", direction: "desc", idColumn: templates.id, idOf: row => row.id }
-    const page = toPage(rows, { limit: 2, total: 10, sort: newest, map: row => row })
+    const page = toCursorResult(rows, { limit: 2, sort: newest, map: row => row })
 
     expect(decodeCursor("newest", page.nextCursor!)).toEqual({ value: null, id: rows[1]!.id })
+  })
+})
+
+describe("toPageResult", () => {
+  test("maps every row it's given, with the page, limit and total", () => {
+    const page = toPageResult(rows.slice(0, 2), { page: 2, limit: 2, total: 4, map: row => row.name })
+
+    expect(page).toEqual({ items: ["Alpha", "Bravo"], total: 4, page: 2, limit: 2 })
+  })
+
+  test("handles a page past the end", () => {
+    expect(toPageResult([], { page: 5, limit: 2, total: 4, map: row => row })).toEqual({ items: [], total: 4, page: 5, limit: 2 })
   })
 })

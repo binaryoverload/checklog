@@ -1,13 +1,13 @@
-import { and, asc, count, desc, eq, sql } from "drizzle-orm"
+import { and, asc, desc, eq, sql } from "drizzle-orm"
 import type { SQL } from "drizzle-orm"
 import { describe, expect, test } from "vitest"
 
 import { templates } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
-import { cursorCondition, orderFor, toPage } from "@/util/pagination.ts"
+import { cursorCondition, orderFor, toCursorResult } from "@/util/pagination.ts"
 import type { SortDefinition } from "@/util/pagination.ts"
 import type { Database, Organization } from "@/util/types.ts"
-import type { Paginated } from "@checklog/shared/api"
+import type { CursorResult } from "@checklog/shared/api"
 import { createOrganization, inRollback } from "@test/support/database.ts"
 
 type TemplateRow = typeof templates.$inferSelect
@@ -80,19 +80,14 @@ async function listTemplates(
   organization: Organization,
   sort: SortDefinition<TemplateRow>,
   query: { limit: number, cursor?: string },
-): Promise<Paginated<string>> {
-  const inOrganization = eq(templates.organizationId, organization.id)
+): Promise<CursorResult<string>> {
+  const rows = await tx.select()
+    .from(templates)
+    .where(and(eq(templates.organizationId, organization.id), cursorCondition(sort, query.cursor)))
+    .orderBy(...orderFor(sort))
+    .limit(query.limit + 1)
 
-  const [rows, [counted]] = await Promise.all([
-    tx.select()
-      .from(templates)
-      .where(and(inOrganization, cursorCondition(sort, query.cursor)))
-      .orderBy(...orderFor(sort))
-      .limit(query.limit + 1),
-    tx.select({ total: count() }).from(templates).where(inOrganization),
-  ])
-
-  return toPage(rows, { limit: query.limit, total: counted!.total, sort, map: row => row.id })
+  return toCursorResult(rows, { limit: query.limit, sort, map: row => row.id })
 }
 
 async function listAll(
@@ -100,8 +95,8 @@ async function listAll(
   organization: Organization,
   sort: SortDefinition<TemplateRow>,
   limit: number,
-): Promise<{ ids: string[], pages: Paginated<string>[] }> {
-  const pages: Paginated<string>[] = []
+): Promise<{ ids: string[], pages: CursorResult<string>[] }> {
+  const pages: CursorResult<string>[] = []
   let cursor: string | undefined
 
   // A cursor that never ends would loop forever, so stop well past the expected number of pages
@@ -166,28 +161,18 @@ describe("paging", () => {
   test("returns an empty page for an empty list", () => inRollback(async (tx) => {
     const organization = await createOrganization(tx)
 
-    expect(await listTemplates(tx, organization, newest, { limit: 25 })).toEqual({ items: [], nextCursor: null, total: 0 })
+    expect(await listTemplates(tx, organization, newest, { limit: 25 })).toEqual({ items: [], nextCursor: null })
   }))
 
-  test("reports the same total on every page", () => inRollback(async (tx) => {
-    const organization = await createOrganization(tx)
-    await insertTemplates(tx, organization, 30)
-
-    const { pages } = await listAll(tx, organization, byName, 7)
-
-    expect(pages.map(page => page.total)).toEqual([30, 30, 30, 30, 30])
-  }))
-
-  test("keeps other organizations' rows out of the items and the total", () => inRollback(async (tx) => {
+  test("keeps other organizations' rows out", () => inRollback(async (tx) => {
     const organization = await createOrganization(tx)
     const otherOrganization = await createOrganization(tx, "Other organization")
     await insertTemplates(tx, organization, 8)
     await insertTemplates(tx, otherOrganization, 12)
 
-    const { ids, pages } = await listAll(tx, organization, newest, 5)
+    const { ids } = await listAll(tx, organization, newest, 5)
 
     expect(ids.sort()).toEqual((await orderedIds(tx, organization, [asc(templates.id)])).sort())
-    expect(pages[0]!.total).toBe(8)
   }))
 
   test("doesn't repeat or skip rows when a newer row is added between pages", () => inRollback(async (tx) => {
@@ -236,7 +221,7 @@ async function listAllFrom(
   let next: string | null = cursor
 
   for (let pageCount = 0; next !== null && pageCount < 50; pageCount++) {
-    const page: Paginated<string> = await listTemplates(tx, organization, sort, { limit, cursor: next })
+    const page: CursorResult<string> = await listTemplates(tx, organization, sort, { limit, cursor: next })
     ids.push(...page.items)
     next = page.nextCursor
   }

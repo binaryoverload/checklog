@@ -1,4 +1,4 @@
-import { and, count, eq } from "drizzle-orm"
+import { and, count, eq, desc } from "drizzle-orm"
 import { Router } from "express"
 
 import { runScopeWhere, visibleRunsWhere } from "@/core/permissions.ts"
@@ -8,21 +8,12 @@ import { HttpError } from "@/http/errors.ts"
 import { route } from "@/http/route.ts"
 import { toRunDto, toRunWithDetailsDto } from "@/mappers/runs.ts"
 import { loadRunRows, lockRun } from "@/services/runs.ts"
-import { cursorCondition, orderFor, toPage } from "@/util/pagination.ts"
-import type { SortDefinition } from "@/util/pagination.ts"
-import type { Run } from "@/util/types.ts"
+import { toPageResult } from "@/util/pagination.ts"
 import { listRunsQuerySchema } from "@checklog/shared/api"
 import { templateAccessIncludes } from "@checklog/shared/domain"
 import { typeIdParamSchema } from "@checklog/shared/utils"
 
 export const runsRouter = Router()
-
-const runSort: SortDefinition<{ run: Run, templateId: string }> = {
-  key: "newest",
-  direction: "desc",
-  idColumn: runs.id,
-  idOf: row => row.run.id,
-}
 
 runsRouter.get("/", route({ query: listRunsQuerySchema }, async ({ query, member, organization, res }) => {
   const visible = visibleRunsWhere({ member, organization })
@@ -32,18 +23,19 @@ runsRouter.get("/", route({ query: listRunsQuerySchema }, async ({ query, member
   const [rows, [counted]] = await Promise.all([
     db.select({ run: runs, templateId: templateVersions.templateId }).from(runs)
       .innerJoin(templateVersions, eq(templateVersions.id, runs.templateVersionId))
-      .where(and(visible, inScope, hasStatus, cursorCondition(runSort, query.cursor)))
-      .orderBy(...orderFor(runSort))
-      .limit(query.limit + 1),
+      .where(and(visible, inScope, hasStatus))
+      .orderBy(desc(runs.id))
+      .limit(query.limit)
+      .offset((query.page - 1) * query.limit),
     db.select({ total: count() }).from(runs).where(and(visible, inScope, hasStatus)),
   ])
 
-  res.json(toPage(
+  res.json(toPageResult(
     rows,
     {
+      page: query.page,
       limit: query.limit,
       total: counted!.total,
-      sort: runSort,
       map: row => toRunDto(row.run, row.templateId),
     },
   ))

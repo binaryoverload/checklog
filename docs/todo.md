@@ -48,6 +48,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
   - [x] Row types for Checklog's tables in `util/types.ts`, with plain names like the existing `Organization`, and the `mappers/` convention, recorded in the implementation notes (agent)
   - [x] `typeIdSchema` in shared (person)
   - [x] `paginationQuerySchema`, `Paginated<T>` with `total`, and the API cursor and count helpers (person)
+  - [x] Split pagination into two styles, one per endpoint: `pageQuerySchema` and `PageResult<T>` (`{ items, total, page, limit }`, using OFFSET) for tables, and `cursorQuerySchema` and `CursorResult<T>` (`{ items, nextCursor }`) for feeds; move `GET /templates` and `GET /runs` to pages (person, route tests updated by agent)
   - [ ] Request schemas and response types per area, added as each area is built, replacing the `never` placeholders and filling the mapper skeletons in `src/mappers/` (person)
 
 ### Time zones
@@ -75,7 +76,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 - [ ] Groups: create, rename, delete, add and remove members (person)
 - [x] `useConfirm()` composable over `useOverlay` with a shared confirm modal, resolving `true` or `false`, for archiving, deleting and leaving with unsaved changes (person)
 - [ ] Switching organization: invalidate the session and organization queries and reset the rest, rather than `resetQueries()` on everything, which briefly shows `SelectOrganizationScreen` (person)
-- [ ] Template list: load more than the first page of 100, and say "1 template" for a single template (person)
+- [ ] Template list: numbered pages with `UPagination` and a plain query with `keepPreviousData`, and say "1 template" for a single template (person)
 
 ### Templates
 

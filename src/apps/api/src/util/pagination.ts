@@ -4,7 +4,7 @@ import type { AnyPgColumn } from "drizzle-orm/pg-core"
 import z from "zod"
 
 import { HttpError } from "@/http/errors.ts"
-import type { Paginated } from "@checklog/shared/api"
+import type { CursorResult, PageResult } from "@checklog/shared/api"
 import { safeJsonParse } from "@checklog/shared/utils"
 
 export type SortValue = string | number | Date
@@ -72,11 +72,21 @@ export function orderFor<TRow>(sort: SortDefinition<TRow>): SQL[] {
   ]
 }
 
-export function toPage<TRow, TItem>(
+export function toPageResult<TRow, TItem>(rows: TRow[], options: { page: number, limit: number, total: number, map: (row: TRow) => TItem }): PageResult<TItem> {
+  const { map, limit, total, page } = options
+  return {
+    items: rows.map(map),
+    total: total,
+    page: page,
+    limit: limit,
+  }
+}
+
+export function toCursorResult<TRow, TItem>(
   rows: TRow[],
-  options: { limit: number, total: number, sort: SortDefinition<TRow>, map: (row: TRow) => TItem },
-): Paginated<TItem> {
-  const { limit, total, sort, map } = options
+  options: { limit: number, sort: SortDefinition<TRow>, map: (row: TRow) => TItem },
+): CursorResult<TItem> {
+  const { limit, sort, map } = options
   const items = rows.slice(0, limit).map(map)
 
   let nextCursor: string | null = null
@@ -87,7 +97,6 @@ export function toPage<TRow, TItem>(
 
   return {
     items,
-    total,
     nextCursor,
   }
 }
