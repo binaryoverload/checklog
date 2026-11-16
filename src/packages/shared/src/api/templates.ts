@@ -9,13 +9,13 @@ import type { FieldOptions, FieldType } from "../domain/fields.ts"
 import { templateAccessLevelSchema, templateStatusSchema, templateStepKindSchema, templateStepRuleIssues } from "../domain/templates.ts"
 import type { TemplateAccessLevel, TemplateStatus, TemplateStepKind, TemplateVersionStatus } from "../domain/templates.ts"
 import { typeIdSchema } from "../utils/typeid.ts"
-import { requiredString } from "../utils/zod.ts"
+import { optionalText, requiredString } from "../utils/zod.ts"
 
 export const templateNameSchema = requiredString().max(200, "Name is too long")
 
 export const createTemplateBodySchema = z.strictObject({
   name: templateNameSchema,
-  description: z.string().max(2000, "Description is too long").nullable().optional(),
+  description: optionalText(2000, "Description is too long"),
 })
 export type CreateTemplateBody = z.infer<typeof createTemplateBodySchema>
 
@@ -69,7 +69,7 @@ const templateStepFields = z.strictObject({
   kind: templateStepKindSchema,
   title: requiredString().max(200),
   position: z.number().int().min(0).optional(),
-  instructions: z.string().max(2000).nullable().optional(),
+  instructions: optionalText(2000, "Too long"),
   isHalt: z.boolean(),
   skippable: z.boolean(),
   assignee: assigneeSchema.nullable().optional(),
