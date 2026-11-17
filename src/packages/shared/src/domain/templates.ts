@@ -1,5 +1,6 @@
 import z from "zod"
 
+import { missingAssigneeIssues } from "./assignees.ts"
 import type { Assignee, AssigneeType } from "./assignees.ts"
 import type { FieldOptions } from "./fields.ts"
 import type { PreconditionIssue } from "./preconditions.ts"
@@ -49,18 +50,7 @@ export function templateVersionPublishIssues(
     issues.push({ location: "resource", resourceType: "templateVersion", problem: "no_steps", versionId, message: "Template must have at least one step" })
   }
 
-  for (const step of steps) {
-    if (step.assigneeType != null && step.assignee == null) {
-      issues.push({
-        location: "resource",
-        resourceType: "templateStep",
-        problem: "missing_assignee",
-        stepId: step.id,
-        fieldId: null,
-        message: "Step has an invalid assignee",
-      })
-    }
-  }
+  issues.push(...missingAssigneeIssues(steps))
 
   for (const field of fields) {
     if (field.options.type === "dropdown" && (field.options.choices.length === 0)) {

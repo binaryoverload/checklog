@@ -4,7 +4,7 @@ export const preconditionIssueSchema = z.discriminatedUnion("resourceType", [
   z.object({
     location: z.literal("resource"),
     resourceType: z.literal("templateStep"),
-    problem: z.enum(["missing_assignee", "dropdown_without_choices"]),
+    problem: z.enum(["missing_assignee", "dropdown_without_choices", "assignee_outside_organization"]),
     stepId: z.string(),
     fieldId: z.string().nullable(),
     message: z.string(),

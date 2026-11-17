@@ -1,5 +1,6 @@
 import z from "zod"
 
+import type { PreconditionIssue } from "./preconditions.ts"
 import { typeIdSchema } from "../utils/typeid.ts"
 
 export const assigneeTypes = ["member", "team", "role"] as const
@@ -64,4 +65,23 @@ export function flatToAssignee(flat: {
       if (!flat.assigneeRole) return null
       return { type: "role", role: flat.assigneeRole }
   }
+}
+
+export function missingAssigneeIssues(
+  steps: { id: string, assigneeType: AssigneeType | null, assignee: Assignee | null }[],
+): PreconditionIssue[] {
+  const issues: PreconditionIssue[] = []
+  for (const step of steps) {
+    if (step.assigneeType != null && step.assignee == null) {
+      issues.push({
+        location: "resource",
+        resourceType: "templateStep",
+        problem: "missing_assignee",
+        stepId: step.id,
+        fieldId: null,
+        message: "Step has an invalid assignee",
+      })
+    }
+  }
+  return issues
 }
