@@ -46,7 +46,7 @@ const columns: TableColumn<TemplateListItemDto>[] = [
   },
 ]
 
-const pageDescription = computed(() => `${data.value?.total ?? "-"} templates`)
+const pageDescription = computed(() => `${data.value?.total ?? "-"} ${data.value?.total === 1 ? "template" : "templates"}`)
 
 const can = useCan()
 

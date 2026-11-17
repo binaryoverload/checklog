@@ -58,7 +58,13 @@ function restoreTemplate() {
         </template>
       </UPageHeader>
       <div v-if="canRun || canEdit" class="flex gap-2 mb-4">
-        <UButton v-if="canEdit && !archived" label="Edit" color="neutral" />
+        <UButton
+          v-if="canEdit && !archived"
+          label="Edit"
+          color="neutral"
+          :to="`/templates/${template.id}/edit`"
+          @click="emit('close')"
+        />
         <UButton
           v-if="canRun"
           label="Start Run"
