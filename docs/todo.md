@@ -115,13 +115,13 @@ Helpers the run routes share, each its own small pull request or part of the fir
 - [x] Shared `missingRequiredFields(fields, values)`, `isEmptyFieldValue(value)` and `allStepsResolved(steps)` in `domain/runs.ts`, alongside `blockedStepIds` (person)
 - [x] `visibleRunsWhere(context)` and `runScopeWhere(context, scope)` in `core/permissions.ts`: runs of templates the member can view, with a step assigned to them, their groups or their roles, or that they started; the scope narrows the list to `mine` or `groups` (person)
 - [x] `memberTeamIdsQuery` as a subquery for `where` clauses, and `getMemberTeamIds` to load the IDs for `canActOnStep` (person)
-- [ ] `services/runs.ts`: `startRun` and `runStartIssues` for the start check, reusing the publish check's missing-assignee rule (person)
+- [x] `services/runs.ts`: `startRun` and `runStartIssues` for the start check, reusing the publish check's missing-assignee rule (person)
 - [x] `services/runs.ts`: `loadRunRows`, loading a run's steps, fields, values and notes for the mapper with the caller's handle (person)
 - [x] `services/runs.ts`: `lockRun`, which locks a visible run with `FOR UPDATE` and returns its template ID and the member's access level; the route checks permissions before the run's status (person)
 - [ ] `services/runs.ts`: `requireRunStep` and `completeRunIfResolved` (person)
 
-- [ ] API: `startRun` from a template's current version, creating its run steps with resolved assignees and due dates from `addOffset`; `runs.timezone` from the schedule, or from `X-Timezone` for an ad hoc run (person)
-- [ ] API: run start check, refused with `precondition_failed`: the template is active with a current version that isn't archived, no missing assignees (`assignee_type` set but its column null), and assigned members and groups still belong to the organization (person). See [Missing assignees](plans/db-structure.md#missing-assignees).
+- [x] API: `startRun` from a template's current version, creating its run steps with resolved assignees and due dates from `addOffset`; `runs.timezone` from the schedule, or from `X-Timezone` for an ad hoc run (person)
+- [x] API: run start check, refused with `precondition_failed`: the template is active with a current version that isn't archived, no missing assignees (`assignee_type` set but its column null), and assigned members and groups still belong to the organization (person). See [Missing assignees](plans/db-structure.md#missing-assignees).
 - [x] Run step permission check `canActOnStep` in `core/permissions.ts`: the step's assignee (member, group or exact role, with no role hierarchy), or anyone with `run` on the template when the step is unassigned; nobody when the assigned member or group has been removed (person)
 - [x] API: list runs (mine, my groups', all, plus status) and get one run with its steps, fields, values, notes and a computed `blocked`; anyone with `view` on the template, assigned a step or who started the run sees the whole run (person)
 - [x] Shared `validateFieldValue(options, value, now)` in `domain/fields.ts`, used by the API and the web app (person)

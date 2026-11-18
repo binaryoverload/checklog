@@ -1,15 +1,15 @@
 import { and, count, eq, desc } from "drizzle-orm"
 import { Router } from "express"
 
-import { runScopeWhere, visibleRunsWhere } from "@/core/permissions.ts"
+import { assertTemplateAccessLevel, runScopeWhere, visibleRunsWhere } from "@/core/permissions.ts"
 import { db } from "@/db/index.ts"
-import { runs, templateVersions } from "@/db/schema.ts"
+import { runs, templates, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import { route } from "@/http/route.ts"
 import { toRunDto, toRunWithDetailsDto } from "@/mappers/runs.ts"
-import { loadRunRows, lockRun } from "@/services/runs.ts"
+import { loadRunRows, lockRun, runStartIssues, startRun } from "@/services/runs.ts"
 import { toPageResult } from "@/util/pagination.ts"
-import { listRunsQuerySchema } from "@checklog/shared/api"
+import { createRunBodySchema, listRunsQuerySchema } from "@checklog/shared/api"
 import { templateAccessIncludes } from "@checklog/shared/domain"
 import { typeIdParamSchema } from "@checklog/shared/utils"
 
@@ -55,8 +55,25 @@ runsRouter.get("/:id", route({ params: typeIdParamSchema("runs") }, async ({ par
   res.json(toRunWithDetailsDto(runData))
 }))
 
-runsRouter.post("/", route({}, ({ res }) => {
-  throw new Error("Not implemented")
+runsRouter.post("/", route({ body: createRunBodySchema }, async ({ body, member, organization, timezone, res }) => {
+  const runData = await db.transaction(async (tx) => {
+    const [template] = await tx.select().from(templates).where(and(
+      eq(templates.id, body.templateId),
+      eq(templates.organizationId, organization.id),
+    )).for("share")
+    if (!template) throw new HttpError("not_found", "Template not found")
+
+    await assertTemplateAccessLevel(tx, { member, organization }, template.id, "run")
+
+    const startIssues = await runStartIssues(tx, template)
+    if (startIssues.length) throw new HttpError("precondition_failed", "Run cannot be started", startIssues)
+
+    const run = await startRun(tx, { template, name: body.name, createdBy: member.userId, timezone, scheduleId: null })
+
+    return await loadRunRows(tx, run, template.id)
+  })
+
+  res.json(toRunWithDetailsDto(runData))
 }))
 
 runsRouter.post("/:id/cancel", route({ params: typeIdParamSchema("runs") }, async ({ params, member, organization, res }) => {

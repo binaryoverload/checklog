@@ -7,6 +7,8 @@ import type { Assignee } from "../domain/assignees.ts"
 import type { FieldValue } from "../domain/fields.ts"
 import { runListScopeSchema, runStatusSchema } from "../domain/runs.ts"
 import type { RunStatus, RunStepStatus } from "../domain/runs.ts"
+import { typeIdSchema } from "../utils/typeid.ts"
+import { requiredString } from "../utils/zod.ts"
 
 export const listRunsQuerySchema = pageQuerySchema()
   .and(z.object({
@@ -14,6 +16,12 @@ export const listRunsQuerySchema = pageQuerySchema()
     status: runStatusSchema.optional(),
   }))
 export type ListRunsQuery = z.infer<typeof listRunsQuerySchema>
+
+export const createRunBodySchema = z.strictObject({
+  templateId: typeIdSchema("templates"),
+  name: requiredString().max(200).optional(),
+})
+export type CreateRunBody = z.infer<typeof createRunBodySchema>
 
 export type RunDto = {
   id: string

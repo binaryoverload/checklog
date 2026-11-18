@@ -1,4 +1,5 @@
-import { eq, and, getTableColumns, inArray } from "drizzle-orm"
+import { asc, eq, and, getTableColumns, inArray } from "drizzle-orm"
+import type { IANAZone } from "luxon"
 
 import { templateAccessLevel, visibleRunsWhere } from "@/core/permissions.ts"
 import { members, teams } from "@/db/auth-schema.ts"
@@ -8,6 +9,7 @@ import type { RunRows } from "@/mappers/runs.ts"
 import type { Database, Run, Template, UserContext } from "@/util/types.ts"
 import { flatToAssignee, missingAssigneeIssues } from "@checklog/shared/domain"
 import type { PreconditionIssue } from "@checklog/shared/domain"
+import { addOffset } from "@checklog/shared/utils"
 
 export async function loadRunRows(tx: Database, run: Run, templateId: string): Promise<RunRows> {
   const templateStepsResult = await tx.select().from(templateSteps)
@@ -114,4 +116,43 @@ export async function runStartIssues(tx: Database, template: Template): Promise<
   }
 
   return issues
+}
+
+export async function startRun(tx: Database, data: { template: Template, createdBy: string, timezone: IANAZone<true>, name?: string, scheduleId: string | null }) {
+  const { template, timezone } = data
+
+  if (!template.currentVersionId) throw new HttpError("internal", "No current version")
+
+  const [run] = await tx.insert(runs).values({
+    organizationId: template.organizationId,
+    templateVersionId: template.currentVersionId,
+    scheduleId: data.scheduleId,
+    name: data.name ?? template.name,
+    timezone: timezone.name,
+    status: "in_progress",
+    createdBy: data.createdBy,
+  }).returning()
+  if (!run) throw new HttpError("internal", "Failed to create run")
+
+  const steps = await tx.select().from(templateSteps)
+    .where(eq(templateSteps.templateVersionId, template.currentVersionId))
+    .orderBy(asc(templateSteps.position))
+
+  if (steps.length > 0) {
+    await tx.insert(runSteps).values(steps.map(step => ({
+      organizationId: template.organizationId,
+      runId: run.id,
+      templateVersionId: step.templateVersionId,
+      templateStepId: step.id,
+      status: "pending" as const,
+      assigneeType: step.assigneeType,
+      assigneeMemberId: step.assigneeMemberId,
+      assigneeTeamId: step.assigneeTeamId,
+      assigneeRole: step.assigneeRole,
+      dueAt: step.dueOffset ? addOffset(run.createdAt, step.dueOffset, timezone) : null,
+      createdBy: data.createdBy,
+    })))
+  }
+
+  return run
 }
