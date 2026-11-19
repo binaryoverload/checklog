@@ -118,7 +118,7 @@ Helpers the run routes share, each its own small pull request or part of the fir
 - [x] `services/runs.ts`: `startRun` and `runStartIssues` for the start check, reusing the publish check's missing-assignee rule (person)
 - [x] `services/runs.ts`: `loadRunRows`, loading a run's steps, fields, values and notes for the mapper with the caller's handle (person)
 - [x] `services/runs.ts`: `lockRun`, which locks a visible run with `FOR UPDATE` and returns its template ID and the member's access level; the route checks permissions before the run's status (person)
-- [ ] `services/runs.ts`: `requireRunStep` and `completeRunIfResolved` (person)
+- [x] `services/runs.ts`: `requireRunStep` and `completeRunIfResolved` (person)
 
 - [x] API: `startRun` from a template's current version, creating its run steps with resolved assignees and due dates from `addOffset`; `runs.timezone` from the schedule, or from `X-Timezone` for an ad hoc run (person)
 - [x] API: run start check, refused with `precondition_failed`: the template is active with a current version that isn't archived, no missing assignees (`assignee_type` set but its column null), and assigned members and groups still belong to the organization (person). See [Missing assignees](plans/db-structure.md#missing-assignees).

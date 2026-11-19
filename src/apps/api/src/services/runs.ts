@@ -1,13 +1,13 @@
 import { asc, eq, and, getTableColumns, inArray } from "drizzle-orm"
 import type { IANAZone } from "luxon"
 
-import { templateAccessLevel, visibleRunsWhere } from "@/core/permissions.ts"
+import { canActOnStep, getMemberTeamIds, templateAccessLevel, visibleRunsWhere } from "@/core/permissions.ts"
 import { members, teams } from "@/db/auth-schema.ts"
 import { runFieldValues, runs, runSteps, stepNotes, templateFields, templateSteps, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import type { RunRows } from "@/mappers/runs.ts"
 import type { Database, Run, Template, UserContext } from "@/util/types.ts"
-import { flatToAssignee, missingAssigneeIssues } from "@checklog/shared/domain"
+import { allStepsResolved, flatToAssignee, missingAssigneeIssues, templateAccessIncludes } from "@checklog/shared/domain"
 import type { PreconditionIssue } from "@checklog/shared/domain"
 import { addOffset } from "@checklog/shared/utils"
 
@@ -152,6 +152,44 @@ export async function startRun(tx: Database, data: { template: Template, created
       dueAt: step.dueOffset ? addOffset(run.createdAt, step.dueOffset, timezone) : null,
       createdBy: data.createdBy,
     })))
+  }
+
+  return run
+}
+
+type StepAccess = "assignee" | "view" | "run"
+export async function requireRunStep(tx: Database, context: UserContext, runId: string, stepId: string, access: StepAccess) {
+  const { run, templateId, templateAccessLevel } = await lockRun(tx, runId, context)
+
+  const [row] = await tx.select({ step: runSteps, templateStep: templateSteps }).from(runSteps)
+    .innerJoin(templateSteps, eq(templateSteps.id, runSteps.templateStepId))
+    .where(and(eq(runSteps.runId, runId), eq(runSteps.id, stepId)))
+  if (!row) throw new HttpError("not_found", "Step not found")
+
+  let allowed
+  if (access === "assignee") {
+    allowed = canActOnStep(row.step, context.member, await getMemberTeamIds(tx, context), templateAccessLevel)
+  } else if (access === "run") {
+    allowed = templateAccessLevel != null && templateAccessIncludes(templateAccessLevel, "run")
+  } else {
+    // lockRun already checks for visibility
+    allowed = true
+  }
+
+  if (!allowed) throw new HttpError("forbidden", "You can't act on this step")
+
+  if (run.status !== "in_progress") throw new HttpError("conflict", "Run not in progress")
+
+  return { run, templateId, ...row, templateAccessLevel }
+}
+
+export async function completeRunIfResolved(tx: Database, run: Run) {
+  const steps = await tx.select({ status: runSteps.status }).from(runSteps).where(eq(runSteps.runId, run.id))
+
+  if (allStepsResolved(steps)) {
+    const [updatedRun] = await tx.update(runs).set({ status: "completed", completedAt: new Date() }).where(eq(runs.id, run.id)).returning()
+    if (!updatedRun) throw new HttpError("internal", "Failed to update run")
+    return updatedRun
   }
 
   return run
