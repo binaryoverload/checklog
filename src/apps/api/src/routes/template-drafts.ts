@@ -13,11 +13,11 @@ import { assertAssigneeValid } from "@/services/assignees.ts"
 import { ensureDraft, requireDraft } from "@/services/templates.ts"
 import { templateStepCreateBodySchema, templateStepOrderBodySchema, templateStepUpdateBodySchema } from "@checklog/shared/api"
 import { assigneeToFlat, flatToAssignee, templateStepRuleIssues, templateVersionPublishIssues } from "@checklog/shared/domain"
-import { diffArrays, typeIdParamSchema, typeIdParamsSchema } from "@checklog/shared/utils"
+import { diffArrays, typeIdParamsSchema } from "@checklog/shared/utils"
 
 export const templateDraftsRouter = Router()
 
-templateDraftsRouter.get("/:id/draft", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
+templateDraftsRouter.get("/:templateId/draft", route({ params: typeIdParamsSchema({ templateId: "templates" }) }, async ({ params, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "view")
 
   const draft = alias(templateVersions, "draft")
@@ -25,7 +25,7 @@ templateDraftsRouter.get("/:id/draft", route({ params: typeIdParamSchema("templa
     .select({ draft })
     .from(templates)
     .leftJoin(draft, and(eq(draft.templateId, templates.id), eq(draft.status, "draft")))
-    .where(and(eq(templates.id, params.id), visible))
+    .where(and(eq(templates.id, params.templateId), visible))
 
   if (!row) throw new HttpError("not_found", "Template not found")
   if (!row.draft) throw new HttpError("not_found", "Template has no draft")
@@ -38,11 +38,11 @@ templateDraftsRouter.get("/:id/draft", route({ params: typeIdParamSchema("templa
   res.json(toTemplateVersionWithStepsDto(row.draft, steps, fields))
 }))
 
-templateDraftsRouter.post("/:id/draft", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
-  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+templateDraftsRouter.post("/:templateId/draft", route({ params: typeIdParamsSchema({ templateId: "templates" }) }, async ({ params, member, organization, res }) => {
+  await assertTemplateAccessLevel(db, { member, organization }, params.templateId, "edit")
 
   const [draft, steps, fields] = await db.transaction(async (tx) => {
-    const draft = await ensureDraft(tx, { member, organization }, params.id)
+    const draft = await ensureDraft(tx, { member, organization }, params.templateId)
 
     const steps = await tx.select().from(templateSteps).where(eq(templateSteps.templateVersionId, draft.id))
     const fields = await tx.select().from(templateFields).where(eq(templateFields.templateVersionId, draft.id))
@@ -53,11 +53,11 @@ templateDraftsRouter.post("/:id/draft", route({ params: typeIdParamSchema("templ
   res.json(toTemplateVersionWithStepsDto(draft, steps, fields))
 }))
 
-templateDraftsRouter.delete("/:id/draft", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
-  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+templateDraftsRouter.delete("/:templateId/draft", route({ params: typeIdParamsSchema({ templateId: "templates" }) }, async ({ params, member, organization, res }) => {
+  await assertTemplateAccessLevel(db, { member, organization }, params.templateId, "edit")
 
   await db.transaction(async (tx) => {
-    const draft = await requireDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.templateId)
 
     if (draft.version === 1) throw new HttpError("conflict", "Cannot delete the first version of a template")
 
@@ -67,11 +67,11 @@ templateDraftsRouter.delete("/:id/draft", route({ params: typeIdParamSchema("tem
   res.sendStatus(204)
 }))
 
-templateDraftsRouter.post("/:id/draft/publish", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
-  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+templateDraftsRouter.post("/:templateId/draft/publish", route({ params: typeIdParamsSchema({ templateId: "templates" }) }, async ({ params, member, organization, res }) => {
+  await assertTemplateAccessLevel(db, { member, organization }, params.templateId, "edit")
 
   const publishedVersion = await db.transaction(async (tx) => {
-    const draft = await requireDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.templateId)
 
     const steps = (await tx.select().from(templateSteps).where(eq(templateSteps.templateVersionId, draft.id))).map(row => ({ ...row, assignee: flatToAssignee(row) }))
     const fields = (await tx.select().from(templateFields).where(eq(templateFields.templateVersionId, draft.id)))
@@ -104,12 +104,12 @@ templateDraftsRouter.post("/:id/draft/publish", route({ params: typeIdParamSchem
   res.json(toTemplateVersionDto(publishedVersion))
 }))
 
-templateDraftsRouter.post("/:id/draft/steps", route({ params: typeIdParamSchema("templates"), body: templateStepCreateBodySchema }, async ({ params, body, member, organization, res }) => {
-  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+templateDraftsRouter.post("/:templateId/draft/steps", route({ params: typeIdParamsSchema({ templateId: "templates" }), body: templateStepCreateBodySchema }, async ({ params, body, member, organization, res }) => {
+  await assertTemplateAccessLevel(db, { member, organization }, params.templateId, "edit")
   await assertAssigneeValid(db, body.assignee, organization.id)
 
   const step = await db.transaction(async (tx) => {
-    const draft = await requireDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.templateId)
 
     const nextPosition = await tx.select({ maxPosition: sql<number>`max(${templateSteps.position})` })
       .from(templateSteps)
@@ -143,14 +143,14 @@ templateDraftsRouter.post("/:id/draft/steps", route({ params: typeIdParamSchema(
   res.json(toTemplateStepDto(step))
 }))
 
-templateDraftsRouter.put("/:id/draft/steps/order", route({
-  params: typeIdParamSchema("templates"),
+templateDraftsRouter.put("/:templateId/draft/steps/order", route({
+  params: typeIdParamsSchema({ templateId: "templates" }),
   body: templateStepOrderBodySchema,
 }, async ({ params, body, member, organization, res }) => {
-  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+  await assertTemplateAccessLevel(db, { member, organization }, params.templateId, "edit")
 
   const steps = await db.transaction(async (tx) => {
-    const draft = await requireDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.templateId)
     const steps = await tx.select().from(templateSteps).where(eq(templateSteps.templateVersionId, draft.id))
 
     const { onlyInArr1, onlyInArr2 } = diffArrays(body.stepIds, steps.map(step => step.id))
@@ -172,15 +172,15 @@ templateDraftsRouter.put("/:id/draft/steps/order", route({
   res.json(sortBy(steps, ["position"]).map(toTemplateStepDto))
 }))
 
-templateDraftsRouter.patch("/:id/draft/steps/:stepId", route({
-  params: typeIdParamsSchema({ id: "templates", stepId: "templateSteps" }),
+templateDraftsRouter.patch("/:templateId/draft/steps/:stepId", route({
+  params: typeIdParamsSchema({ templateId: "templates", stepId: "templateSteps" }),
   body: templateStepUpdateBodySchema,
 }, async ({ params, body, member, organization, res }) => {
-  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+  await assertTemplateAccessLevel(db, { member, organization }, params.templateId, "edit")
   await assertAssigneeValid(db, body.assignee, organization.id)
 
   const step = await db.transaction(async (tx) => {
-    const draft = await requireDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.templateId)
 
     const [existingStep] = await tx.select().from(templateSteps).where(and(eq(templateSteps.templateVersionId, draft.id), eq(templateSteps.id, params.stepId)))
     if (!existingStep) {
@@ -220,11 +220,11 @@ templateDraftsRouter.patch("/:id/draft/steps/:stepId", route({
   res.json(toTemplateStepDto(step))
 }))
 
-templateDraftsRouter.delete("/:id/draft/steps/:stepId", route({ params: typeIdParamsSchema({ id: "templates", stepId: "templateSteps" }) }, async ({ params, member, organization, res }) => {
-  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+templateDraftsRouter.delete("/:templateId/draft/steps/:stepId", route({ params: typeIdParamsSchema({ templateId: "templates", stepId: "templateSteps" }) }, async ({ params, member, organization, res }) => {
+  await assertTemplateAccessLevel(db, { member, organization }, params.templateId, "edit")
 
   await db.transaction(async (tx) => {
-    const draft = await requireDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.templateId)
 
     const [deleted] = await tx.delete(templateSteps)
       .where(and(eq(templateSteps.templateVersionId, draft.id), eq(templateSteps.id, params.stepId)))

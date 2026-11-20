@@ -11,7 +11,7 @@ import { loadRunRows, lockRun, runStartIssues, startRun } from "@/services/runs.
 import { toPageResult } from "@/util/pagination.ts"
 import { createRunBodySchema, listRunsQuerySchema } from "@checklog/shared/api"
 import { templateAccessIncludes } from "@checklog/shared/domain"
-import { typeIdParamSchema } from "@checklog/shared/utils"
+import { typeIdParamsSchema } from "@checklog/shared/utils"
 
 export const runsRouter = Router()
 
@@ -41,11 +41,11 @@ runsRouter.get("/", route({ query: listRunsQuerySchema }, async ({ query, member
   ))
 }))
 
-runsRouter.get("/:id", route({ params: typeIdParamSchema("runs") }, async ({ params, member, organization, res }) => {
+runsRouter.get("/:runId", route({ params: typeIdParamsSchema({ runId: "runs" }) }, async ({ params, member, organization, res }) => {
   const [row] = await db.select({ run: runs, templateId: templateVersions.templateId }).from(runs)
     .innerJoin(templateVersions, eq(templateVersions.id, runs.templateVersionId))
     .where(and(
-      eq(runs.id, params.id),
+      eq(runs.id, params.runId),
       visibleRunsWhere({ member, organization }),
     ))
   if (!row) throw new HttpError("not_found", "Run not found")
@@ -76,9 +76,9 @@ runsRouter.post("/", route({ body: createRunBodySchema }, async ({ body, member,
   res.json(toRunWithDetailsDto(runData))
 }))
 
-runsRouter.post("/:id/cancel", route({ params: typeIdParamSchema("runs") }, async ({ params, member, organization, res }) => {
+runsRouter.post("/:runId/cancel", route({ params: typeIdParamsSchema({ runId: "runs" }) }, async ({ params, member, organization, res }) => {
   const runData = await db.transaction(async (tx) => {
-    const { run, templateId, templateAccessLevel } = await lockRun(tx, params.id, { member, organization })
+    const { run, templateId, templateAccessLevel } = await lockRun(tx, params.runId, { member, organization })
     if (!templateAccessLevel || !templateAccessIncludes(templateAccessLevel, "run")) {
       throw new HttpError("forbidden", "You need run access to the template to cancel this run")
     }

@@ -16,12 +16,12 @@ import { dateInTimezone, typeIdParamsSchema } from "@checklog/shared/utils"
 
 export const runStepsRouter = Router()
 
-runStepsRouter.put("/:id/steps/:stepId/values", route({
-  params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }),
+runStepsRouter.put("/:runId/steps/:stepId/values", route({
+  params: typeIdParamsSchema({ runId: "runs", stepId: "runSteps" }),
   body: setStepValuesBodySchema,
 }, async ({ params, body, member, organization, res, timezone }) => {
   const runData = await db.transaction(async (tx) => {
-    const { run, step, templateId } = await requireRunStep(tx, { member, organization }, params.id, params.stepId, "assignee")
+    const { run, step, templateId } = await requireRunStep(tx, { member, organization }, params.runId, params.stepId, "assignee")
 
     if (run.status !== "in_progress") throw new HttpError("conflict", "Run not in progress")
     if (step.status !== "pending") throw new HttpError("conflict", "Step not pending")
@@ -72,11 +72,11 @@ runStepsRouter.put("/:id/steps/:stepId/values", route({
   res.json(toRunWithDetailsDto(runData))
 }))
 
-runStepsRouter.post("/:id/steps/:stepId/complete", route({
-  params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }),
+runStepsRouter.post("/:runId/steps/:stepId/complete", route({
+  params: typeIdParamsSchema({ runId: "runs", stepId: "runSteps" }),
 }, async ({ params, member, organization, res }) => {
   const runData = await db.transaction(async (tx) => {
-    const { run, step, templateStep, templateId } = await requireRunStep(tx, { member, organization }, params.id, params.stepId, "assignee")
+    const { run, step, templateStep, templateId } = await requireRunStep(tx, { member, organization }, params.runId, params.stepId, "assignee")
 
     if (run.status !== "in_progress") throw new HttpError("conflict", "Run not in progress")
     if (step.status !== "pending") throw new HttpError("conflict", "Step not pending")
@@ -110,12 +110,12 @@ runStepsRouter.post("/:id/steps/:stepId/complete", route({
   res.json(toRunWithDetailsDto(runData))
 }))
 
-runStepsRouter.post("/:id/steps/:stepId/skip", route({
-  params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }),
+runStepsRouter.post("/:runId/steps/:stepId/skip", route({
+  params: typeIdParamsSchema({ runId: "runs", stepId: "runSteps" }),
   body: skipStepBodySchema,
 }, async ({ params, body, member, organization, res }) => {
   const runData = await db.transaction(async (tx) => {
-    const { run, step, templateStep, templateId } = await requireRunStep(tx, { member, organization }, params.id, params.stepId, "assignee")
+    const { run, step, templateStep, templateId } = await requireRunStep(tx, { member, organization }, params.runId, params.stepId, "assignee")
 
     if (run.status !== "in_progress") throw new HttpError("conflict", "Run not in progress")
     if (step.status !== "pending") throw new HttpError("conflict", "Step not pending")
@@ -137,12 +137,12 @@ runStepsRouter.post("/:id/steps/:stepId/skip", route({
   res.json(toRunWithDetailsDto(runData))
 }))
 
-runStepsRouter.post("/:id/steps/:stepId/notes", route({
-  params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }),
+runStepsRouter.post("/:runId/steps/:stepId/notes", route({
+  params: typeIdParamsSchema({ runId: "runs", stepId: "runSteps" }),
   body: addStepNoteBodySchema,
 }, async ({ params, body, member, organization, res }) => {
   const note = await db.transaction(async (tx) => {
-    const { step } = await requireRunStep(tx, { member, organization }, params.id, params.stepId, "view")
+    const { step } = await requireRunStep(tx, { member, organization }, params.runId, params.stepId, "view")
 
     const [note] = await tx.insert(stepNotes).values({
       runStepId: step.id,
@@ -157,12 +157,12 @@ runStepsRouter.post("/:id/steps/:stepId/notes", route({
   res.json(toStepNoteDto(note))
 }))
 
-runStepsRouter.patch("/:id/steps/:stepId/assignee", route({
-  params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }),
+runStepsRouter.patch("/:runId/steps/:stepId/assignee", route({
+  params: typeIdParamsSchema({ runId: "runs", stepId: "runSteps" }),
   body: reassignStepBodySchema,
 }, async ({ params, body, member, organization, res }) => {
   const runData = await db.transaction(async (tx) => {
-    const { run, step, templateId } = await requireRunStep(tx, { member, organization }, params.id, params.stepId, "run")
+    const { run, step, templateId } = await requireRunStep(tx, { member, organization }, params.runId, params.stepId, "run")
 
     if (run.status !== "in_progress") throw new HttpError("conflict", "Run not in progress")
     if (step.status !== "pending") throw new HttpError("conflict", "Step not pending")

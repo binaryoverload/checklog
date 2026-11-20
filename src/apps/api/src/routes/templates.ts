@@ -12,7 +12,7 @@ import { lockTemplate } from "@/services/templates.ts"
 import { isUniqueViolation } from "@/util/db.ts"
 import { toPageResult } from "@/util/pagination.ts"
 import { createTemplateBodySchema, listTemplatesQuerySchema, updateTemplateBodySchema } from "@checklog/shared/api"
-import { typeIdParamSchema, typeIdParamsSchema } from "@checklog/shared/utils"
+import { typeIdParamsSchema } from "@checklog/shared/utils"
 
 export const templatesRouter = Router()
 
@@ -84,7 +84,7 @@ templatesRouter.get("/", route({ query: listTemplatesQuerySchema }, async ({ que
   ))
 }))
 
-templatesRouter.get("/:id", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
+templatesRouter.get("/:templateId", route({ params: typeIdParamsSchema({ templateId: "templates" }) }, async ({ params, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "view")
 
   const currentVersion = alias(templateVersions, "current_version")
@@ -99,18 +99,18 @@ templatesRouter.get("/:id", route({ params: typeIdParamSchema("templates") }, as
     .from(templates)
     .leftJoin(currentVersion, eq(currentVersion.id, templates.currentVersionId))
     .leftJoin(draft, and(eq(draft.templateId, templates.id), eq(draft.status, "draft")))
-    .where(and(eq(templates.id, params.id), visible))
+    .where(and(eq(templates.id, params.templateId), visible))
 
   if (!row) throw new HttpError("not_found", "Template not found")
 
   res.json(toTemplateDetailsDto(row.template, row.currentVersion, row.draft, row.accessLevel))
 }))
 
-templatesRouter.get("/:id/versions", route({ params: typeIdParamSchema("templates") }, async ({ params, member, organization, res }) => {
+templatesRouter.get("/:templateId/versions", route({ params: typeIdParamsSchema({ templateId: "templates" }) }, async ({ params, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "view")
 
   const template = await db.select().from(templates)
-    .where(and(eq(templates.id, params.id), visible))
+    .where(and(eq(templates.id, params.templateId), visible))
     .then(([row]) => row)
 
   if (!template) throw new HttpError("not_found", "Template not found")
@@ -122,12 +122,12 @@ templatesRouter.get("/:id/versions", route({ params: typeIdParamSchema("template
   res.json(versions.map(toTemplateVersionDto))
 }))
 
-templatesRouter.get("/:id/versions/:versionId", route({ params: typeIdParamsSchema({ id: "templates", versionId: "templateVersions" }) }, async ({ params, member, organization, res }) => {
+templatesRouter.get("/:templateId/versions/:versionId", route({ params: typeIdParamsSchema({ templateId: "templates", versionId: "templateVersions" }) }, async ({ params, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "view")
 
   const [row] = await db.select({ version: templateVersions }).from(templateVersions)
     .innerJoin(templates, eq(templates.id, templateVersions.templateId))
-    .where(and(eq(templates.id, params.id), eq(templateVersions.id, params.versionId), visible))
+    .where(and(eq(templates.id, params.templateId), eq(templateVersions.id, params.versionId), visible))
   if (!row) throw new HttpError("not_found", "Template version not found")
 
   const [steps, fields] = await Promise.all([
@@ -138,14 +138,14 @@ templatesRouter.get("/:id/versions/:versionId", route({ params: typeIdParamsSche
   res.json(toTemplateVersionWithStepsDto(row.version, steps, fields))
 }))
 
-templatesRouter.post("/:id/versions/:versionId/archive", route({ params: typeIdParamsSchema({ id: "templates", versionId: "templateVersions" }), impersonation: "refuse" }, async ({ params, member, organization, res }) => {
-  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+templatesRouter.post("/:templateId/versions/:versionId/archive", route({ params: typeIdParamsSchema({ templateId: "templates", versionId: "templateVersions" }), impersonation: "refuse" }, async ({ params, member, organization, res }) => {
+  await assertTemplateAccessLevel(db, { member, organization }, params.templateId, "edit")
 
   const archived = await db.transaction(async (tx) => {
-    await lockTemplate(tx, { member, organization }, params.id)
+    await lockTemplate(tx, { member, organization }, params.templateId)
 
     const [version] = await tx.select().from(templateVersions)
-      .where(and(eq(templateVersions.templateId, params.id), eq(templateVersions.id, params.versionId)))
+      .where(and(eq(templateVersions.templateId, params.templateId), eq(templateVersions.id, params.versionId)))
     if (!version) throw new HttpError("not_found", "Template version not found")
     if (version.status === "archived") throw new HttpError("conflict", "The version is already archived")
     if (version.status === "draft") throw new HttpError("conflict", "A draft can't be archived; discard it instead")
@@ -161,7 +161,7 @@ templatesRouter.post("/:id/versions/:versionId/archive", route({ params: typeIdP
   res.json(toTemplateVersionDto(archived))
 }))
 
-templatesRouter.patch("/:id", route({ params: typeIdParamSchema("templates"), body: updateTemplateBodySchema }, async ({ params, body, member, organization, res }) => {
+templatesRouter.patch("/:templateId", route({ params: typeIdParamsSchema({ templateId: "templates" }), body: updateTemplateBodySchema }, async ({ params, body, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "edit")
 
   try {
@@ -170,11 +170,11 @@ templatesRouter.patch("/:id", route({ params: typeIdParamSchema("templates"), bo
         name: body.name,
         description: body.description,
       })
-      .where(and(eq(templates.id, params.id), visible))
+      .where(and(eq(templates.id, params.templateId), visible))
       .returning()
 
     if (!updated) {
-      const level = await templateAccessLevel(db, { member, organization }, params.id)
+      const level = await templateAccessLevel(db, { member, organization }, params.templateId)
       if (!level) throw new HttpError("not_found", "Template not found")
       throw new HttpError("forbidden", "You need edit access to this template")
     }
@@ -188,13 +188,13 @@ templatesRouter.patch("/:id", route({ params: typeIdParamSchema("templates"), bo
   }
 }))
 
-templatesRouter.post("/:id/archive", route({ params: typeIdParamSchema("templates"), impersonation: "refuse" }, async ({ params, member, organization, res }) => {
+templatesRouter.post("/:templateId/archive", route({ params: typeIdParamsSchema({ templateId: "templates" }), impersonation: "refuse" }, async ({ params, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "edit")
 
   const archived = await db.transaction(async (tx) => {
     const [template] = await tx.update(templates)
       .set({ status: "archived" })
-      .where(and(eq(templates.id, params.id), eq(templates.status, "active"), visible))
+      .where(and(eq(templates.id, params.templateId), eq(templates.status, "active"), visible))
       .returning()
     if (!template) return null
 
@@ -208,7 +208,7 @@ templatesRouter.post("/:id/archive", route({ params: typeIdParamSchema("template
   })
 
   if (!archived) {
-    const level = await templateAccessLevel(db, { member, organization }, params.id)
+    const level = await templateAccessLevel(db, { member, organization }, params.templateId)
     if (!level) throw new HttpError("not_found", "Template not found")
     if (level !== "edit") throw new HttpError("forbidden", "You need edit access to this template")
     throw new HttpError("conflict", "Template is already archived")
@@ -217,7 +217,7 @@ templatesRouter.post("/:id/archive", route({ params: typeIdParamSchema("template
   res.json(toTemplateDto(archived))
 }))
 
-templatesRouter.post("/:id/restore", route({ params: typeIdParamSchema("templates"), impersonation: "refuse" }, async ({ params, member, organization, res }) => {
+templatesRouter.post("/:templateId/restore", route({ params: typeIdParamsSchema({ templateId: "templates" }), impersonation: "refuse" }, async ({ params, member, organization, res }) => {
   const visible = visibleTemplatesWhere({ member, organization }, "edit")
 
   try {
@@ -225,11 +225,11 @@ templatesRouter.post("/:id/restore", route({ params: typeIdParamSchema("template
       .set({
         status: "active",
       })
-      .where(and(eq(templates.id, params.id), eq(templates.status, "archived"), visible))
+      .where(and(eq(templates.id, params.templateId), eq(templates.status, "archived"), visible))
       .returning()
 
     if (!updated) {
-      const level = await templateAccessLevel(db, { member, organization }, params.id)
+      const level = await templateAccessLevel(db, { member, organization }, params.templateId)
       if (!level) throw new HttpError("not_found", "Template not found")
       if (level !== "edit") throw new HttpError("forbidden", "You need edit access to this template")
       throw new HttpError("conflict", "Template is not archived")

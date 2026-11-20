@@ -15,13 +15,13 @@ import { diffArrays, typeIdParamsSchema } from "@checklog/shared/utils"
 
 export const templateFieldsRouter = Router()
 
-templateFieldsRouter.post("/:id/draft/steps/:stepId/fields", route({ body: templateFieldCreateBodySchema, params: typeIdParamsSchema({ id: "templates", stepId: "templateSteps" }) }, async ({
+templateFieldsRouter.post("/:templateId/draft/steps/:stepId/fields", route({ body: templateFieldCreateBodySchema, params: typeIdParamsSchema({ templateId: "templates", stepId: "templateSteps" }) }, async ({
   body, params, member, organization, res,
 }) => {
-  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+  await assertTemplateAccessLevel(db, { member, organization }, params.templateId, "edit")
 
   const field = await db.transaction(async (tx) => {
-    const draft = await requireDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.templateId)
 
     const [step] = await tx.select({ id: templateSteps.id }).from(templateSteps)
       .where(and(
@@ -64,11 +64,11 @@ templateFieldsRouter.post("/:id/draft/steps/:stepId/fields", route({ body: templ
   res.json(toTemplateFieldDto(field))
 }))
 
-templateFieldsRouter.patch("/:id/draft/steps/:stepId/fields/:fieldId", route({ body: templateFieldUpdateBodySchema, params: typeIdParamsSchema({ id: "templates", stepId: "templateSteps", fieldId: "templateFields" }) }, async ({ body, params, member, organization, res }) => {
-  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+templateFieldsRouter.patch("/:templateId/draft/steps/:stepId/fields/:fieldId", route({ body: templateFieldUpdateBodySchema, params: typeIdParamsSchema({ templateId: "templates", stepId: "templateSteps", fieldId: "templateFields" }) }, async ({ body, params, member, organization, res }) => {
+  await assertTemplateAccessLevel(db, { member, organization }, params.templateId, "edit")
 
   const field = await db.transaction(async (tx) => {
-    const draft = await requireDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.templateId)
 
     const [field] = await tx.select().from(templateFields).where(and(
       eq(templateFields.templateVersionId, draft.id),
@@ -107,13 +107,13 @@ templateFieldsRouter.patch("/:id/draft/steps/:stepId/fields/:fieldId", route({ b
   res.json(toTemplateFieldDto(field))
 }))
 
-templateFieldsRouter.put("/:id/draft/steps/:stepId/fields/order", route({ body: templateFieldOrderBodySchema, params: typeIdParamsSchema({ id: "templates", stepId: "templateSteps" }) }, async ({
+templateFieldsRouter.put("/:templateId/draft/steps/:stepId/fields/order", route({ body: templateFieldOrderBodySchema, params: typeIdParamsSchema({ templateId: "templates", stepId: "templateSteps" }) }, async ({
   body, params, member, organization, res,
 }) => {
-  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+  await assertTemplateAccessLevel(db, { member, organization }, params.templateId, "edit")
 
   const fields = await db.transaction(async (tx) => {
-    const draft = await requireDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.templateId)
     const [step] = await tx.select({ id: templateSteps.id }).from(templateSteps).where(and(
       eq(templateSteps.templateVersionId, draft.id),
       eq(templateSteps.id, params.stepId),
@@ -147,13 +147,13 @@ templateFieldsRouter.put("/:id/draft/steps/:stepId/fields/order", route({ body: 
   res.json(sortBy(fields, ["position"]).map(toTemplateFieldDto))
 }))
 
-templateFieldsRouter.delete("/:id/draft/steps/:stepId/fields/:fieldId", route({ params: typeIdParamsSchema({ id: "templates", stepId: "templateSteps", fieldId: "templateFields" }) }, async ({
+templateFieldsRouter.delete("/:templateId/draft/steps/:stepId/fields/:fieldId", route({ params: typeIdParamsSchema({ templateId: "templates", stepId: "templateSteps", fieldId: "templateFields" }) }, async ({
   params, member, organization, res,
 }) => {
-  await assertTemplateAccessLevel(db, { member, organization }, params.id, "edit")
+  await assertTemplateAccessLevel(db, { member, organization }, params.templateId, "edit")
 
   await db.transaction(async (tx) => {
-    const draft = await requireDraft(tx, { member, organization }, params.id)
+    const draft = await requireDraft(tx, { member, organization }, params.templateId)
 
     const [deletedRow] = await tx.delete(templateFields)
       .where(and(
