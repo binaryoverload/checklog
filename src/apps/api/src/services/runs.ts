@@ -178,8 +178,6 @@ export async function requireRunStep(tx: Database, context: UserContext, runId: 
 
   if (!allowed) throw new HttpError("forbidden", "You can't act on this step")
 
-  if (run.status !== "in_progress") throw new HttpError("conflict", "Run not in progress")
-
   return { run, templateId, ...row, templateAccessLevel }
 }
 

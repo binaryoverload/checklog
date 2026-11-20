@@ -128,7 +128,7 @@ Helpers the run routes share, each its own small pull request or part of the fir
 - [x] API: set field values by key, checking each against its field's options and `allowFuture` (date fields against the user's zone) (person)
 - [ ] API: complete a step, enforcing required fields and halt steps (person)
 - [ ] API: skip a skippable step with a reason (person)
-- [ ] API: add notes to a step (person)
+- [x] API: add notes to a step, including on completed and cancelled runs (person)
 - [ ] API: reassign a step, cancel a run, and complete the run when every step is resolved; completed and cancelled runs refuse step actions with `conflict` (person)
 - [ ] UI: run list with the start column, run page with steps, fields, notes, skip and complete; the start time in the run's zone, due dates with the run's zone alongside when it differs, and times rendered on the client only (person)
 

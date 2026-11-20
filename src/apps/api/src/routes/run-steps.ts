@@ -1,30 +1,28 @@
 import { eq, and } from "drizzle-orm"
 import { Router } from "express"
-import z from "zod"
 
 import { db } from "@/db/index.ts"
-import { runFieldValues, templateFields } from "@/db/schema.ts"
+import { runFieldValues, stepNotes, templateFields } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import { route } from "@/http/route.ts"
-import { toRunWithDetailsDto } from "@/mappers/runs.ts"
+import { toRunWithDetailsDto, toStepNoteDto } from "@/mappers/runs.ts"
 import { loadRunRows, requireRunStep } from "@/services/runs.ts"
 import { buildConflictUpdateColumns } from "@/util/db.ts"
+import { addStepNoteBodySchema, setStepValuesBodySchema } from "@checklog/shared/api"
 import type { ApiErrorDetail } from "@checklog/shared/api"
-import { fieldKeySchema, fieldValueSchema, validateFieldValue } from "@checklog/shared/domain"
+import { validateFieldValue } from "@checklog/shared/domain"
 import { dateInTimezone, typeIdParamsSchema } from "@checklog/shared/utils"
 
 export const runStepsRouter = Router()
 
 runStepsRouter.put("/:id/steps/:stepId/values", route({
   params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }),
-  body: z.object({
-    values: z.record(fieldKeySchema, fieldValueSchema.nullable())
-      .refine(v => Object.keys(v).length > 0, "Must have at least one value"),
-  }),
+  body: setStepValuesBodySchema,
 }, async ({ params, body, member, organization, res, timezone }) => {
   const runData = await db.transaction(async (tx) => {
     const { run, step, templateId } = await requireRunStep(tx, { member, organization }, params.id, params.stepId, "assignee")
 
+    if (run.status !== "in_progress") throw new HttpError("conflict", "Run not in progress")
     if (step.status !== "pending") throw new HttpError("conflict", "Step not pending")
 
     const values = body.values
@@ -81,8 +79,24 @@ runStepsRouter.post("/:id/steps/:stepId/skip", route({ params: typeIdParamsSchem
   throw new Error("Not implemented")
 }))
 
-runStepsRouter.post("/:id/steps/:stepId/notes", route({ params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }) }, ({ res }) => {
-  throw new Error("Not implemented")
+runStepsRouter.post("/:id/steps/:stepId/notes", route({
+  params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }),
+  body: addStepNoteBodySchema,
+}, async ({ params, body, member, organization, res }) => {
+  const note = await db.transaction(async (tx) => {
+    const { step } = await requireRunStep(tx, { member, organization }, params.id, params.stepId, "view")
+
+    const [note] = await tx.insert(stepNotes).values({
+      runStepId: step.id,
+      organizationId: organization.id,
+      createdBy: member.userId,
+      body: body.body,
+    }).returning()
+    if (!note) throw new HttpError("internal", "Failed to create note")
+    return note
+  })
+
+  res.json(toStepNoteDto(note))
 }))
 
 runStepsRouter.patch("/:id/steps/:stepId/assignee", route({ params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }) }, ({ res }) => {

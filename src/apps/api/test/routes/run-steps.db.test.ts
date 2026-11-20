@@ -649,8 +649,22 @@ describe("POST /api/runs/:runId/steps/:stepId/notes", () => {
   })
 
   test.each([
+    ["completed", { status: "completed" as const, completedAt: new Date() }],
+    ["cancelled", { status: "cancelled" as const }],
+  ])("adds a note to a step of a %s run", async (_status, values) => {
+    const { organization } = await signedInMember("owner")
+    const { version, templateSteps: [templateStep] } = await publishedTemplate(organization, [{}])
+    const run = await insertRun(version, values)
+    const step = await insertRunStep(run, templateStep!)
+
+    expectStatus(await addNote(run, step, { body: "Followed up afterwards" }), 200)
+    expect((await notesOf(step)).map(note => note.body)).toEqual(["Followed up afterwards"])
+  })
+
+  test.each([
     ["no body", {}],
     ["an empty body", { body: "" }],
+    ["a body over 500 characters", { body: "a".repeat(501) }],
   ])("refuses %s with validation_failed and adds nothing", async (_description, body) => {
     const { organization } = await signedInMember("owner")
     const { run, runSteps: [step] } = await runWithSteps(organization, [{}])
