@@ -1,5 +1,7 @@
 import z from "zod"
 
+import { requiredString } from "../utils/zod.ts"
+
 export const fieldTypes = ["text", "number", "date", "dropdown", "checkbox"] as const
 export const fieldTypeSchema = z.enum(fieldTypes)
 export type FieldType = z.infer<typeof fieldTypeSchema>
@@ -65,6 +67,8 @@ export const fieldOptionsSchema = z.discriminatedUnion("type", [
 ])
 
 export type FieldOptions = z.infer<typeof fieldOptionsSchema>
+
+export const fieldKeySchema = requiredString().max(50).regex(/^[a-z][a-z0-9_]*$/)
 
 export const fieldValueSchema = z.discriminatedUnion("type", [
   z.object({

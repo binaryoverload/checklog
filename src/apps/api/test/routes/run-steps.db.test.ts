@@ -44,7 +44,7 @@ const reassign = (run: { id: string }, step: { id: string }, assignee: object | 
 const textOptions: FieldOptions = { type: "text", multiLine: false }
 
 describeRunVisibility([
-  { name: "PUT /api/runs/:runId/steps/:stepId/values", send: (run, step) => setValues(run, step, {}) },
+  { name: "PUT /api/runs/:runId/steps/:stepId/values", send: (run, step) => setValues(run, step, { comment: { type: "text", value: "Fine" } }) },
   { name: "POST /api/runs/:runId/steps/:stepId/complete", send: completeStep },
   { name: "POST /api/runs/:runId/steps/:stepId/skip", send: (run, step) => skipStep(run, step) },
   { name: "POST /api/runs/:runId/steps/:stepId/notes", send: (run, step) => addNote(run, step) },
@@ -356,6 +356,7 @@ describe("PUT /api/runs/:runId/steps/:stepId/values", () => {
   test.each([
     ["no values", undefined],
     ["values that aren't an object", ["reading"]],
+    ["an empty set of values", {}],
   ])("refuses %s with validation_failed", async (_description, values) => {
     const { run, step } = await stepWithFields([{ key: "reading", type: "number", options: { type: "number" } }])
 

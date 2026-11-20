@@ -1,4 +1,6 @@
-import { DrizzleQueryError } from "drizzle-orm"
+import type { SQL } from "drizzle-orm"
+import { DrizzleQueryError, getTableColumns, sql } from "drizzle-orm"
+import type { PgTable } from "drizzle-orm/pg-core"
 import { DatabaseError } from "pg"
 
 // https://www.postgresql.org/docs/current/errcodes-appendix.html
@@ -28,4 +30,19 @@ export function isUniqueViolation(error: unknown, constraintName?: string): bool
     return isUnique && error.cause.constraint != null && error.cause.constraint.includes(constraintName)
   }
   return isUnique
+}
+
+export function buildConflictUpdateColumns<
+  T extends PgTable,
+  Q extends keyof T["_"]["columns"],
+>(
+  table: T,
+  columns: Q[],
+) {
+  const cls = getTableColumns(table)
+  return columns.reduce((acc, column) => {
+    const colName = cls[column]!.name
+    acc[column] = sql`excluded.${sql.identifier(colName)}`
+    return acc
+  }, {} as Record<Q, SQL>)
 }

@@ -4,7 +4,7 @@ import type { CreatedFields, UpdatedFields } from "./common.ts"
 import { pageQuerySchema } from "./pagination.ts"
 import { assigneeSchema } from "../domain/assignees.ts"
 import type { Assignee } from "../domain/assignees.ts"
-import { fieldOptionsSchema } from "../domain/fields.ts"
+import { fieldKeySchema, fieldOptionsSchema } from "../domain/fields.ts"
 import type { FieldOptions, FieldType } from "../domain/fields.ts"
 import { templateAccessLevelSchema, templateStatusSchema, templateStepKindSchema, templateStepRuleIssues } from "../domain/templates.ts"
 import type { TemplateAccessLevel, TemplateStatus, TemplateStepKind, TemplateVersionStatus } from "../domain/templates.ts"
@@ -121,7 +121,7 @@ export type TemplateStepWithFieldsDto = TemplateStepDto & {
 
 const templateFieldFields = z.strictObject({
   label: requiredString().max(100),
-  key: requiredString().max(50).regex(/^[a-z][a-z0-9_]*$/),
+  key: fieldKeySchema,
   helpText: requiredString().max(200).nullish(),
   required: z.boolean(),
   options: fieldOptionsSchema,
