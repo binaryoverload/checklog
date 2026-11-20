@@ -126,10 +126,11 @@ Helpers the run routes share, each its own small pull request or part of the fir
 - [x] API: list runs (mine, my groups', all, plus status) and get one run with its steps, fields, values, notes and a computed `blocked`; anyone with `view` on the template, assigned a step or who started the run sees the whole run (person)
 - [x] Shared `validateFieldValue(options, value, now)` in `domain/fields.ts`, used by the API and the web app (person)
 - [x] API: set field values by key, checking each against its field's options and `allowFuture` (date fields against the user's zone) (person)
-- [ ] API: complete a step, enforcing required fields and halt steps (person)
-- [ ] API: skip a skippable step with a reason (person)
+- [x] API: complete a step, enforcing required fields and halt steps (person)
+- [x] API: skip a skippable step with a reason, blocked by a pending halt step like completing (person)
 - [x] API: add notes to a step, including on completed and cancelled runs (person)
-- [ ] API: reassign a step, cancel a run, and complete the run when every step is resolved; completed and cancelled runs refuse step actions with `conflict` (person)
+- [x] API: reassign a step, and complete the run when every step is resolved; completed and cancelled runs refuse step actions with `conflict` (person)
+- [ ] API: cancel a run (person)
 - [ ] UI: run list with the start column, run page with steps, fields, notes, skip and complete; the start time in the run's zone, due dates with the run's zone alongside when it differs, and times rendered on the client only (person)
 
 ### Approvals

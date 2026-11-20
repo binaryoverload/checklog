@@ -23,5 +23,13 @@ export const preconditionIssueSchema = z.discriminatedUnion("resourceType", [
     templateId: z.string(),
     message: z.string(),
   }),
+  z.object({
+    location: z.literal("resource"),
+    resourceType: z.literal("runStep"),
+    problem: z.enum(["halt_step_not_completed", "missing_field_value"]),
+    stepId: z.string(),
+    fieldId: z.string().nullable(),
+    message: z.string(),
+  }),
 ])
 export type PreconditionIssue = z.infer<typeof preconditionIssueSchema>

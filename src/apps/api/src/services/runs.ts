@@ -1,4 +1,4 @@
-import { asc, eq, and, getTableColumns, inArray } from "drizzle-orm"
+import { asc, eq, and, getTableColumns, inArray, lt } from "drizzle-orm"
 import type { IANAZone } from "luxon"
 
 import { canActOnStep, getMemberTeamIds, templateAccessLevel, visibleRunsWhere } from "@/core/permissions.ts"
@@ -6,7 +6,7 @@ import { members, teams } from "@/db/auth-schema.ts"
 import { runFieldValues, runs, runSteps, stepNotes, templateFields, templateSteps, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import type { RunRows } from "@/mappers/runs.ts"
-import type { Database, Run, Template, UserContext } from "@/util/types.ts"
+import type { Database, Run, Template, TemplateStep, UserContext } from "@/util/types.ts"
 import { allStepsResolved, flatToAssignee, missingAssigneeIssues, templateAccessIncludes } from "@checklog/shared/domain"
 import type { PreconditionIssue } from "@checklog/shared/domain"
 import { addOffset } from "@checklog/shared/utils"
@@ -191,4 +191,24 @@ export async function completeRunIfResolved(tx: Database, run: Run) {
   }
 
   return run
+}
+
+export async function assertNoPendingHaltBefore(tx: Database, run: Run, templateStep: TemplateStep) {
+  const pendingHalts = await tx.select({ id: runSteps.id }).from(runSteps)
+    .innerJoin(templateSteps, eq(templateSteps.id, runSteps.templateStepId))
+    .where(and(
+      eq(runSteps.runId, run.id),
+      lt(templateSteps.position, templateStep.position),
+      eq(templateSteps.isHalt, true),
+      eq(runSteps.status, "pending"),
+    ))
+
+  if (pendingHalts.length) throw new HttpError("precondition_failed", "Step is blocked", pendingHalts.map(halt => ({
+    location: "resource",
+    resourceType: "runStep",
+    problem: "halt_step_not_completed",
+    stepId: halt.id,
+    fieldId: null,
+    message: "A halt step before this one isn't done",
+  })))
 }

@@ -571,6 +571,21 @@ describe("POST /api/runs/:runId/steps/:stepId/skip", () => {
     expect(await storedRunStep(step!.id)).toEqual(step)
   })
 
+  test("refuses a step after a pending halt step with precondition_failed, pointing at the halt step, and changes nothing", async () => {
+    const { organization } = await signedInMember("owner")
+    const { run, runSteps: [halt, after], templateSteps: [haltTemplateStep] } = await runWithSteps(organization, [{ isHalt: true }, { skippable: true }])
+
+    expectPreconditionFailed(await skipStep(run, after!), [[halt!.id, haltTemplateStep!.id]])
+    expect(await storedRunStep(after!.id)).toEqual(after)
+  })
+
+  test("skips a pending halt step itself", async () => {
+    const { organization } = await signedInMember("owner")
+    const { run, runSteps: [halt] } = await runWithSteps(organization, [{ isHalt: true, skippable: true }, {}])
+
+    expectStatus(await skipStep(run, halt!), 200)
+  })
+
   test.each([
     ["no reason", {}],
     ["an empty reason", { reason: "" }],

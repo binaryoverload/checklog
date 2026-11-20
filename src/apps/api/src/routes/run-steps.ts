@@ -2,15 +2,16 @@ import { eq, and } from "drizzle-orm"
 import { Router } from "express"
 
 import { db } from "@/db/index.ts"
-import { runFieldValues, stepNotes, templateFields } from "@/db/schema.ts"
+import { runFieldValues, runSteps, stepNotes, templateFields } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import { route } from "@/http/route.ts"
 import { toRunWithDetailsDto, toStepNoteDto } from "@/mappers/runs.ts"
-import { loadRunRows, requireRunStep } from "@/services/runs.ts"
+import { assertAssigneeValid } from "@/services/assignees.ts"
+import { assertNoPendingHaltBefore, completeRunIfResolved, loadRunRows, requireRunStep } from "@/services/runs.ts"
 import { buildConflictUpdateColumns } from "@/util/db.ts"
-import { addStepNoteBodySchema, setStepValuesBodySchema } from "@checklog/shared/api"
+import { addStepNoteBodySchema, reassignStepBodySchema, setStepValuesBodySchema, skipStepBodySchema } from "@checklog/shared/api"
 import type { ApiErrorDetail } from "@checklog/shared/api"
-import { validateFieldValue } from "@checklog/shared/domain"
+import { assigneeToFlat, missingRequiredFields, validateFieldValue } from "@checklog/shared/domain"
 import { dateInTimezone, typeIdParamsSchema } from "@checklog/shared/utils"
 
 export const runStepsRouter = Router()
@@ -71,12 +72,69 @@ runStepsRouter.put("/:id/steps/:stepId/values", route({
   res.json(toRunWithDetailsDto(runData))
 }))
 
-runStepsRouter.post("/:id/steps/:stepId/complete", route({ params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }) }, ({ res }) => {
-  throw new Error("Not implemented")
+runStepsRouter.post("/:id/steps/:stepId/complete", route({
+  params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }),
+}, async ({ params, member, organization, res }) => {
+  const runData = await db.transaction(async (tx) => {
+    const { run, step, templateStep, templateId } = await requireRunStep(tx, { member, organization }, params.id, params.stepId, "assignee")
+
+    if (run.status !== "in_progress") throw new HttpError("conflict", "Run not in progress")
+    if (step.status !== "pending") throw new HttpError("conflict", "Step not pending")
+    if (templateStep.kind === "approval") throw new HttpError("conflict", "Approval steps are resolved by approving")
+
+    await assertNoPendingHaltBefore(tx, run, templateStep)
+
+    const fields = await tx.select().from(templateFields).where(eq(templateFields.templateStepId, templateStep.id))
+    const values = await tx.select().from(runFieldValues).where(eq(runFieldValues.runStepId, step.id))
+
+    const missingFields = missingRequiredFields(fields, values)
+    if (missingFields.length) throw new HttpError("precondition_failed", "Missing fields", missingFields.map(f => ({
+      location: "resource",
+      resourceType: "runStep",
+      problem: "missing_field_value",
+      stepId: step.id,
+      fieldId: f.id,
+      message: `${f.label} is required`,
+    })))
+
+    await tx.update(runSteps).set({
+      status: "completed",
+      completedBy: member.userId,
+      completedAt: new Date(),
+    }).where(eq(runSteps.id, step.id))
+
+    const updatedRun = await completeRunIfResolved(tx, run)
+
+    return await loadRunRows(tx, updatedRun, templateId)
+  })
+  res.json(toRunWithDetailsDto(runData))
 }))
 
-runStepsRouter.post("/:id/steps/:stepId/skip", route({ params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }) }, ({ res }) => {
-  throw new Error("Not implemented")
+runStepsRouter.post("/:id/steps/:stepId/skip", route({
+  params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }),
+  body: skipStepBodySchema,
+}, async ({ params, body, member, organization, res }) => {
+  const runData = await db.transaction(async (tx) => {
+    const { run, step, templateStep, templateId } = await requireRunStep(tx, { member, organization }, params.id, params.stepId, "assignee")
+
+    if (run.status !== "in_progress") throw new HttpError("conflict", "Run not in progress")
+    if (step.status !== "pending") throw new HttpError("conflict", "Step not pending")
+    if (!templateStep.skippable) throw new HttpError("conflict", "Step not skippable")
+
+    await assertNoPendingHaltBefore(tx, run, templateStep)
+
+    await tx.update(runSteps).set({
+      status: "skipped",
+      skipReason: body.reason,
+      completedBy: member.userId,
+      completedAt: new Date(),
+    }).where(eq(runSteps.id, step.id))
+
+    const updatedRun = await completeRunIfResolved(tx, run)
+
+    return await loadRunRows(tx, updatedRun, templateId)
+  })
+  res.json(toRunWithDetailsDto(runData))
 }))
 
 runStepsRouter.post("/:id/steps/:stepId/notes", route({
@@ -99,6 +157,21 @@ runStepsRouter.post("/:id/steps/:stepId/notes", route({
   res.json(toStepNoteDto(note))
 }))
 
-runStepsRouter.patch("/:id/steps/:stepId/assignee", route({ params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }) }, ({ res }) => {
-  throw new Error("Not implemented")
+runStepsRouter.patch("/:id/steps/:stepId/assignee", route({
+  params: typeIdParamsSchema({ id: "runs", stepId: "runSteps" }),
+  body: reassignStepBodySchema,
+}, async ({ params, body, member, organization, res }) => {
+  const runData = await db.transaction(async (tx) => {
+    const { run, step, templateId } = await requireRunStep(tx, { member, organization }, params.id, params.stepId, "run")
+
+    if (run.status !== "in_progress") throw new HttpError("conflict", "Run not in progress")
+    if (step.status !== "pending") throw new HttpError("conflict", "Step not pending")
+
+    await assertAssigneeValid(tx, body.assignee, organization.id)
+
+    await tx.update(runSteps).set(assigneeToFlat(body.assignee)).where(eq(runSteps.id, step.id))
+
+    return await loadRunRows(tx, run, templateId)
+  })
+  res.json(toRunWithDetailsDto(runData))
 }))
