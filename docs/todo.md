@@ -143,7 +143,7 @@ Helpers the run routes share, each its own small pull request or part of the fir
 
 ### Schedules
 
-- [ ] API: create, edit, pause and resume a schedule (RRULE and time zone) for a template, and calculate `next_run_at` (person)
+- [ ] API: list, create, edit, pause, resume, archive and restore a template's schedules under `/schedules` (RRULE and time zone), and calculate `next_run_at`; resume only from paused, archived schedules can't be edited, and restoring brings one back paused (person)
 - [ ] Job: pg-boss recurring job that starts due runs and advances `next_run_at`; a run that fails the start check is skipped and the people who can edit the template are notified (person)
 - [ ] UI: schedule settings on a template (person)
 

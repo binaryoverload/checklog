@@ -131,15 +131,24 @@ export async function insertTemplateField(
   return field!
 }
 
-export async function insertSchedule(tx: Database, template: Template, status: ScheduleStatus): Promise<Schedule> {
+// A standard RFC 5545 rule with its start and zone: daily at 09:00 in London, from 1 January 2099
+export const dailyScheduleRrule = "DTSTART;TZID=Europe/London:20990101T090000\nRRULE:FREQ=DAILY"
+
+export async function insertSchedule(
+  tx: Database,
+  template: Template,
+  status: ScheduleStatus,
+  values: Partial<typeof schedules.$inferInsert> = {},
+): Promise<Schedule> {
   const [schedule] = await tx.insert(schedules).values({
     organizationId: template.organizationId,
     templateId: template.id,
     status,
-    rrule: "FREQ=WEEKLY",
+    rrule: dailyScheduleRrule,
     timezone: "Europe/London",
     runNamePattern: "Weekly checks",
     createdBy: "user_someone_else",
+    ...values,
   }).returning()
   return schedule!
 }
