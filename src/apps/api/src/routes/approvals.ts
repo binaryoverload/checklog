@@ -19,7 +19,11 @@ approvalsRouter.post("/:approvalId/decisions", route({
   const runData = await db.transaction(async (tx) => {
     const [row] = await tx.select({ approval: approvalRequests, runStep: runSteps }).from(approvalRequests)
       .innerJoin(runSteps, eq(runSteps.id, approvalRequests.runStepId))
-      .where(and(eq(approvalRequests.id, params.approvalId), eq(approvalRequests.organizationId, organization.id)))
+      .where(and(
+        eq(approvalRequests.id, params.approvalId),
+        eq(approvalRequests.organizationId, organization.id),
+      ))
+
     if (!row) throw new HttpError("not_found", "Approval request not found")
 
     const { run, step, templateId } = await requireRunStep(tx, { member, organization }, row.runStep.runId, row.runStep.id, "assignee")
