@@ -933,3 +933,54 @@ describe("PATCH /api/runs/:runId/steps/:stepId/assignee", () => {
     expect(await storedRunStep(otherStep!.id)).toEqual(otherStep)
   })
 })
+
+// Approval steps only block the steps after them when they're also halt steps
+describe("approval steps before the step being acted on", () => {
+  const actions = [
+    { name: "complete", spec: {}, send: completeStep },
+    { name: "skip", spec: { skippable: true }, send: (run: Run, step: RunStep) => skipStep(run, step) },
+  ]
+
+  async function runAfterApproval(organization: Organization, approver: string, approval: StepSpec, action: (typeof actions)[number]) {
+    const { version, templateSteps: [approvalTemplateStep, laterTemplateStep] } = await publishedTemplate(organization, [
+      { kind: "approval", assigneeType: "member", assigneeMemberId: approver, ...approval },
+      action.spec,
+    ])
+    const run = await insertRun(version)
+    return { run, approvalTemplateStep: approvalTemplateStep!, laterTemplateStep: laterTemplateStep! }
+  }
+
+  for (const action of actions) describe(action.name, () => {
+    test.each(["pending", "rejected"] as const)("refuses a step after a %s halt approval with precondition_failed, pointing at the approval step, and changes nothing", async (status) => {
+      const { organization, member } = await signedInMember("owner")
+      const { run, approvalTemplateStep, laterTemplateStep } = await runAfterApproval(organization, member.id, { isHalt: true }, action)
+      const approval = await insertRunStep(run, approvalTemplateStep)
+      await insertApprovalRequest(approval, { status })
+      const later = await insertRunStep(run, laterTemplateStep)
+
+      expectPreconditionFailed(await action.send(run, later), [[approval.id, approvalTemplateStep.id]])
+      expect(await storedRunStep(later.id)).toEqual(later)
+    })
+
+    test("allows a step after an approved halt approval", async () => {
+      const { organization, member } = await signedInMember("owner")
+      const { run, approvalTemplateStep, laterTemplateStep } = await runAfterApproval(organization, member.id, { isHalt: true }, action)
+      const approval = await insertRunStep(run, approvalTemplateStep, { status: "completed", completedAt: new Date(), completedBy: member.userId })
+      await insertApprovalRequest(approval, { status: "approved" })
+      const later = await insertRunStep(run, laterTemplateStep)
+
+      expectStatus(await action.send(run, later), 200)
+    })
+
+    test("allows a step after a pending approval that isn't a halt step", async () => {
+      const { organization, member } = await signedInMember("owner")
+      const { run, approvalTemplateStep, laterTemplateStep } = await runAfterApproval(organization, member.id, { isHalt: false }, action)
+      const approval = await insertRunStep(run, approvalTemplateStep)
+      await insertApprovalRequest(approval)
+      const later = await insertRunStep(run, laterTemplateStep)
+
+      expectStatus(await action.send(run, later), 200)
+      expect((await storedRun(run.id))!.status).toBe("in_progress")
+    })
+  })
+})
