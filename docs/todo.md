@@ -137,7 +137,7 @@ Helpers the run routes share, each its own small pull request or part of the fir
 
 - [x] API: create an approval request when an approval step is reached (every earlier step completed or skipped), as an upsert on `run_step_id`; the approver is the step's current assignee (person)
 - [x] API: approve or reject, with a comment required on rejection; the request's status follows the latest decision, a rejection keeps the step open and an approval resolves it (person)
-- [ ] API: include each approval step's request and its decisions on the run step DTO, so the run page has the request ID to decide on (person)
+- [x] API: include each approval step's request and its decisions on the run step DTO, so the run page has the request ID to decide on (person)
 - [ ] API: list approval requests awaiting me (person)
 - [ ] UI: "awaiting my approval" list and the approve or reject dialog (person)
 

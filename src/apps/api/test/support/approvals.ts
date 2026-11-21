@@ -14,13 +14,19 @@ export async function insertApprovalRequest(step: RunStep, values: Partial<typeo
   return row!
 }
 
-export async function insertApprovalDecision(request: ApprovalRequest, decision: "approved" | "rejected", comment: string | null = null) {
+export async function insertApprovalDecision(
+  request: ApprovalRequest,
+  decision: "approved" | "rejected",
+  comment: string | null = null,
+  values: Partial<typeof approvalDecisions.$inferInsert> = {},
+) {
   const [row] = await db.insert(approvalDecisions).values({
     organizationId: request.organizationId,
     approvalRequestId: request.id,
     decision,
     comment,
     createdBy: "user_someone_else",
+    ...values,
   }).returning()
   return row!
 }

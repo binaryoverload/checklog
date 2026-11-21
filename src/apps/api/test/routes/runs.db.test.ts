@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest"
 
 import { db } from "@/db/index.ts"
 import type { PageResult, RunDto, RunWithDetailsDto } from "@checklog/shared/api"
+import { insertApprovalDecision, insertApprovalRequest } from "@test/support/approvals.ts"
 import {
   addToGroup,
   createGroup,
@@ -94,6 +95,69 @@ describe("GET /api/runs/:runId", () => {
 
     expect(returned!.notes.map(note => note.body)).toEqual(["First note", "Second note"])
     expect(returned!.notes[0]).not.toHaveProperty("organizationId")
+  })
+
+  test("returns an approval step's pending request with no decisions", async () => {
+    const { organization, member } = await signedInMember("owner")
+    const { run, runSteps: [step] } = await runWithSteps(organization, [{ kind: "approval", assigneeType: "member", assigneeMemberId: member.id }])
+    const request = await insertApprovalRequest(step!)
+
+    const [returned] = ((await getRun(run.id)).body as RunWithDetailsDto).steps
+
+    expect(returned!.approval).toEqual({
+      id: request.id,
+      runStepId: step!.id,
+      status: "pending",
+      decisions: [],
+      createdBy: request.createdBy,
+      createdAt: request.createdAt.toISOString(),
+      updatedAt: request.updatedAt.toISOString(),
+    })
+  })
+
+  test("returns a rejected request's decisions oldest first, with their comments", async () => {
+    const { organization, member } = await signedInMember("owner")
+    const { run, runSteps: [step] } = await runWithSteps(organization, [{ kind: "approval", assigneeType: "member", assigneeMemberId: member.id }])
+    const request = await insertApprovalRequest(step!, { status: "rejected" })
+    // Inserted newest first, so the order can only come from createdAt
+    await insertApprovalDecision(request, "rejected", "Still missing the readings", { createdAt: new Date("2026-11-02T09:00:00Z") })
+    await insertApprovalDecision(request, "rejected", "The pressure readings are missing", { createdAt: new Date("2026-11-01T09:00:00Z") })
+
+    const [returned] = ((await getRun(run.id)).body as RunWithDetailsDto).steps
+
+    expect(returned!.approval).toMatchObject({ id: request.id, status: "rejected" })
+    expect(returned!.approval!.decisions.map(decision => [decision.decision, decision.comment])).toEqual([
+      ["rejected", "The pressure readings are missing"],
+      ["rejected", "Still missing the readings"],
+    ])
+    expect(returned!.approval!.decisions[0]).toMatchObject({ createdBy: "user_someone_else", createdAt: "2026-11-01T09:00:00.000Z" })
+    expect(returned!.approval!.decisions[0]).not.toHaveProperty("organizationId")
+    expect(returned!.approval!.decisions[0]).not.toHaveProperty("approvalRequestId")
+  })
+
+  test("returns no approval for a task step, or an approval step that hasn't been reached", async () => {
+    const { organization, member } = await signedInMember("owner")
+    const { run } = await runWithSteps(organization, [{}, { kind: "approval", assigneeType: "member", assigneeMemberId: member.id }])
+
+    const steps = ((await getRun(run.id)).body as RunWithDetailsDto).steps
+
+    expect(steps.map(step => step.approval)).toEqual([null, null])
+  })
+
+  test("returns each approval step's own request, not another step's or another run's", async () => {
+    const { organization, member } = await signedInMember("owner")
+    const approver = { kind: "approval" as const, assigneeType: "member" as const, assigneeMemberId: member.id }
+    const { run, runSteps: [first, second] } = await runWithSteps(organization, [approver, approver])
+    const firstRequest = await insertApprovalRequest(first!, { status: "rejected" })
+    const secondRequest = await insertApprovalRequest(second!)
+    await insertApprovalDecision(firstRequest, "rejected", "Not yet")
+    const { runSteps: [elsewhere] } = await runWithSteps(organization, [approver])
+    await insertApprovalDecision(await insertApprovalRequest(elsewhere!, { status: "rejected" }), "rejected", "Another run")
+
+    const steps = ((await getRun(run.id)).body as RunWithDetailsDto).steps
+
+    expect(steps.map(step => step.approval?.id)).toEqual([firstRequest.id, secondRequest.id])
+    expect(steps.map(step => step.approval!.decisions.map(decision => decision.comment))).toEqual([["Not yet"], []])
   })
 
   test("marks the steps after a pending halt step as blocked", async () => {

@@ -3,7 +3,7 @@ import type { IANAZone } from "luxon"
 
 import { canActOnStep, getMemberTeamIds, templateAccessLevel, visibleRunsWhere } from "@/core/permissions.ts"
 import { members, teams } from "@/db/auth-schema.ts"
-import { approvalRequests, runFieldValues, runs, runSteps, stepNotes, templateFields, templateSteps, templateVersions } from "@/db/schema.ts"
+import { approvalDecisions, approvalRequests, runFieldValues, runs, runSteps, stepNotes, templateFields, templateSteps, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import type { RunRows } from "@/mappers/runs.ts"
 import type { Database, Run, Template, TemplateStep, UserContext } from "@/util/types.ts"
@@ -29,6 +29,15 @@ export async function loadRunRows(tx: Database, run: Run, templateId: string): P
     .innerJoin(runSteps, eq(runFieldValues.runStepId, runSteps.id))
     .where(eq(runSteps.runId, run.id))
 
+  const approvalRequestsResult = await tx.select(getTableColumns(approvalRequests)).from(approvalRequests)
+    .innerJoin(runSteps, eq(approvalRequests.runStepId, runSteps.id))
+    .where(eq(runSteps.runId, run.id))
+
+  const approvalDecisionsResult = await tx.select(getTableColumns(approvalDecisions)).from(approvalDecisions)
+    .innerJoin(approvalRequests, eq(approvalDecisions.approvalRequestId, approvalRequests.id))
+    .innerJoin(runSteps, eq(approvalRequests.runStepId, runSteps.id))
+    .where(eq(runSteps.runId, run.id))
+
   return {
     run,
     templateId,
@@ -37,6 +46,8 @@ export async function loadRunRows(tx: Database, run: Run, templateId: string): P
     runSteps: runStepResult,
     runStepNotes: runStepNotesResult,
     runFieldValues: runFieldValuesResult,
+    approvalRequests: approvalRequestsResult,
+    approvalDecisions: approvalDecisionsResult,
   }
 }
 

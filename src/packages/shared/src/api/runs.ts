@@ -2,11 +2,9 @@ import z from "zod"
 
 import type { CreatedFields, UpdatedFields } from "./common.ts"
 import { pageQuerySchema } from "./pagination.ts"
-import type { TemplateFieldDto, TemplateStepDto } from "./templates.ts"
-import type { Assignee } from "../domain/assignees.ts"
-import type { FieldValue } from "../domain/fields.ts"
+import type { RunStepWithDetailsDto } from "./run-steps.ts"
 import { runListScopeSchema, runStatusSchema } from "../domain/runs.ts"
-import type { RunStatus, RunStepStatus } from "../domain/runs.ts"
+import type { RunStatus } from "../domain/runs.ts"
 import { typeIdSchema } from "../utils/typeid.ts"
 import { requiredString } from "../utils/zod.ts"
 
@@ -35,35 +33,3 @@ export type RunDto = {
 } & CreatedFields & UpdatedFields
 
 export type RunWithDetailsDto = RunDto & { steps: RunStepWithDetailsDto[] }
-
-export type RunStepDto = {
-  id: string
-  runId: string
-  templateStepId: string
-  status: RunStepStatus
-  assignee: Assignee | null
-  assigneeMissing: boolean
-  dueAt: string | null
-  completedAt: string | null
-  completedBy: string | null
-  skipReason: string | null
-} & CreatedFields & UpdatedFields
-
-export type RunStepWithDetailsDto = RunStepDto & {
-  blocked: boolean
-  templateStep: TemplateStepDto
-  fields: RunFieldWithValueDto[]
-  notes: StepNoteDto[]
-}
-
-export type RunFieldWithValueDto = TemplateFieldDto & {
-  value: FieldValue | null
-  valueUpdatedBy: string | null
-  valueUpdatedAt: string | null
-}
-
-export type StepNoteDto = {
-  id: string
-  runStepId: string
-  body: string
-} & CreatedFields
