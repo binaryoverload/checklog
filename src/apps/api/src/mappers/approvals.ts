@@ -1,12 +1,26 @@
+import { sortBy } from "es-toolkit"
+
 import type { ApprovalDecision, ApprovalRequest } from "@/util/types.ts"
 import type { ApprovalDecisionDto, ApprovalRequestDto } from "@checklog/shared/api"
 
-export function toApprovalRequestDto(_row: ApprovalRequest): ApprovalRequestDto {
-  // TODO (person): list each field explicitly, never ...row
-  throw new Error("toApprovalRequestDto isn't written yet")
+export function toApprovalRequestDto(request: ApprovalRequest, decisions: ApprovalDecision[]): ApprovalRequestDto {
+  return {
+    id: request.id,
+    runStepId: request.runStepId,
+    status: request.status,
+    decisions: sortBy(decisions, ["createdAt", "id"]).map(toApprovalDecisionDto),
+    createdAt: request.createdAt.toISOString(),
+    createdBy: request.createdBy,
+    updatedAt: request.updatedAt.toISOString(),
+  }
 }
 
-export function toApprovalDecisionDto(_row: ApprovalDecision): ApprovalDecisionDto {
-  // TODO (person): list each field explicitly, never ...row
-  throw new Error("toApprovalDecisionDto isn't written yet")
+export function toApprovalDecisionDto(decision: ApprovalDecision): ApprovalDecisionDto {
+  return {
+    id: decision.id,
+    decision: decision.decision,
+    comment: decision.comment,
+    createdAt: decision.createdAt.toISOString(),
+    createdBy: decision.createdBy,
+  }
 }

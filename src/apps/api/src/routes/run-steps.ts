@@ -7,7 +7,7 @@ import { HttpError } from "@/http/errors.ts"
 import { route } from "@/http/route.ts"
 import { toRunWithDetailsDto, toStepNoteDto } from "@/mappers/runs.ts"
 import { assertAssigneeValid } from "@/services/assignees.ts"
-import { assertNoPendingHaltBefore, completeRunIfResolved, loadRunRows, requireRunStep } from "@/services/runs.ts"
+import { assertNoPendingHaltBefore, completeRunIfResolved, createReachedApprovalRequests, loadRunRows, requireRunStep } from "@/services/runs.ts"
 import { buildConflictUpdateColumns } from "@/util/db.ts"
 import { addStepNoteBodySchema, reassignStepBodySchema, setStepValuesBodySchema, skipStepBodySchema } from "@checklog/shared/api"
 import type { ApiErrorDetail } from "@checklog/shared/api"
@@ -104,6 +104,7 @@ runStepsRouter.post("/:runId/steps/:stepId/complete", route({
     }).where(eq(runSteps.id, step.id))
 
     const updatedRun = await completeRunIfResolved(tx, run)
+    await createReachedApprovalRequests(tx, updatedRun, member.userId)
 
     return await loadRunRows(tx, updatedRun, templateId)
   })
@@ -131,6 +132,7 @@ runStepsRouter.post("/:runId/steps/:stepId/skip", route({
     }).where(eq(runSteps.id, step.id))
 
     const updatedRun = await completeRunIfResolved(tx, run)
+    await createReachedApprovalRequests(tx, updatedRun, member.userId)
 
     return await loadRunRows(tx, updatedRun, templateId)
   })

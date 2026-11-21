@@ -6,6 +6,7 @@ import type { Organization, Run, RunStep } from "@/util/types.ts"
 import type { RunWithDetailsDto, StepNoteDto } from "@checklog/shared/api"
 import type { FieldOptions } from "@checklog/shared/domain"
 import { typeIdForTable } from "@checklog/shared/utils"
+import { approvalRequestsOf, insertApprovalRequest } from "@test/support/approvals.ts"
 import { createGroup, createMember, createOrganization, expectCreationKept, grant } from "@test/support/database.ts"
 import { api, expectError, expectStatus } from "@test/support/http.ts"
 import {
@@ -518,6 +519,47 @@ describe("POST /api/runs/:runId/steps/:stepId/complete", () => {
     expect(await storedRunStep(step.id)).toEqual(step)
   })
 
+  test("creates a pending approval request for the next approval step once every earlier step is resolved", async () => {
+    const { organization, member } = await signedInMember("owner")
+    const { run, runSteps: [first, approval] } = await runWithSteps(organization, [{}, { kind: "approval", assigneeType: "member", assigneeMemberId: member.id }])
+
+    expectStatus(await completeStep(run, first!), 200)
+
+    expect(await approvalRequestsOf(approval!)).toMatchObject([{ status: "pending", organizationId: organization.id }])
+    expect(await approvalRequestsOf(first!)).toEqual([])
+  })
+
+  test("doesn't create an approval request while an earlier step is still pending", async () => {
+    const { organization, member } = await signedInMember("owner")
+    const { run, runSteps: [first, , approval] } = await runWithSteps(organization, [
+      {},
+      {},
+      { kind: "approval", assigneeType: "member", assigneeMemberId: member.id },
+    ])
+
+    expectStatus(await completeStep(run, first!), 200)
+
+    expect(await approvalRequestsOf(approval!)).toEqual([])
+  })
+
+  test("keeps an approval step's existing request as it was when a later step is completed", async () => {
+    const { organization, member } = await signedInMember("owner")
+    const { version, templateSteps: [first, approval, last] } = await publishedTemplate(organization, [
+      {},
+      { kind: "approval", assigneeType: "member", assigneeMemberId: member.id },
+      {},
+    ])
+    const run = await insertRun(version)
+    await insertRunStep(run, first!, { status: "completed", completedAt: new Date(), completedBy: "user_someone_else" })
+    const approvalStep = await insertRunStep(run, approval!)
+    const lastStep = await insertRunStep(run, last!)
+    const request = await insertApprovalRequest(approvalStep, { status: "rejected" })
+
+    expectStatus(await completeStep(run, lastStep), 200)
+
+    expect(await approvalRequestsOf(approvalStep)).toEqual([request])
+  })
+
   test("keeps who started the run and created the step, and when", async () => {
     const { organization } = await signedInMember("owner")
     const { run, runSteps: [step] } = await runWithSteps(organization, [{}])
@@ -561,6 +603,23 @@ describe("POST /api/runs/:runId/steps/:stepId/skip", () => {
 
     expect(response.body).toMatchObject({ status: "completed" })
     expect((await storedRun(run.id))!.status).toBe("completed")
+  })
+
+  test("creates a pending approval request for the next approval step once every earlier step is resolved, counting skipped steps", async () => {
+    const { organization, member } = await signedInMember("owner")
+    const { version, templateSteps: [first, second, approval] } = await publishedTemplate(organization, [
+      {},
+      { skippable: true },
+      { kind: "approval", assigneeType: "member", assigneeMemberId: member.id },
+    ])
+    const run = await insertRun(version)
+    await insertRunStep(run, first!, { status: "completed", completedAt: new Date(), completedBy: "user_someone_else" })
+    const skipped = await insertRunStep(run, second!)
+    const approvalStep = await insertRunStep(run, approval!)
+
+    expectStatus(await skipStep(run, skipped), 200)
+
+    expect(await approvalRequestsOf(approvalStep)).toMatchObject([{ status: "pending", organizationId: organization.id }])
   })
 
   test("refuses a step that isn't skippable with conflict and changes nothing", async () => {

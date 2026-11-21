@@ -130,13 +130,15 @@ Helpers the run routes share, each its own small pull request or part of the fir
 - [x] API: skip a skippable step with a reason, blocked by a pending halt step like completing (person)
 - [x] API: add notes to a step, including on completed and cancelled runs (person)
 - [x] API: reassign a step, and complete the run when every step is resolved; completed and cancelled runs refuse step actions with `conflict` (person)
-- [ ] API: cancel a run (person)
+- [x] API: cancel a run (person)
 - [ ] UI: run list with the start column, run page with steps, fields, notes, skip and complete; the start time in the run's zone, due dates with the run's zone alongside when it differs, and times rendered on the client only (person)
 
 ### Approvals
 
-- [ ] API: create an approval request when an approval step is reached, as an upsert on `run_step_id`; the approver is the step's current assignee (person)
-- [ ] API: approve or reject, with a comment required on rejection; the request's status follows the latest decision, a rejection keeps the step open and an approval resolves it (person)
+- [x] API: create an approval request when an approval step is reached (every earlier step completed or skipped), as an upsert on `run_step_id`; the approver is the step's current assignee (person)
+- [x] API: approve or reject, with a comment required on rejection; the request's status follows the latest decision, a rejection keeps the step open and an approval resolves it (person)
+- [ ] API: include each approval step's request and its decisions on the run step DTO, so the run page has the request ID to decide on (person)
+- [ ] API: list approval requests awaiting me (person)
 - [ ] UI: "awaiting my approval" list and the approve or reject dialog (person)
 
 ### Schedules

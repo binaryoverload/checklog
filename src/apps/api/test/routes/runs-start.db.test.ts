@@ -5,6 +5,7 @@ import { db } from "@/db/index.ts"
 import { templates, templateVersions } from "@/db/schema.ts"
 import type { RunWithDetailsDto } from "@checklog/shared/api"
 import { typeIdForTable } from "@checklog/shared/utils"
+import { approvalRequestsOf } from "@test/support/approvals.ts"
 import {
   addToGroup,
   createGroup,
@@ -365,6 +366,39 @@ describe("POST /api/runs", () => {
       const { template } = await publishedTemplate(organization, [{}, {}])
 
       expectStatus(await startRun({ templateId: template.id }), 200)
+    })
+  })
+
+  describe("approval requests", () => {
+    test("creates a pending approval request for an approval step at the start of the run", async () => {
+      const { organization, member } = await signedInMember("owner")
+      const { template, templateSteps: [approval] } = await publishedTemplate(organization, [
+        { kind: "approval", assigneeType: "member", assigneeMemberId: member.id },
+        {},
+      ])
+
+      expectStatus(await startRun({ templateId: template.id }), 200)
+
+      const [run] = await runsOf(template)
+      const steps = await stepsOfRun(run!)
+      const approvalStep = steps.find(step => step.templateStepId === approval!.id)!
+      const taskStep = steps.find(step => step.templateStepId !== approval!.id)!
+      expect(await approvalRequestsOf(approvalStep)).toMatchObject([{ status: "pending", organizationId: organization.id }])
+      expect(await approvalRequestsOf(taskStep)).toEqual([])
+    })
+
+    test("doesn't create a request for an approval step after an unresolved step", async () => {
+      const { organization, member } = await signedInMember("owner")
+      const { template } = await publishedTemplate(organization, [
+        {},
+        { kind: "approval", assigneeType: "member", assigneeMemberId: member.id },
+      ])
+
+      expectStatus(await startRun({ templateId: template.id }), 200)
+
+      const [run] = await runsOf(template)
+      const steps = await stepsOfRun(run!)
+      for (const step of steps) expect(await approvalRequestsOf(step)).toEqual([])
     })
   })
 })

@@ -3,7 +3,7 @@ import type { IANAZone } from "luxon"
 
 import { canActOnStep, getMemberTeamIds, templateAccessLevel, visibleRunsWhere } from "@/core/permissions.ts"
 import { members, teams } from "@/db/auth-schema.ts"
-import { runFieldValues, runs, runSteps, stepNotes, templateFields, templateSteps, templateVersions } from "@/db/schema.ts"
+import { approvalRequests, runFieldValues, runs, runSteps, stepNotes, templateFields, templateSteps, templateVersions } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import type { RunRows } from "@/mappers/runs.ts"
 import type { Database, Run, Template, TemplateStep, UserContext } from "@/util/types.ts"
@@ -154,6 +154,8 @@ export async function startRun(tx: Database, data: { template: Template, created
     })))
   }
 
+  await createReachedApprovalRequests(tx, run, data.createdBy)
+
   return run
 }
 
@@ -211,4 +213,18 @@ export async function assertNoPendingHaltBefore(tx: Database, run: Run, template
     fieldId: null,
     message: "A halt step before this one isn't done",
   })))
+}
+
+export async function createReachedApprovalRequests(tx: Database, run: Run, createdBy: string) {
+  const steps = await tx.select({ step: runSteps, templateStep: templateSteps }).from(runSteps)
+    .innerJoin(templateSteps, eq(templateSteps.id, runSteps.templateStepId))
+    .orderBy(templateSteps.position)
+    .where(eq(runSteps.runId, run.id))
+
+  const next = steps.find(({ step }) => step.status === "pending")
+  if (next?.templateStep.kind !== "approval") return
+
+  await tx.insert(approvalRequests)
+    .values({ organizationId: run.organizationId, runStepId: next.step.id, createdBy })
+    .onConflictDoNothing({ target: [approvalRequests.organizationId, approvalRequests.runStepId] })
 }
