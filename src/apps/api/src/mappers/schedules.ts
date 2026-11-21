@@ -1,4 +1,4 @@
-import { RRule } from "rrule"
+import { RRuleTemporal } from "rrule-temporal"
 
 import { rruleToRecurrence } from "@/util/rrule.ts"
 import type { Schedule } from "@/util/types.ts"
@@ -9,7 +9,7 @@ export function toScheduleDto(row: Schedule): ScheduleDto {
     id: row.id,
     templateId: row.templateId,
     status: row.status,
-    recurrence: rruleToRecurrence(RRule.fromString(row.rrule)),
+    recurrence: rruleToRecurrence(new RRuleTemporal({ rruleString: row.rrule })),
     timezone: row.timezone,
     nextRunAt: row.nextRunAt?.toISOString() ?? null,
     runNamePattern: row.runNamePattern,

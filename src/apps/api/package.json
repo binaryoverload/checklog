@@ -30,7 +30,8 @@
     "nodemailer": "catalog:",
     "pg": "catalog:",
     "pg-boss": "catalog:",
-    "rrule": "catalog:",
+    "rrule-temporal": "catalog:",
+    "temporal-polyfill": "catalog:",
     "typeid-js": "catalog:",
     "winston": "catalog:",
     "zod": "catalog:"

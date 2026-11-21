@@ -1,6 +1,6 @@
 import { asc, eq } from "drizzle-orm"
 import { DateTime } from "luxon"
-import { rrulestr } from "rrule"
+import { RRuleTemporal } from "rrule-temporal"
 import type request from "supertest"
 import { describe, expect, test } from "vitest"
 
@@ -26,7 +26,7 @@ const editSchedule = (scheduleId: string, body: object) => api().patch(`/api/sch
 const changeStatus = (scheduleId: string, action: string) => api().post(`/api/schedules/${scheduleId}/${action}`)
 
 // The recurrence insertSchedule's default rule stands for: daily at 09:00 in London, from 1 January 2099
-const daily: ScheduleRecurrence = { frequency: "daily", startDate: "2099-01-01", time: "09:00" }
+const daily: ScheduleRecurrence = { frequency: "daily", interval: 1, startDate: "2099-01-01", time: "09:00" }
 const dailyFirstRun = "2099-01-01T09:00:00.000Z"
 
 const validBody = (templateId: string, overrides: object = {}) => ({ templateId, recurrence: daily, timezone: "Europe/London", runNamePattern: "{template}", ...overrides })
@@ -178,9 +178,9 @@ describe("POST /api/schedules", () => {
     expectStatus(await createSchedule(validBody(template.id)), 200)
 
     const [stored] = await schedulesOf(template)
-    const rule = rrulestr(stored!.rrule)
-    expect(rule.toString()).toContain("FREQ=DAILY")
-    expect(rule.options.tzid).toBe("Europe/London")
+    const rule = new RRuleTemporal({ rruleString: stored!.rrule }).options()
+    expect(rule.freq).toBe("DAILY")
+    expect(rule.tzid).toBe("Europe/London")
   })
 
   test.each<[string, ScheduleRecurrence]>([
@@ -192,8 +192,8 @@ describe("POST /api/schedules", () => {
       time: "07:30",
       endDate: "2099-12-31",
     }],
-    ["monthly with a count", { frequency: "monthly", count: 6, startDate: "2099-01-15", time: "18:00" }],
-    ["yearly in chosen months", { frequency: "yearly", months: [3, 9], startDate: "2099-01-01", time: "12:00" }],
+    ["monthly with a count", { frequency: "monthly", interval: 1, count: 6, startDate: "2099-01-15", time: "18:00" }],
+    ["yearly in chosen months", { frequency: "yearly", interval: 1, months: [3, 9], startDate: "2099-01-01", time: "12:00" }],
   ])("returns the recurrence it was given: %s", async (_description, recurrence) => {
     const { organization } = await signedInMember("owner")
     const template = await templateFor(organization)
@@ -202,6 +202,15 @@ describe("POST /api/schedules", () => {
 
     expectStatus(response, 200)
     expect((response.body as ScheduleDto).recurrence).toEqual(recurrence)
+  })
+
+  test("fills in an interval of 1 when the recurrence has none", async () => {
+    const { organization } = await signedInMember("owner")
+    const template = await templateFor(organization)
+    const response = await createSchedule(validBody(template.id, { recurrence: { ...daily, interval: undefined } }))
+
+    expectStatus(response, 200)
+    expect((response.body as ScheduleDto).recurrence.interval).toBe(1)
   })
 
   test.each([
@@ -224,7 +233,7 @@ describe("POST /api/schedules", () => {
     const firstMonday = start.plus({ days: (8 - start.weekday) % 7 })
 
     const response = await createSchedule(validBody(template.id, {
-      recurrence: { frequency: "weekly", weekdays: ["monday"], startDate: "2099-01-01", time: "09:00" },
+      recurrence: { frequency: "weekly", interval: 1, weekdays: ["monday"], startDate: "2099-01-01", time: "09:00" },
     }))
 
     expect(timeOf((response.body as ScheduleDto).nextRunAt)).toBe(instant(firstMonday.toISODate()!, "09:00", "Europe/London"))
@@ -252,18 +261,20 @@ describe("POST /api/schedules", () => {
     expect((response.body as ScheduleDto).nextRunAt).toBeNull()
   })
 
-  test("names runs after the template when no run name pattern is given", async () => {
+  test("names runs after the template, date and time when no run name pattern is given", async () => {
     const { organization } = await signedInMember("owner")
     const template = await templateFor(organization)
+
     const response = await createSchedule({ ...validBody(template.id), runNamePattern: undefined })
 
     expectStatus(response, 200)
-    expect((response.body as ScheduleDto).runNamePattern).toBe("{template}")
+    expect((response.body as ScheduleDto).runNamePattern).toBe("{template} - {date} {time}")
   })
 
   test.each([
     "{template}",
     "{template} {date}",
+    "{template} at {time}",
     "Week {week} checks",
     "Fridge check",
   ])("accepts the run name pattern %j", async (runNamePattern) => {
@@ -363,7 +374,7 @@ describe("PATCH /api/schedules/:scheduleId", () => {
     const { organization } = await signedInMember("owner")
     const template = await templateFor(organization)
     const schedule = await insertSchedule(db, template, "active", { nextRunAt: new Date(dailyFirstRun) })
-    const recurrence: ScheduleRecurrence = { frequency: "daily", startDate: "2099-07-01", time: "06:45" }
+    const recurrence: ScheduleRecurrence = { frequency: "daily", interval: 1, startDate: "2099-07-01", time: "06:45" }
 
     const response = await editSchedule(schedule.id, { recurrence })
 
@@ -398,6 +409,18 @@ describe("PATCH /api/schedules/:scheduleId", () => {
 
     expectStatus(response, 200)
     expect((await storedSchedule(schedule.id))!.runNamePattern).toBe("{template}, {date}")
+  })
+
+  test("clears the next run when the new recurrence has no occurrences left", async () => {
+    const { organization } = await signedInMember("owner")
+    const template = await templateFor(organization)
+    const schedule = await insertSchedule(db, template, "active", { nextRunAt: new Date(dailyFirstRun) })
+
+    const response = await editSchedule(schedule.id, { recurrence: { ...daily, startDate: "2020-01-01", count: 3 } })
+
+    expectStatus(response, 200)
+    expect(response.body).toMatchObject({ status: "active", nextRunAt: null })
+    expect((await storedSchedule(schedule.id))!.nextRunAt).toBeNull()
   })
 
   test("keeps a paused schedule paused, with no next run", async () => {

@@ -1,47 +1,67 @@
-import rrule from "rrule"
-import type { ByWeekday } from "rrule"
+import { allowedWeekdays, RRuleTemporal } from "rrule-temporal"
+import type { Freq, Weekday } from "rrule-temporal"
+import { Temporal } from "temporal-polyfill"
 
 import type { ScheduleRecurrence } from "@checklog/shared/domain"
-import { filterUndefined, jsDateToUTCISODate, jsDateToUTCISOTime, toArray } from "@checklog/shared/utils"
+import { toArray } from "@checklog/shared/utils"
 
 const weekdayNames = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const
 
-function weekdayIndex(day: ByWeekday): number {
-  if (typeof day === "number") return day
-  if (typeof day === "string") return rrule.Weekday.fromStr(day).weekday
-  return day.weekday
+function toRRuleWeekday(day: typeof weekdayNames[number]): Weekday {
+  return allowedWeekdays[weekdayNames.indexOf(day)]!
 }
 
-export function recurrenceToRRule(recurrence: ScheduleRecurrence, timezone: string): rrule.RRule {
-  const startDate = recurrence.startDate.split("-").map(Number) as [number, number, number]
-  const startTime = recurrence.time.split(":").map(Number) as [number, number]
+function fromRRuleWeekday(day: Weekday): typeof weekdayNames[number] {
+  return weekdayNames[allowedWeekdays.indexOf(day)]!
+}
 
-  const endDate = recurrence.endDate ? recurrence.endDate.split("-").map(Number) as [number, number, number] : undefined
+export function recurrenceToRRule(recurrence: ScheduleRecurrence, timezone: string): RRuleTemporal {
+  const [startYear, startMonth, startDay] = recurrence.startDate.split("-").map(Number) as [number, number, number]
+  const [hour, minute] = recurrence.time.split(":").map(Number) as [number, number]
+  const endDate = recurrence.endDate?.split("-").map(Number) as [number, number, number] | undefined
 
-  // Filter undefined because a undefined set value can cause unwanted behavior in RRule
-  return new rrule.RRule(filterUndefined({
-    freq: rrule.Frequency[recurrence.frequency.toUpperCase() as keyof typeof rrule.Frequency],
+  return new RRuleTemporal({
+    freq: recurrence.frequency.toUpperCase() as Freq,
     interval: recurrence.interval,
     count: recurrence.count,
-    dtstart: rrule.datetime(startDate[0], startDate[1], startDate[2], startTime[0], startTime[1]),
-    until: endDate ? rrule.datetime(endDate[0], endDate[1], endDate[2], 23, 59, 59) : undefined,
-    byweekday: recurrence.weekdays?.map(day => weekdayNames.indexOf(day)),
-    bymonth: recurrence.months,
+    dtstart: Temporal.ZonedDateTime.from({
+      year: startYear,
+      month: startMonth,
+      day: startDay,
+      hour,
+      minute,
+      timeZone: timezone,
+    }),
+    until: endDate
+      ? Temporal.ZonedDateTime.from({
+          year: endDate[0],
+          month: endDate[1],
+          day: endDate[2],
+          hour: 23,
+          minute: 59,
+          second: 59,
+          timeZone: timezone,
+        })
+      : undefined,
+    byDay: recurrence.weekdays?.map(toRRuleWeekday),
+    byMonth: recurrence.months,
     tzid: timezone,
-  }))
+  })
 }
 
-export function rruleToRecurrence({ options, origOptions }: rrule.RRule): ScheduleRecurrence {
-  const weekdays = toArray(origOptions.byweekday)?.map(day => weekdayNames[weekdayIndex(day)]!)
+export function rruleToRecurrence(rrule: RRuleTemporal): ScheduleRecurrence {
+  const options = rrule.options()
+
+  const weekdays = toArray(options.byDay)?.map(w => fromRRuleWeekday(w as Weekday))
 
   return {
-    frequency: rrule.Frequency[options.freq].toLowerCase() as ScheduleRecurrence["frequency"],
-    interval: origOptions.interval ?? undefined,
-    count: origOptions.count ?? undefined,
-    startDate: jsDateToUTCISODate(options.dtstart),
-    time: jsDateToUTCISOTime(options.dtstart, { includeSeconds: false }),
-    endDate: options.until ? jsDateToUTCISODate(options.until) : undefined,
+    frequency: options.freq.toLowerCase() as ScheduleRecurrence["frequency"],
+    interval: options.interval ?? 1,
+    count: options.count ?? undefined,
+    startDate: options.dtstart.toPlainDate().toString(),
+    time: options.dtstart.toPlainTime().toString({ smallestUnit: "minute" }),
+    endDate: options.until ? options.until.toPlainDate().toString() : undefined,
     weekdays: weekdays,
-    months: toArray(origOptions.bymonth),
+    months: options.byMonth?.map(Number),
   }
 }
