@@ -92,11 +92,11 @@ export function templateAccessLevelSql(context: UserContext): SQL<TemplateAccess
 /**
  * Returns SQL conditions for steps assigned to the member, their teams or roles.
  */
-function stepAssignedToQueries(context: UserContext) {
+export function stepAssignedToQueries(context: UserContext) {
   return {
-    member: eq(runSteps.assigneeMemberId, context.member.id),
-    teams: inArray(runSteps.assigneeTeamId, memberTeamIdsQuery(db, context)),
-    roles: inArray(runSteps.assigneeRole, memberRoles(context.member)),
+    member: and(eq(runSteps.assigneeType, "member"), eq(runSteps.assigneeMemberId, context.member.id))!,
+    teams: and(eq(runSteps.assigneeType, "team"), inArray(runSteps.assigneeTeamId, memberTeamIdsQuery(db, context)))!,
+    roles: and(eq(runSteps.assigneeType, "role"), inArray(runSteps.assigneeRole, memberRoles(context.member)))!,
   }
 }
 

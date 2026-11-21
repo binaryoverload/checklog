@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest"
 
 import { db } from "@/db/index.ts"
 import type { Member, Organization } from "@/util/types.ts"
-import type { RunWithDetailsDto } from "@checklog/shared/api"
+import type { ApprovalRequestDetailDto, PageResult, RunWithDetailsDto } from "@checklog/shared/api"
 import { typeIdForTable } from "@checklog/shared/utils"
 import { approvalRequestsOf, decisionsOf, insertApprovalDecision, insertApprovalRequest, storedApprovalRequest } from "@test/support/approvals.ts"
 import { createGroup, createMember, createOrganization, expectCreationKept, grant } from "@test/support/database.ts"
@@ -323,5 +323,211 @@ describe("POST /api/approvals/:approvalId/decisions", () => {
       expectError(await decide(request.id, approve), 401, "unauthorized")
       expect(await storedRunStep(step.id)).toEqual(step)
     })
+  })
+})
+
+describe("GET /api/approvals", () => {
+  const listApprovals = (query: Record<string, string | number> = {}) => api().get("/api/approvals").query(query)
+
+  const idsOf = (response: { body: PageResult<ApprovalRequestDetailDto> }) => response.body.items.map(item => item.id)
+
+  test("returns a page of the requests the member can decide, with their run, step and decisions", async () => {
+    const { organization, member } = await signedInMember("viewer")
+    const { run, step, request } = await pendingApproval(organization, assignedTo(member), { run: { name: "Monday checks" }, request: { status: "rejected" } })
+    await insertApprovalDecision(request, "rejected", "The pressure readings are missing")
+
+    const response = await listApprovals()
+
+    expectStatus(response, 200)
+    const body = response.body as PageResult<ApprovalRequestDetailDto>
+    expect(body).toMatchObject({ total: 1, page: 1, limit: 100 })
+    expect(body.items).toHaveLength(1)
+    const [item] = body.items
+    expect(item).toMatchObject({
+      id: request.id,
+      runStepId: step.id,
+      status: "rejected",
+      run: { id: run.id, name: "Monday checks" },
+      step: { id: step.id, title: "Step 1" },
+    })
+    expect(item!.decisions).toMatchObject([{ decision: "rejected", comment: "The pressure readings are missing" }])
+    expect(item).not.toHaveProperty("organizationId")
+  })
+
+  test("lists requests on steps assigned to a group the member is in, or to one of their roles", async () => {
+    const { organization, member } = await signedInMember("viewer")
+    const teamId = await createGroup(db, organization, [member])
+    const { request: byGroup } = await pendingApproval(organization, { assigneeType: "team", assigneeTeamId: teamId })
+    const { request: byRole } = await pendingApproval(organization, { assigneeType: "role", assigneeRole: "viewer" })
+
+    expect(idsOf(await listApprovals()).sort()).toEqual([byGroup.id, byRole.id].sort())
+  })
+
+  test("leaves out requests on steps assigned to someone else, even for an owner with access to the template", async () => {
+    const { organization } = await signedInMember("owner")
+    const other = await createMember(db, organization, "viewer")
+    await pendingApproval(organization, assignedTo(other.member))
+    await pendingApproval(organization, { assigneeType: "role", assigneeRole: "editor" })
+
+    expect(idsOf(await listApprovals())).toEqual([])
+  })
+
+  test.each([
+    ["member", { assigneeType: "member" as const, assigneeMemberId: null }],
+    ["group", { assigneeType: "team" as const, assigneeTeamId: null }],
+  ])("leaves out a request whose assigned %s has been removed", async (_kind, assignee) => {
+    const { organization } = await signedInMember("owner")
+    await pendingApproval(organization, assignee)
+
+    expect(idsOf(await listApprovals())).toEqual([])
+  })
+
+  // An approved request, on a step the approval resolved
+  async function approvedApproval(organization: Organization, member: Member) {
+    const { version, templateSteps: [approvalTemplateStep] } = await publishedTemplate(organization, [{ kind: "approval", ...assignedTo(member) }])
+    const run = await insertRun(version)
+    const step = await insertRunStep(run, approvalTemplateStep!, { status: "completed", completedAt: new Date(), completedBy: member.userId })
+    return insertApprovalRequest(step, { status: "approved" })
+  }
+
+  test("lists pending and rejected requests, but not approved ones", async () => {
+    const { organization, member } = await signedInMember("viewer")
+    const { request: pending } = await pendingApproval(organization, assignedTo(member))
+    const { request: rejected } = await pendingApproval(organization, assignedTo(member), { request: { status: "rejected" } })
+    await approvedApproval(organization, member)
+
+    expect(idsOf(await listApprovals()).sort()).toEqual([pending.id, rejected.id].sort())
+  })
+
+  test("lists the same requests for status=pending as with no status", async () => {
+    const { organization, member } = await signedInMember("viewer")
+    const { request: pending } = await pendingApproval(organization, assignedTo(member))
+    const { request: rejected } = await pendingApproval(organization, assignedTo(member), { request: { status: "rejected" } })
+    await approvedApproval(organization, member)
+    await pendingApproval(organization, assignedTo(member), { run: { status: "cancelled" } })
+
+    expect(idsOf(await listApprovals({ status: "pending" })).sort()).toEqual([pending.id, rejected.id].sort())
+  })
+
+  test("lists approved requests and requests on completed and cancelled runs for status=all", async () => {
+    const { organization, member } = await signedInMember("viewer")
+    const { request: pending } = await pendingApproval(organization, assignedTo(member))
+    const { request: rejected } = await pendingApproval(organization, assignedTo(member), { request: { status: "rejected" } })
+    const approved = await approvedApproval(organization, member)
+    const { request: onCompleted } = await pendingApproval(organization, assignedTo(member), { run: { status: "completed", completedAt: new Date() } })
+    const { request: onCancelled } = await pendingApproval(organization, assignedTo(member), { run: { status: "cancelled" } })
+
+    const response = await listApprovals({ status: "all" })
+
+    expectStatus(response, 200)
+    expect(idsOf(response).sort()).toEqual([pending.id, rejected.id, approved.id, onCompleted.id, onCancelled.id].sort())
+    expect(response.body).toMatchObject({ total: 5 })
+  })
+
+  test("still leaves out requests on steps assigned to someone else, and other organizations' requests, for status=all", async () => {
+    const { organization } = await signedInMember("owner")
+    const other = await createMember(db, organization, "viewer")
+    await approvedApproval(organization, other.member)
+    await pendingApproval(organization, { assigneeType: "role", assigneeRole: "editor" })
+    await pendingApproval(await createOrganization(db), { assigneeType: "role", assigneeRole: "owner" })
+
+    expect(idsOf(await listApprovals({ status: "all" }))).toEqual([])
+  })
+
+  test.each([
+    ["completed", { status: "completed" as const, completedAt: new Date() }],
+    ["cancelled", { status: "cancelled" as const }],
+  ])("leaves out requests on a %s run", async (_status, values) => {
+    const { organization, member } = await signedInMember("viewer")
+    await pendingApproval(organization, assignedTo(member), { run: values })
+
+    expect(idsOf(await listApprovals())).toEqual([])
+  })
+
+  test("leaves out another organization's requests", async () => {
+    await pendingApproval(await createOrganization(db), { assigneeType: "role", assigneeRole: "owner" })
+    await signedInMember("owner")
+
+    expect(idsOf(await listApprovals())).toEqual([])
+  })
+
+  test("returns the requests oldest first, in pages", async () => {
+    const { organization, member } = await signedInMember("viewer")
+    // Created out of order, so the order can only come from createdAt
+    const { request: newest } = await pendingApproval(organization, assignedTo(member), { request: { createdAt: new Date("2026-11-03T09:00:00Z") } })
+    const { request: oldest } = await pendingApproval(organization, assignedTo(member), { request: { createdAt: new Date("2026-11-01T09:00:00Z") } })
+    const { request: middle } = await pendingApproval(organization, assignedTo(member), { request: { createdAt: new Date("2026-11-02T09:00:00Z") } })
+
+    const firstPage = await listApprovals({ page: 1, limit: 2 })
+    const secondPage = await listApprovals({ page: 2, limit: 2 })
+
+    expect(firstPage.body).toMatchObject({ total: 3, page: 1, limit: 2 })
+    expect(idsOf(firstPage)).toEqual([oldest.id, middle.id])
+    expect(secondPage.body).toMatchObject({ total: 3, page: 2, limit: 2 })
+    expect(idsOf(secondPage)).toEqual([newest.id])
+  })
+
+  // Created out of order, so the order can only come from createdAt
+  async function threeRequests(organization: Organization, member: Member) {
+    const { request: newest } = await pendingApproval(organization, assignedTo(member), { request: { createdAt: new Date("2026-11-03T09:00:00Z") } })
+    const { request: oldest } = await pendingApproval(organization, assignedTo(member), { request: { createdAt: new Date("2026-11-01T09:00:00Z") } })
+    const { request: middle } = await pendingApproval(organization, assignedTo(member), { request: { createdAt: new Date("2026-11-02T09:00:00Z") } })
+    return { oldest, middle, newest }
+  }
+
+  test("returns the requests oldest first for order=asc", async () => {
+    const { organization, member } = await signedInMember("viewer")
+    const { oldest, middle, newest } = await threeRequests(organization, member)
+
+    expect(idsOf(await listApprovals({ order: "asc" }))).toEqual([oldest.id, middle.id, newest.id])
+  })
+
+  test("returns the requests newest first for order=desc, in pages", async () => {
+    const { organization, member } = await signedInMember("viewer")
+    const { oldest, middle, newest } = await threeRequests(organization, member)
+
+    const firstPage = await listApprovals({ order: "desc", page: 1, limit: 2 })
+    const secondPage = await listApprovals({ order: "desc", page: 2, limit: 2 })
+
+    expect(firstPage.body).toMatchObject({ total: 3, page: 1, limit: 2 })
+    expect(idsOf(firstPage)).toEqual([newest.id, middle.id])
+    expect(idsOf(secondPage)).toEqual([oldest.id])
+  })
+
+  test("breaks ties on the request ID, in the same direction as the order", async () => {
+    const { organization, member } = await signedInMember("viewer")
+    const createdAt = new Date("2026-11-01T09:00:00Z")
+    const ids = []
+    for (let i = 0; i < 3; i++) ids.push((await pendingApproval(organization, assignedTo(member), { request: { createdAt } })).request.id)
+    const ascending = [...ids].sort()
+
+    expect(idsOf(await listApprovals({ order: "asc" }))).toEqual(ascending)
+    expect(idsOf(await listApprovals({ order: "desc" }))).toEqual([...ascending].reverse())
+  })
+
+  test("returns an empty page past the end, with the total", async () => {
+    const { organization, member } = await signedInMember("viewer")
+    await pendingApproval(organization, assignedTo(member))
+
+    const response = await listApprovals({ page: 3, limit: 2 })
+
+    expectStatus(response, 200)
+    expect(response.body).toEqual({ items: [], total: 1, page: 3, limit: 2 })
+  })
+
+  test.each([
+    ["a limit of 0", { limit: 0 }],
+    ["a page of 0", { page: 0 }],
+    ["a page that isn't a whole number", { page: 1.5 }],
+    ["a status that isn't pending or all", { status: "approved" }],
+    ["an order that isn't asc or desc", { order: "newest" }],
+  ])("refuses %s with validation_failed", async (_description, query) => {
+    await signedInMember("owner")
+
+    expectError(await listApprovals(query), 400, "validation_failed")
+  })
+
+  test("refuses a signed-out request with unauthorized", async () => {
+    expectError(await listApprovals(), 401, "unauthorized")
   })
 })

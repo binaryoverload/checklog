@@ -1,5 +1,5 @@
-import type { SQL } from "drizzle-orm"
-import { DrizzleQueryError, getTableColumns, sql } from "drizzle-orm"
+import type { AnyColumn, SQL, SQLWrapper } from "drizzle-orm"
+import { asc, desc, DrizzleQueryError, getTableColumns, sql } from "drizzle-orm"
 import type { PgTable } from "drizzle-orm/pg-core"
 import { DatabaseError } from "pg"
 
@@ -45,4 +45,9 @@ export function buildConflictUpdateColumns<
     acc[column] = sql`excluded.${sql.identifier(colName)}`
     return acc
   }, {} as Record<Q, SQL>)
+}
+
+export function buildOrderBy(order: "asc" | "desc", columns: (AnyColumn | SQLWrapper)[]): SQL[] {
+  const direction = order === "asc" ? asc : desc
+  return columns.map(column => direction(column))
 }
