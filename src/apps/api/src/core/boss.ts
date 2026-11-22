@@ -20,8 +20,9 @@ export function createBoss(role: Role): PgBoss {
 
   const boss = new PgBoss({
     connectionString: config.DATABASE_URL,
-    application_name: `checklog-${role}`,
-
+    instanceName: `checklog-${role}`,
+    persistWarnings: true,
+    warningRetentionDays: 60,
     ...options[role],
   })
   boss.on("error", error => logger.error("pg-boss error", error))
