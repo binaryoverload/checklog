@@ -145,7 +145,8 @@ Helpers the run routes share, each its own small pull request or part of the fir
 
 - [x] API: list, create, edit, pause, resume, archive and restore a template's schedules under `/schedules` (RRULE with `rrule-temporal`, and time zone), and calculate `next_run_at`; resume only from paused, archived schedules can't be edited, and restoring brings one back paused (person)
 - [x] pg-boss in the API (sending jobs only) and the worker (processing, maintenance and cron), and the read-only pg-boss dashboard at `/api/admin/jobs` for platform admins (person)
-- [ ] Job: pg-boss recurring job that starts due runs and advances `next_run_at`; a run that fails the start check is skipped and the people who can edit the template are notified (person)
+- [x] Job: a pg-boss tick every minute that claims due schedules, queues a `schedule-run` job for each in the same transaction, and advances `next_run_at` (person)
+- [ ] Job: `schedule-run` starts the run with the system actor and the name from the pattern; a run that fails the start check is skipped and the people who can edit the template are notified (person)
 - [ ] UI: schedule settings on a template (person)
 
 ### Notifications
