@@ -43,6 +43,9 @@ catalog:
   nuxt: ^4.6.3
   pg: ^8.23.1
   pg-boss: ^12.38.0
+  # Must pair with pg-boss's schema version: 1.12.x and 1.13.x pair with 12.38.x
+  "@pg-boss/dashboard": 1.13.0
+  "@hono/node-server": 2.1.6
   tailwindcss: ^4.3.3
   supertest: ^7.3.1
   tsdown: ^0.23.4

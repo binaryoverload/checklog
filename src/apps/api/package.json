@@ -21,6 +21,8 @@
   "dependencies": {
     "@better-auth/drizzle-adapter": "catalog:",
     "@checklog/shared": "workspace:*",
+    "@hono/node-server": "catalog:",
+    "@pg-boss/dashboard": "catalog:",
     "better-auth": "catalog:",
     "cors": "catalog:",
     "drizzle-orm": "catalog:",

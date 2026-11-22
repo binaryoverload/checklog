@@ -6,6 +6,8 @@ import { auth } from "@/core/auth.ts"
 import { config } from "@/core/config.ts"
 import { pool } from "@/db/index.ts"
 import { errorHandler, notFound } from "@/http/error-handling.ts"
+import { platformAdminGuard } from "@/http/middlewares.ts"
+import { pgBossDashboardListener, pgBossDashboardPath } from "@/http/pg-boss-dashboard.ts"
 import { requestLogging } from "@/http/request-logging.ts"
 import { apiRouter } from "@/routes/index.ts"
 
@@ -38,8 +40,12 @@ export function createApp() {
 
   app.all("/api/auth/*splat", toNodeHandler(auth))
 
-  app.use(express.json())
+  app.use([pgBossDashboardPath, `${pgBossDashboardPath}.data`], platformAdminGuard, (req, res) => {
+    req.url = req.originalUrl // Express strips the mount path; the handler needs it
+    pgBossDashboardListener(req, res)
+  })
 
+  app.use(express.json())
   app.use(apiRouter())
 
   // Last, so they catch whatever the routes above didn't handle
