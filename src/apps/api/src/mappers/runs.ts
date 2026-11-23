@@ -27,6 +27,7 @@ export function toRunDto(row: Run, templateId: string): RunDto {
     templateId,
     templateVersionId: row.templateVersionId,
     scheduleId: row.scheduleId,
+    scheduledFor: row.scheduledFor?.toISOString() ?? null,
     name: row.name,
     status: row.status,
     timezone: row.timezone,

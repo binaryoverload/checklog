@@ -163,6 +163,7 @@ export const runs = pgTable("runs", {
   organizationId: text("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
   templateVersionId: text("template_version_id").notNull(),
   scheduleId: text("schedule_id"),
+  scheduledFor: timestampWithTimezone("scheduled_for"),
   name: text("name").notNull(),
   timezone: text("timezone").notNull(),
   status: text("status", { enum: runStatuses }).notNull().default("in_progress"),
@@ -172,6 +173,7 @@ export const runs = pgTable("runs", {
 }, t => [
   unique().on(t.organizationId, t.id),
   unique().on(t.organizationId, t.id, t.templateVersionId),
+  unique().on(t.scheduleId, t.scheduledFor),
   index("runs_organization_status_idx").on(t.organizationId, t.status),
   index("runs_template_version_idx").on(t.templateVersionId),
   index("runs_schedule_idx").on(t.scheduleId),

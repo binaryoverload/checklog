@@ -50,6 +50,13 @@
       "when": 1793998310950,
       "tag": "0006_timezone_modifications",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795394944843,
+      "tag": "0007_scheduled_for",
+      "breakpoints": true
     }
   ]
 }

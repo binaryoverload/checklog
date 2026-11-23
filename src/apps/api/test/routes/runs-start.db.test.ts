@@ -43,6 +43,7 @@ describe("POST /api/runs", () => {
     expect(body).toMatchObject({
       templateVersionId: version.id,
       scheduleId: null,
+      scheduledFor: null,
       name: template.name,
       timezone: "Europe/London",
       status: "in_progress",

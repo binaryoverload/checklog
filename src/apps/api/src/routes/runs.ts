@@ -68,7 +68,14 @@ runsRouter.post("/", route({ body: createRunBodySchema }, async ({ body, member,
     const startIssues = await runStartIssues(tx, template)
     if (startIssues.length) throw new HttpError("precondition_failed", "Run cannot be started", startIssues)
 
-    const run = await startRun(tx, { template, name: body.name, createdBy: member.userId, timezone, scheduleId: null })
+    const run = await startRun(tx, {
+      template,
+      name: body.name,
+      createdBy: member.userId,
+      timezone,
+      scheduleId: null,
+      scheduledFor: null,
+    })
 
     return await loadRunRows(tx, run, template.id)
   })

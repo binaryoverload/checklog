@@ -129,7 +129,16 @@ export async function runStartIssues(tx: Database, template: Template): Promise<
   return issues
 }
 
-export async function startRun(tx: Database, data: { template: Template, createdBy: string, timezone: IANAZone<true>, name?: string, scheduleId: string | null }) {
+interface StartRunData {
+  template: Template
+  createdBy: string
+  timezone: IANAZone<true>
+  name?: string
+  scheduleId: string | null
+  scheduledFor: Date | null
+}
+
+export async function startRun(tx: Database, data: StartRunData) {
   const { template, timezone } = data
 
   if (!template.currentVersionId) throw new HttpError("internal", "No current version")
@@ -138,6 +147,7 @@ export async function startRun(tx: Database, data: { template: Template, created
     organizationId: template.organizationId,
     templateVersionId: template.currentVersionId,
     scheduleId: data.scheduleId,
+    scheduledFor: data.scheduledFor,
     name: data.name ?? template.name,
     timezone: timezone.name,
     status: "in_progress",

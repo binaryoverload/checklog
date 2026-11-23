@@ -4,7 +4,7 @@ import { RRuleTemporal } from "rrule-temporal"
 
 import { assertTemplateAccessLevel } from "@/core/permissions.ts"
 import { db } from "@/db/index.ts"
-import { schedules } from "@/db/schema.ts"
+import { schedules, templates } from "@/db/schema.ts"
 import { HttpError } from "@/http/errors.ts"
 import { route } from "@/http/route.ts"
 import { toScheduleDto } from "@/mappers/schedules.ts"
@@ -66,8 +66,8 @@ schedulesRouter.patch("/:scheduleId", route({
     const schedule = await lockSchedule(tx, { member, organization }, params.scheduleId)
 
     await assertTemplateAccessLevel(tx, { member, organization }, schedule.templateId, "edit")
-    await lockTemplate(tx, { member, organization }, schedule.templateId)
-
+    const [template] = await tx.select({ status: templates.status }).from(templates).where(eq(templates.id, schedule.templateId))
+    if (template?.status === "archived") throw new HttpError("conflict", "Template is archived")
     if (schedule.status === "archived") throw new HttpError("conflict", "Cannot update archived schedule")
 
     // If either the recurrence or the timezone change we need to compute a new rrule
@@ -187,7 +187,8 @@ schedulesRouter.post("/:scheduleId/restore", route({
     const schedule = await lockSchedule(tx, { member, organization }, params.scheduleId)
 
     await assertTemplateAccessLevel(tx, { member, organization }, schedule.templateId, "edit")
-    await lockTemplate(tx, { member, organization }, schedule.templateId)
+    const [template] = await tx.select({ status: templates.status }).from(templates).where(eq(templates.id, schedule.templateId))
+    if (template?.status === "archived") throw new HttpError("conflict", "Template is archived")
 
     if (schedule.status !== "archived") throw new HttpError("conflict", "Cannot unarchive non-archived schedule")
 

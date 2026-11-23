@@ -41,6 +41,7 @@ UI screens are written by a person under the [AI use policy](../AGENTS.md); agen
 - [x] Development seed: `pnpm db:seed` creates sign-in accounts and an organization through Better Auth (agent)
 - [x] Seed groups and templates, split into modules: published, draft-only and archived templates and versions, every field type and assignee kind, and access grants (agent)
 - [x] Seed runs once `startRun` exists: in-progress, completed and cancelled runs with values and notes, and approved, rejected and pending approvals (agent)
+- [x] Seed schedules: active, paused and archived, with two per organization due straight away so the worker's tick has something to queue (agent)
 - [x] The permission function: one place that answers "can this user do this in this organization", from the member's role and `template_access`, in `core/permissions.ts` (person)
 - [ ] **Shared API contracts:** request schemas (Zod) and response types (plain TypeScript, `Dto` suffix) in the shared package's `api` entry point, filled by mappers in the API
   - [x] Restructure `packages/shared` into the `api`, `domain`, `auth` and `utils` entry points: split `enums.ts` and the area files between `api/` and `domain/`, switch to subpath exports with no root entry, update every import and the tsdown `alwaysBundle` pattern (agent, behaviour-neutral refactor)
@@ -146,7 +147,8 @@ Helpers the run routes share, each its own small pull request or part of the fir
 - [x] API: list, create, edit, pause, resume, archive and restore a template's schedules under `/schedules` (RRULE with `rrule-temporal`, and time zone), and calculate `next_run_at`; resume only from paused, archived schedules can't be edited, and restoring brings one back paused (person)
 - [x] pg-boss in the API (sending jobs only) and the worker (processing, maintenance and cron), and the read-only pg-boss dashboard at `/api/admin/jobs` for platform admins (person)
 - [x] Job: a pg-boss tick every minute that claims due schedules, queues a `schedule-run` job for each in the same transaction, and advances `next_run_at` (person)
-- [ ] Job: `schedule-run` starts the run with the system actor and the name from the pattern; a run that fails the start check is skipped and the people who can edit the template are notified (person)
+- [x] Job: `schedule-run` starts the run with the system actor and the name from the pattern, recording the occurrence in `runs.scheduled_for` so a retry can't start it twice; a paused or archived schedule, or a template that fails the start check, is skipped (person)
+- [ ] Notify the people who can edit the template when a scheduled run is skipped by the start check, once notifications exist (person)
 - [ ] UI: schedule settings on a template (person)
 
 ### Notifications

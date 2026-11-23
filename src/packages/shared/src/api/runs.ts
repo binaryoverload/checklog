@@ -26,6 +26,7 @@ export type RunDto = {
   templateId: string
   templateVersionId: string
   scheduleId: string | null
+  scheduledFor: string | null
   name: string
   timezone: string
   status: RunStatus

@@ -1,0 +1,2 @@
+ALTER TABLE "runs" ADD COLUMN "scheduled_for" timestamp (3) with time zone;--> statement-breakpoint
+ALTER TABLE "runs" ADD CONSTRAINT "runs_schedule_id_scheduled_for_unique" UNIQUE("schedule_id","scheduled_for");

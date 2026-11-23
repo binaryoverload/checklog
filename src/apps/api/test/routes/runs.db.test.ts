@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest"
 
 import { db } from "@/db/index.ts"
 import type { PageResult, RunDto, RunWithDetailsDto } from "@checklog/shared/api"
+import { systemScheduleActor } from "@checklog/shared/auth"
 import { insertApprovalDecision, insertApprovalRequest } from "@test/support/approvals.ts"
 import {
   addToGroup,
@@ -10,6 +11,7 @@ import {
   createOrganization,
   expectCreationKept,
   grant,
+  insertSchedule,
 } from "@test/support/database.ts"
 import { api, expectError, expectStatus } from "@test/support/http.ts"
 import {
@@ -55,6 +57,25 @@ describe("GET /api/runs/:runId", () => {
     expect(body).not.toHaveProperty("organizationId")
     expect(body.steps.map(step => step.templateStep.title)).toEqual(["First", "Second", "Third"])
     expect(body.steps[0]).not.toHaveProperty("organizationId")
+  })
+
+  test("returns the schedule and occurrence a scheduled run was started for", async () => {
+    const { organization } = await signedInMember("owner")
+    const { template, version } = await publishedTemplate(organization, [{}])
+    const schedule = await insertSchedule(db, template, "active")
+    const scheduledFor = new Date("2026-11-23T09:00:00.000Z")
+    const run = await insertRun(version, { scheduleId: schedule.id, scheduledFor, createdBy: systemScheduleActor })
+
+    const body = (await getRun(run.id)).body as RunWithDetailsDto
+
+    expect(body).toMatchObject({ scheduleId: schedule.id, scheduledFor: "2026-11-23T09:00:00.000Z", createdBy: systemScheduleActor })
+  })
+
+  test("returns no schedule or occurrence for a run started by hand", async () => {
+    const { organization } = await signedInMember("owner")
+    const { run } = await runWithSteps(organization, [{}])
+
+    expect((await getRun(run.id)).body).toMatchObject({ scheduleId: null, scheduledFor: null })
   })
 
   test("returns each step's template step settings", async () => {

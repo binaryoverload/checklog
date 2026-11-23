@@ -172,7 +172,14 @@ async function insertRun(tx: Transaction, definition: SeedRun, organization: See
     .where(and(eq(templates.organizationId, organization.id), eq(templates.name, definition.template)))
   if (!template?.currentVersionId) throw new Error(`Seed run ${definition.name} needs the published template ${definition.template}`)
 
-  const started = await startRun(tx, { template, createdBy: memberOf(definition.startedBy), timezone, name: definition.name, scheduleId: null })
+  const started = await startRun(tx, {
+    template,
+    createdBy: memberOf(definition.startedBy),
+    timezone,
+    name: definition.name,
+    scheduleId: null,
+    scheduledFor: null,
+  })
 
   // Backdate the run, and work its due dates out again from the new start
   const startedAt = new Date(Date.now() - (definition.startedDaysAgo === 0 ? hours(3) : definition.startedDaysAgo * hours(24)))

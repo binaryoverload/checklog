@@ -24,3 +24,8 @@ export function canonicalTimezone(zone: string): string {
   const canonical = Intl.DateTimeFormat("en", { timeZone: zone }).resolvedOptions().timeZone
   return canonical
 }
+
+export function getValidTimezone(zone: string): IANAZone<true> {
+  if (!isValidTimezone(zone)) throw new Error("Invalid timezone")
+  return new IANAZone(zone) as IANAZone<true>
+}
