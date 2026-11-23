@@ -8,11 +8,13 @@ const id = route.params.id as string
 const templateQuery = useTemplateQuery(() => id)
 const template = computed(() => templateQuery.data?.value)
 
+useHead({ title: "Edit Template" })
+
 </script>
 
 <template>
   <div v-if="template">
-    <UBreadcrumb class="mb-8" :items="[{ label: 'Templates', to: '/templates' }, { label: template.name ?? 'Edit' }]" />
+    <UBreadcrumb class="mb-8" :items="[{ label: 'Templates', to: '/templates' }, { label: template.name ?? 'Template', to: `/templates/${id}` }, { label: 'Edit' }]" />
     <UPageHeader
       :title="template.name"
       :description="template.description ?? undefined"

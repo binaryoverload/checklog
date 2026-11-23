@@ -57,12 +57,11 @@ function restoreTemplate() {
           <span>{{ template.name }}</span><UBadge v-if="archived" color="warning" label="Archived" />
         </template>
       </UPageHeader>
-      <div v-if="canRun || canEdit" class="flex gap-2 mb-4">
+      <div class="flex gap-2 mb-4">
         <UButton
-          v-if="canEdit && !archived"
-          label="Edit"
+          label="View"
           color="neutral"
-          :to="`/templates/${template.id}/edit`"
+          :to="`/templates/${template.id}`"
           @click="emit('close')"
         />
         <UButton

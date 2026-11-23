@@ -3,18 +3,22 @@ import type { NavigationMenuItem } from "@nuxt/ui"
 
 const route = useRoute()
 
-const main: NavigationMenuItem[] = [
-  { label: "Home", icon: "i-lucide-house", to: "/" },
-  { label: "Runs", icon: "i-lucide-list-checks", to: "/runs" },
-  { label: "Templates", icon: "i-lucide-file-stack", to: "/templates" },
-  { label: "Approvals", icon: "i-lucide-badge-check", to: "/approvals" },
-  { label: "Notifications", icon: "i-lucide-bell", to: "/notifications" },
-]
+function isInSection(path: string) {
+  return route.path === path || route.path.startsWith(`${path}/`)
+}
 
-const organization: NavigationMenuItem[] = [
-  { label: "Members", icon: "i-lucide-users", to: "/members" },
-  { label: "Groups", icon: "i-lucide-users-round", to: "/groups" },
-]
+const main = computed<NavigationMenuItem[]>(() => ([
+  { label: "Home", icon: "i-lucide-house", to: "/" },
+  { label: "Runs", icon: "i-lucide-list-checks", to: "/runs", active: isInSection("/runs") },
+  { label: "Templates", icon: "i-lucide-file-stack", to: "/templates", active: isInSection("/templates") },
+  { label: "Approvals", icon: "i-lucide-badge-check", to: "/approvals", active: isInSection("/approvals") },
+  { label: "Notifications", icon: "i-lucide-bell", to: "/notifications", active: isInSection("/notifications") },
+]))
+
+const organization = computed<NavigationMenuItem[]>(() => ([
+  { label: "Members", icon: "i-lucide-users", to: "/members", active: isInSection("/members") },
+  { label: "Groups", icon: "i-lucide-users-round", to: "/groups", active: isInSection("/groups") },
+]))
 
 const activeOrganization = useActiveOrganization()
 
