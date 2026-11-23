@@ -21,30 +21,51 @@ export interface ScheduleRunData {
 export async function queueDueSchedules(boss: PgBoss) {
   try {
     const scheduleIds = await db.transaction(async (tx) => {
+      const now = new Date()
+
       const schedulesToSchedule = await tx.select().from(schedules)
         .where(and(
           eq(schedules.status, "active"),
-          lte(schedules.nextRunAt, new Date()),
+          lte(schedules.nextRunAt, now),
         ))
         .for("update", { skipLocked: true })
 
+      const queued: string[] = []
       for (const schedule of schedulesToSchedule) {
+        let occurrence: Date, nextRunAt: Date | null
+        try {
+          const rule = new RRuleTemporal({ rruleString: schedule.rrule })
+
+          // We get the latest occurrence so that downtime only triggers the latest missed run
+          const latest = rule.previous(now, true)
+          occurrence = latest ? new Date(latest.epochMilliseconds) : schedule.nextRunAt!
+
+          const next = rule.next(now)
+          nextRunAt = next ? new Date(next.epochMilliseconds) : null
+        } catch (error) {
+          logger.error("Couldn't work out a schedule's next run", {
+            scheduleId: schedule.id,
+            error: error instanceof Error ? error.stack : String(error),
+          })
+          continue
+        }
+
         await boss.send({
           name: "schedule-run",
           data: {
             scheduleId: schedule.id,
-            occurrence: schedule.nextRunAt!.toISOString(),
+            occurrence: occurrence.toISOString(),
           },
           options: {
             db: bossDb(tx),
           },
         })
-        const next = new RRuleTemporal({ rruleString: schedule.rrule }).next(new Date())
-        const nextRunAt = next ? new Date(next.epochMilliseconds) : null
+
         await tx.update(schedules).set({ nextRunAt }).where(eq(schedules.id, schedule.id))
+        queued.push(schedule.id)
       }
 
-      return schedulesToSchedule.map(s => s.id)
+      return queued
     })
     if (scheduleIds.length) logger.info("Queued scheduled runs", { scheduleIds })
     return { scheduleIds }

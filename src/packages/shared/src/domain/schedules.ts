@@ -14,7 +14,7 @@ export const timezoneSchema = z.string()
 export const scheduleRecurrenceSchema = z.object({
   frequency: z.enum(["yearly", "monthly", "weekly", "daily", "hourly"]),
   interval: z.number().int().min(1).default(1),
-  count: z.number().int().min(1).optional(),
+  count: z.number().int().min(1).max(1000).optional(),
   startDate: z.iso.date(),
   time: z.iso.time({ precision: -1 }),
   endDate: z.iso.date().optional(),

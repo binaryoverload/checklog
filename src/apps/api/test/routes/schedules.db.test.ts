@@ -251,6 +251,16 @@ describe("POST /api/schedules", () => {
     expect(timeOf((response.body as ScheduleDto).nextRunAt)).toBe(expected.toMillis())
   })
 
+  test.each(["hourly", "daily", "weekly", "monthly"] as const)("works out the next run of a %s schedule with the largest count", async (frequency) => {
+    const { organization } = await signedInMember("owner")
+    const template = await templateFor(organization)
+
+    const response = await createSchedule(validBody(template.id, { recurrence: { ...daily, frequency, count: 1000 } }))
+
+    expectStatus(response, 200)
+    expect(timeOf((response.body as ScheduleDto).nextRunAt)).toBe(timeOf(dailyFirstRun))
+  })
+
   test("leaves no next run when every occurrence has passed", async () => {
     const { organization } = await signedInMember("owner")
     const template = await templateFor(organization)
@@ -296,6 +306,7 @@ describe("POST /api/schedules", () => {
   test.each([
     ["no recurrence", { recurrence: undefined }],
     ["a recurrence with both a count and an end date", { recurrence: { ...daily, count: 3, endDate: "2099-02-01" } }],
+    ["a count over 1000", { recurrence: { ...daily, count: 1001 } }],
     ["a time with seconds", { recurrence: { ...daily, time: "09:00:00" } }],
     ["an unknown frequency", { recurrence: { ...daily, frequency: "fortnightly" } }],
     ["a fixed-offset time zone", { timezone: "+01:00" }],
@@ -455,6 +466,7 @@ describe("PATCH /api/schedules/:scheduleId", () => {
 
   test.each([
     ["a recurrence with both a count and an end date", { recurrence: { ...daily, count: 3, endDate: "2099-02-01" } }],
+    ["a count over 1000", { recurrence: { ...daily, count: 1001 } }],
     ["a fixed-offset time zone", { timezone: "+01:00" }],
     ["an unknown placeholder in the run name pattern", { runNamePattern: "{template} {wek}" }],
     ["a change of template", { templateId: typeIdForTable("templates").toString() }],

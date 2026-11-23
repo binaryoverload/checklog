@@ -29,6 +29,8 @@ afterAll(async () => {
 
 // Every hour on the hour in London, since 2020, so there's always a next run within the hour
 const hourly = "DTSTART;TZID=Europe/London:20200101T000000\nRRULE:FREQ=HOURLY"
+// Finished: 09:00 on 1, 2 and 3 January 2020, so its last occurrence doesn't depend on when the test runs
+const finished = "DTSTART;TZID=Europe/London:20200101T090000\nRRULE:FREQ=DAILY;COUNT=3"
 const nextHour = () => DateTime.now().setZone("Europe/London").startOf("hour").plus({ hours: 1 }).toMillis()
 const anHourAgo = () => new Date(Date.now() - 60 * 60 * 1000)
 
@@ -48,8 +50,8 @@ async function templateIn(organization: Organization): Promise<Template> {
 describe("queueDueSchedules", () => {
   test("queues a run for a due schedule, for the occurrence it was due at", async () => {
     const template = await templateIn(await createOrganization(db))
-    const dueAt = anHourAgo()
-    const schedule = await insertSchedule(db, template, "active", { rrule: hourly, nextRunAt: dueAt })
+    const dueAt = new Date("2020-01-03T09:00:00.000Z")
+    const schedule = await insertSchedule(db, template, "active", { rrule: finished, nextRunAt: dueAt })
 
     const { scheduleIds } = await queueDueSchedules(boss)
 
@@ -76,9 +78,17 @@ describe("queueDueSchedules", () => {
     expect((await storedSchedule(schedule.id)).nextRunAt?.getTime()).toBe(nextHour())
   })
 
+  test("uses the most recent missed occurrence, not the first one missed", async () => {
+    const template = await templateIn(await createOrganization(db))
+    const schedule = await insertSchedule(db, template, "active", { rrule: finished, nextRunAt: new Date("2020-01-01T09:00:00.000Z") })
+
+    await queueDueSchedules(boss)
+
+    expect((await queuedRuns(schedule.id)).map(job => job.data.occurrence)).toEqual(["2020-01-03T09:00:00.000Z"])
+  })
+
   test("clears the next run of a schedule with no occurrences left", async () => {
     const template = await templateIn(await createOrganization(db))
-    const finished = "DTSTART;TZID=Europe/London:20200101T090000\nRRULE:FREQ=DAILY;COUNT=3"
     const schedule = await insertSchedule(db, template, "active", { rrule: finished, nextRunAt: anHourAgo() })
 
     await queueDueSchedules(boss)
@@ -128,6 +138,30 @@ describe("queueDueSchedules", () => {
     await Promise.all([queueDueSchedules(boss), queueDueSchedules(boss)])
 
     expect(await queuedRuns(schedule.id)).toHaveLength(1)
+  })
+
+  test("leaves a schedule whose next run can't be worked out as it was, and still queues the others", async () => {
+    const template = await templateIn(await createOrganization(db))
+    const dueAt = new Date("2020-01-03T09:00:00.000Z")
+    // More occurrences than rrule-temporal will step through, so working out its next run throws
+    const unworkable = "DTSTART;TZID=Europe/London:20200101T000000\nRRULE:FREQ=HOURLY;COUNT=100000"
+    const before = await insertSchedule(db, template, "active", { rrule: finished, nextRunAt: dueAt })
+    const bad = await insertSchedule(db, template, "active", { rrule: unworkable, nextRunAt: dueAt })
+    const after = await insertSchedule(db, template, "active", { rrule: finished, nextRunAt: dueAt })
+
+    try {
+      const { scheduleIds } = await queueDueSchedules(boss)
+
+      expect(scheduleIds).toEqual(expect.arrayContaining([before.id, after.id]))
+      expect(scheduleIds).not.toContain(bad.id)
+      expect(await queuedRuns(before.id)).toHaveLength(1)
+      expect(await queuedRuns(after.id)).toHaveLength(1)
+      expect(await queuedRuns(bad.id)).toEqual([])
+      expect((await storedSchedule(bad.id)).nextRunAt).toEqual(dueAt)
+    } finally {
+      // The tick looks at every schedule, so don't leave this one due for the other tests
+      await db.delete(schedules).where(eq(schedules.id, bad.id))
+    }
   })
 })
 
