@@ -11,6 +11,8 @@
     "start": "node dist/index.mjs",
     "start:worker": "node dist/worker.mjs",
     "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:migrate:dev": "pnpm db:migrate && pnpm db:seed",
     "db:seed": "tsx --import dotenv/config src/seed/index.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
