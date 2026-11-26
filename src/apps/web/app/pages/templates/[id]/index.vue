@@ -17,7 +17,11 @@ const template = computed(() => templateQuery.data?.value)
       :title="template.name"
       :description="template.description ?? undefined"
       :ui="{ title: 'flex items-center gap-2' }"
-    />
+    >
+      <template #title>
+        {{ template.name  }} <VersionTags :template="template" /> <TemplateAccessLevelBadge :access-level="template.accessLevel"/>
+      </template>
+    </UPageHeader>
     <UTabs
       variant="link"
       :content="false"
