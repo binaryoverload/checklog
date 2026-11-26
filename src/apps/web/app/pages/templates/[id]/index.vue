@@ -12,7 +12,7 @@ const template = computed(() => templateQuery.data?.value)
 
 <template>
   <div v-if="template">
-    <UBreadcrumb class="mb-8" :items="[{ label: 'Templates', to: '/templates' }, { label: template.name ?? 'Edit' }]" />
+    <UBreadcrumb class="mb-8" :items="[{ label: 'Templates', to: '/templates' }, { label: template.name ?? 'Template' }]" />
     <UPageHeader
       :title="template.name"
       :description="template.description ?? undefined"
