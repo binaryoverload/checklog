@@ -11,6 +11,7 @@ import { useTemplatesQuery } from "~/queries/templates.ts"
 definePageMeta({ title: "Templates" })
 
 const VersionTags = resolveComponent("VersionTags")
+const TemplateAccessLevelBadge = resolveComponent("TemplateAccessLevelBadge")
 const UserDisplay = resolveComponent("UserDisplay")
 const NuxtTime = resolveComponent("NuxtTime")
 
@@ -30,6 +31,10 @@ const columns: TableColumn<TemplateListItemDto>[] = [
     cell: ({ row }) => {
       return h(VersionTags, { template: row.original })
     },
+  },
+  {
+    header: "Access",
+    cell: ({ row }) => h(TemplateAccessLevelBadge, { accessLevel: row.original.accessLevel }),
   },
   {
     header: "Steps",

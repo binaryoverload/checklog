@@ -3,6 +3,7 @@ import type { TemplateAccessLevel } from "@checklog/shared/domain"
 
 defineProps<{
   accessLevel: TemplateAccessLevel
+  size?: "sm" | "md" | "lg"
 }>()
 
 const levels = {
@@ -13,5 +14,5 @@ const levels = {
 </script>
 
 <template>
-  <UBadge v-bind="levels[accessLevel]" variant="subtle" />
+  <UBadge v-bind="levels[accessLevel]" variant="subtle" :size="size ?? 'md'" />
 </template>

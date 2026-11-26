@@ -1,5 +1,11 @@
 <script setup lang="ts">
-defineProps<{ template: { currentVersion: { version: number } | null, draftVersion: { version: number } | null } }>()
+defineProps<{
+  template: {
+    currentVersion: { version: number } | null
+    draftVersion: { version: number } | null
+  }
+  size?: "sm" | "md" | "lg"
+}>()
 </script>
 
 <template>
@@ -8,12 +14,14 @@ defineProps<{ template: { currentVersion: { version: number } | null, draftVersi
       v-if="template.currentVersion"
       color="success"
       variant="subtle"
+      :size="size ?? 'md'"
       :label="`v${template.currentVersion.version}`"
     />
     <UBadge
       v-if="template.draftVersion"
       color="warning"
       variant="outline"
+      :size="size ?? 'md'"
       :label="`v${template.draftVersion.version} draft`"
     />
   </div>

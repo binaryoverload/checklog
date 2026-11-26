@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useTemplateQuery } from "~/queries/templates.ts"
 
+definePageMeta({ title: "Template" })
+
 const route = useRoute()
 
 const id = route.params.id as string
@@ -14,12 +16,24 @@ const template = computed(() => templateQuery.data?.value)
   <div v-if="template">
     <UBreadcrumb class="mb-8" :items="[{ label: 'Templates', to: '/templates' }, { label: template.name ?? 'Template' }]" />
     <UPageHeader
-      :title="template.name"
       :description="template.description ?? undefined"
       :ui="{ title: 'flex items-center gap-2' }"
     >
       <template #title>
-        {{ template.name  }} <VersionTags :template="template" /> <TemplateAccessLevelBadge :access-level="template.accessLevel"/>
+        <span class="flex items-center">
+          {{ template.name }}
+          <span class="flex gap-2 ml-4">
+            <UBadge
+              v-if="template.status === 'archived'"
+              label="Archived"
+              color="neutral"
+              variant="outline"
+              size="lg"
+            />
+            <VersionTags :template="template" size="lg" />
+            <TemplateAccessLevelBadge :access-level="template.accessLevel" size="lg" />
+          </span>
+        </span>
       </template>
     </UPageHeader>
     <UTabs

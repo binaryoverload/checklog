@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { useTemplateQuery } from "~/queries/templates.ts"
 
+definePageMeta({ title: "Edit Template" })
+
 const route = useRoute()
 
 const id = route.params.id as string
 
 const templateQuery = useTemplateQuery(() => id)
 const template = computed(() => templateQuery.data?.value)
-
-useHead({ title: "Edit Template" })
 
 </script>
 
